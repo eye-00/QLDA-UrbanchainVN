@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CITIZEN
+  BUSINESS
+  RECEPTION_OFFICER
+  COMMUNE_OFFICER
+  LAND_REGISTRY_OFFICER
+  APPROVAL_AUTHORITY
+  ADMIN
+}
+
+enum RegistrationStatus {
+  MOI_TAO
+  CHO_TIEP_NHAN
+  CAN_BO_SUNG
+  DA_TIEP_NHAN
+  CHO_XAC_NHAN_CAP_XA
+  DA_XAC_NHAN_CAP_XA
+  DANG_THAM_DINH_VPDKDD
+  CHO_THUE
+  CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH
+  CHO_KY_CAP
+  DA_KY_CAP
+  DA_CAP
+  DA_TRA_KET_QUA
+  TU_CHOI
+}
+
+enum TransferStatus {
+  MOI_TAO_BIEN_DONG
+  CHO_TIEP_NHAN
+  CAN_BO_SUNG
+  DA_TIEP_NHAN
+  DANG_KIEM_TRA_DIEU_KIEN
+  DA_CHUYEN_THUE
+  CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH
+  DANG_CAP_NHAT_BIEN_DONG
+  DA_DANG_KY_BIEN_DONG
+  DA_TRA_KET_QUA
+  TU_CHOI
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  fullName       String
+  role           UserRole
+  identityNumber String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  registrations  Registration[]
+}
+
+model Registration {
+  id             String             @id @default(cuid())
+  code           String             @unique
+  applicantId    String
+  landCode       String?
+  parcelNumber   String
+  mapSheetNumber String
+  area           Decimal            @db.Decimal(10,2)
+  landUsePurpose String
+  address        String
+  status         RegistrationStatus @default(MOI_TAO)
+  ipfsCid        String?
+  documentHash   String?
+  tokenId        Int?
+  txHash         String?
+  applicant      User               @relation(fields: [applicantId], references: [id])
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  files          FileAsset[]
+}
+
+model TransferRequest {
+  id           String         @id @default(cuid())
+  code         String         @unique
+  landCode     String
+  fromUserId   String?
+  toUserRef    String
+  status       TransferStatus @default(MOI_TAO_BIEN_DONG)
+  supportingCid String?
+  supportingHash String?
+  txHash       String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model FileAsset {
+  id             String   @id @default(cuid())
+  ownerType      String
+  ownerId        String
+  documentType   String
+  originalName   String
+  storageStatus  String
+  cid            String?
+  hash           String?
+  registrationId String?
+  registration   Registration? @relation(fields: [registrationId], references: [id])
+  createdAt      DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  payload    Json?
+  createdAt  DateTime @default(now())
+}

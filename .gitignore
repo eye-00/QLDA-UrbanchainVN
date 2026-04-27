@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+.DS_Store
+.turbo/
+backend/prisma/dev.db
+backend/generated/
+frontend/.vite/
+contracts/cache/
+contracts/artifacts/
+contracts/typechain-types/

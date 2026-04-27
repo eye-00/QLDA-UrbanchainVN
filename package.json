@@ -1,0 +1,35 @@
+{
+  "name": "urbanchain-vn",
+  "private": true,
+  "workspaces": [
+    "contracts",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "infra:up": "docker compose up -d mysql ipfs",
+    "infra:down": "docker compose down",
+    "db:generate": "npm --workspace backend run prisma:generate",
+    "db:push": "npm --workspace backend exec prisma db push",
+    "db:migrate": "npm --workspace backend run prisma:migrate",
+    "db:seed": "npm --workspace backend run prisma:seed",
+    "dev:contracts": "npm --workspace contracts run node",
+    "dev:backend": "npm --workspace backend run dev",
+    "dev:frontend": "npm --workspace frontend run dev",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "eslint \"backend/src/**/*.ts\" \"backend/test/**/*.ts\" \"backend/prisma/**/*.ts\"",
+    "lint:frontend": "eslint \"frontend/src/**/*.{ts,tsx}\" \"frontend/test/**/*.ts\"",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "build": "npm run build -w contracts && npm run build -w backend && npm run build -w frontend",
+    "test": "npm run test -w contracts && npm run test -w backend && npm run test -w frontend"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.46.2",
+    "@typescript-eslint/parser": "^8.46.2",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "prettier": "^3.6.2"
+  }
+}
