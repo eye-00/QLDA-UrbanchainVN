@@ -137,6 +137,9 @@ Tạo tài khoản người dùng.
   "status": "ACTIVE"
 }
 ```
+### Quy tắc bắt buộc
+- Public register chỉ cho `CITIZEN` hoặc `BUSINESS`.
+- Request cố gắng tạo role nội bộ (`ADMIN`, officer roles) phải trả `403`.
 
 ## 4.2. POST /auth/login
 Đăng nhập hệ thống.
@@ -162,14 +165,180 @@ Tạo tài khoản người dùng.
 }
 ```
 
-## 4.3. GET /auth/me
+## 4.3. POST /auth/refresh
+Làm mới phiên đăng nhập bằng refresh token.
+
+### Request
+```json
+{
+  "refreshToken": "refresh-token"
+}
+```
+
+### Response data
+```json
+{
+  "accessToken": "jwt-token",
+  "refreshToken": "refresh-token-rotated",
+  "user": {
+    "userId": "usr_001",
+    "fullName": "Nguyen Van A",
+    "role": "CITIZEN"
+  }
+}
+```
+
+## 4.4. POST /auth/logout
+Thu hồi session hiện tại (hoặc toàn bộ session của user nếu không truyền `refreshToken`).
+
+### Request
+```json
+{
+  "refreshToken": "refresh-token-rotated"
+}
+```
+
+## 4.5. POST /auth/password/reset-request
+Yêu cầu tạo reset token.
+
+### Request
+```json
+{
+  "email": "a@example.com"
+}
+```
+
+## 4.6. POST /auth/password/reset-confirm
+Xác nhận đổi mật khẩu bằng reset token.
+
+### Request
+```json
+{
+  "email": "a@example.com",
+  "token": "reset-token",
+  "newPassword": "NewStrongPassword@123"
+}
+```
+
+## 4.7. POST /auth/change-password
+Đổi mật khẩu khi user đã đăng nhập.
+
+### Request
+```json
+{
+  "currentPassword": "StrongPassword@123",
+  "newPassword": "NewStrongPassword@123"
+}
+```
+
+## 4.8. GET /auth/me
 Lấy hồ sơ người dùng hiện tại.
+
+## 4.9. Quy tắc đăng nhập tài khoản bị khoá
+- User có `status = LOCKED` không được đăng nhập.
+- API trả mã `400` với error envelope chuẩn.
+- Hệ thống hỗ trợ auto-lock theo số lần đăng nhập sai vượt ngưỡng.
 
 ---
 
-## 5. File APIs
+## 5. User & Organization APIs (Sprint 2)
 
-## 5.1. POST /files/upload
+> Nhóm API này chỉ dành cho vai trò `ADMIN`.
+
+## 5.1. GET /users
+Danh sách user có hỗ trợ tìm kiếm/lọc.
+
+### Query params
+- `keyword`
+- `role`
+- `organizationId`
+- `status`
+- `page`
+- `pageSize`
+
+## 5.2. POST /users
+Tạo user bởi admin.
+
+### Request
+```json
+{
+  "fullName": "Can bo tiep nhan moi",
+  "email": "new-officer@urbanchain.vn",
+  "password": "StrongPassword@123",
+  "role": "RECEPTION_OFFICER",
+  "organizationId": "org_001"
+}
+```
+
+## 5.3. PATCH /users/:id
+Cập nhật thông tin user.
+
+## 5.4. PATCH /users/:id/status
+Khoá/mở khoá user.
+
+### Request
+```json
+{
+  "status": "LOCKED"
+}
+```
+
+## 5.5. GET /organizations
+Danh sách đơn vị xử lý.
+
+### Query params
+- `keyword`
+- `includeInactive`
+
+## 5.6. POST /organizations
+Tạo đơn vị.
+
+## 5.7. PATCH /organizations/:id
+Cập nhật đơn vị.
+
+## 5.8. DELETE /organizations/:id
+Xoá mềm đơn vị (`isActive = false`).
+
+---
+
+## 6. Land Parcel APIs (Sprint 2)
+
+> Vai trò truy cập: officer/admin (`RECEPTION_OFFICER`, `COMMUNE_OFFICER`, `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`, `ADMIN`).
+
+## 6.1. GET /lands
+Danh sách thửa đất với bộ lọc.
+
+### Query params
+- `keyword`
+- `provinceCode`
+- `districtName`
+- `communeName`
+- `ownerUserId`
+- `landUsePurpose`
+- `page`
+- `pageSize`
+
+## 6.2. POST /lands
+Tạo thửa đất.
+
+## 6.3. PATCH /lands/:id
+Cập nhật thửa đất.
+
+## 6.4. GET /lands/:id
+Lấy chi tiết thửa đất.
+
+## 6.5. GET /lands/search
+Endpoint tương thích luồng cũ, nhận query `q`.
+
+## 6.6. Quy tắc chống trùng thửa (`US-031`)
+- Unique key: `parcelCode + provinceCode + districtName + communeName`.
+- Khi trùng, API trả `409 Conflict` với error envelope chuẩn.
+
+---
+
+## 7. File APIs
+
+## 7.1. POST /files/upload
 Upload tài liệu hồ sơ.
 
 ### Request
@@ -190,17 +359,17 @@ Upload tài liệu hồ sơ.
 }
 ```
 
-## 5.2. GET /files/:fileId
+## 7.2. GET /files/:fileId
 Lấy metadata file.
 
-## 5.3. GET /files/:fileId/download
+## 7.3. GET /files/:fileId/download
 Tải file từ gateway hoặc signed URL.
 
 ---
 
-## 6. Registration APIs – Đăng ký đất đai lần đầu
+## 8. Registration APIs – Đăng ký đất đai lần đầu
 
-## 6.1. POST /registrations
+## 8.1. POST /registrations
 Tạo hồ sơ đăng ký lần đầu.
 
 ### Request
@@ -235,7 +404,7 @@ Tạo hồ sơ đăng ký lần đầu.
 }
 ```
 
-## 6.2. POST /registrations/:registrationId/submit
+## 8.2. POST /registrations/:registrationId/submit
 Nộp hồ sơ vào luồng xử lý.
 
 ### Response data
@@ -246,7 +415,7 @@ Nộp hồ sơ vào luồng xử lý.
 }
 ```
 
-## 6.3. GET /registrations/:registrationId
+## 8.3. GET /registrations/:registrationId
 Lấy chi tiết hồ sơ đăng ký.
 
 ### Response data tối thiểu
@@ -263,7 +432,7 @@ Lấy chi tiết hồ sơ đăng ký.
 }
 ```
 
-## 6.4. GET /registrations
+## 8.4. GET /registrations
 Danh sách hồ sơ, hỗ trợ filter theo vai trò.
 
 ### Query params gợi ý
@@ -273,7 +442,7 @@ Danh sách hồ sơ, hỗ trợ filter theo vai trò.
 - `pageSize`
 - `assignedRole`
 
-## 6.5. PATCH /registrations/:registrationId/status
+## 8.5. PATCH /registrations/:registrationId/status
 Đổi trạng thái hồ sơ theo workflow.
 
 ### Request
@@ -289,7 +458,7 @@ Danh sách hồ sơ, hỗ trợ filter theo vai trò.
 - Mọi thay đổi trạng thái phải lưu audit trail.
 - `reason` là bắt buộc với các trạng thái từ chối hoặc yêu cầu bổ sung.
 
-## 6.6. POST /registrations/:registrationId/commune-confirm
+## 8.6. POST /registrations/:registrationId/commune-confirm
 UBND cấp xã xác nhận xử lý.
 
 ### Request
@@ -300,7 +469,7 @@ UBND cấp xã xác nhận xử lý.
 }
 ```
 
-## 6.7. POST /registrations/:registrationId/tax-transfer
+## 8.7. POST /registrations/:registrationId/tax-transfer
 Chuyển thông tin sang cơ quan thuế.
 
 ### Request
@@ -311,7 +480,7 @@ Chuyển thông tin sang cơ quan thuế.
 }
 ```
 
-## 6.8. POST /registrations/:registrationId/approve
+## 8.8. POST /registrations/:registrationId/approve
 Phê duyệt/ký cấp kết quả.
 
 ### Request
@@ -322,7 +491,7 @@ Phê duyệt/ký cấp kết quả.
 }
 ```
 
-## 6.9. POST /registrations/:registrationId/blockchain-sync
+## 8.9. POST /registrations/:registrationId/blockchain-sync
 Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
 
 ### Request
@@ -343,9 +512,9 @@ Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
 
 ---
 
-## 7. Transfer APIs – Đăng ký biến động / chuyển nhượng
+## 9. Transfer APIs – Đăng ký biến động / chuyển nhượng
 
-## 7.1. POST /transfers
+## 9.1. POST /transfers
 Tạo hồ sơ biến động do chuyển nhượng.
 
 ### Request
@@ -372,16 +541,16 @@ Tạo hồ sơ biến động do chuyển nhượng.
 }
 ```
 
-## 7.2. POST /transfers/:transferId/submit
+## 9.2. POST /transfers/:transferId/submit
 Nộp hồ sơ biến động.
 
-## 7.3. GET /transfers/:transferId
+## 9.3. GET /transfers/:transferId
 Chi tiết hồ sơ chuyển nhượng.
 
-## 7.4. GET /transfers
+## 9.4. GET /transfers
 Danh sách hồ sơ biến động.
 
-## 7.5. PATCH /transfers/:transferId/status
+## 9.5. PATCH /transfers/:transferId/status
 Đổi trạng thái hồ sơ biến động.
 
 ### Request
@@ -392,10 +561,10 @@ Danh sách hồ sơ biến động.
 }
 ```
 
-## 7.6. POST /transfers/:transferId/tax-transfer
+## 9.6. POST /transfers/:transferId/tax-transfer
 Chuyển thông tin nghĩa vụ tài chính.
 
-## 7.7. POST /transfers/:transferId/complete
+## 9.7. POST /transfers/:transferId/complete
 Hoàn tất cập nhật biến động.
 
 ### Request
@@ -406,7 +575,7 @@ Hoàn tất cập nhật biến động.
 }
 ```
 
-## 7.8. POST /transfers/:transferId/blockchain-sync
+## 9.8. POST /transfers/:transferId/blockchain-sync
 Ghi lịch sử giao dịch số hỗ trợ.
 
 ### Response data
@@ -420,9 +589,9 @@ Ghi lịch sử giao dịch số hỗ trợ.
 
 ---
 
-## 8. Land / Search APIs
+## 10. Land / Search APIs
 
-## 8.1. GET /lands/:landId
+## 10.1. GET /lands/:landId
 Chi tiết thửa đất.
 
 ### Response data
@@ -438,10 +607,10 @@ Chi tiết thửa đất.
 }
 ```
 
-## 8.2. GET /lands/:landId/history
+## 10.2. GET /lands/:landId/history
 Lịch sử đăng ký và biến động.
 
-## 8.3. GET /search/lands
+## 10.3. GET /search/lands
 Tra cứu theo từ khóa.
 
 ### Query params
@@ -452,14 +621,14 @@ Tra cứu theo từ khóa.
 - `page`
 - `pageSize`
 
-## 8.4. GET /search/registrations
+## 10.4. GET /search/registrations
 Tra cứu hồ sơ.
 
 ---
 
-## 9. OCR / AI Support APIs
+## 11. OCR / AI Support APIs
 
-## 9.1. POST /ocr/jobs
+## 11.1. POST /ocr/jobs
 Tạo job OCR.
 
 ### Request
@@ -478,10 +647,10 @@ Tạo job OCR.
 }
 ```
 
-## 9.2. GET /ocr/jobs/:ocrJobId
+## 11.2. GET /ocr/jobs/:ocrJobId
 Xem trạng thái OCR.
 
-## 9.3. GET /registrations/:registrationId/ocr-result
+## 11.3. GET /registrations/:registrationId/ocr-result
 Lấy kết quả OCR và cảnh báo.
 
 ### Response data
@@ -502,9 +671,9 @@ Lấy kết quả OCR và cảnh báo.
 
 ---
 
-## 10. Dashboard / Report APIs
+## 12. Dashboard / Report APIs
 
-## 10.1. GET /dashboard/summary
+## 12.1. GET /dashboard/summary
 Tổng quan hồ sơ.
 
 ### Response data
@@ -519,10 +688,14 @@ Tổng quan hồ sơ.
 }
 ```
 
-## 10.2. GET /dashboard/transactions
+### Ghi chú Sprint 2 (`US-098`)
+- `/dashboard/summary` trả payload khác nhau theo `role` của user đăng nhập.
+- Trường `data.role` luôn có mặt để frontend render theo quyền.
+
+## 12.2. GET /dashboard/transactions
 Giám sát giao dịch blockchain.
 
-## 10.3. GET /reports/summary
+## 12.3. GET /reports/summary
 Báo cáo tổng hợp.
 
 ### Query params
@@ -532,13 +705,34 @@ Báo cáo tổng hợp.
 
 ---
 
-## 11. Audit Trail APIs
+## 13. Audit Trail APIs
 
-## 11.1. GET /audit/registrations/:registrationId
-Lịch sử thay đổi hồ sơ đăng ký.
+## 13.1. GET /audit/access-logs
+Nhật ký truy cập/xác thực (`AUTH_*`).
 
-## 11.2. GET /audit/transfers/:transferId
-Lịch sử thay đổi hồ sơ biến động.
+### Query params
+- `page`
+- `pageSize`
+- `actorId`
+- `action`
+- `from`
+- `to`
+
+## 13.2. GET /audit/user-actions
+Nhật ký thao tác người dùng/cán bộ (`USER_*`, `REGISTRATION_*`, `TRANSFER_*`, `FILE_*`, `AUTH_PASSWORD_*`).
+
+### Query params
+- `page`
+- `pageSize`
+- `actorId`
+- `entityType`
+- `entityId`
+- `action`
+- `from`
+- `to`
+
+## 13.3. GET /audit/rbac-changes
+Nhật ký thay đổi phân quyền (`RBAC_*`).
 
 ### Audit record mẫu
 ```json
@@ -555,27 +749,33 @@ Lịch sử thay đổi hồ sơ biến động.
 }
 ```
 
+## 13.4. Sprint 1 closure evidence (Auth/Test/Audit)
+- Auth lifecycle và RBAC behavior: [backend/test/auth-rbac.test.ts](../backend/test/auth-rbac.test.ts), [backend/src/modules/auth/auth.routes.ts](../backend/src/modules/auth/auth.routes.ts).
+- Audit API RBAC scope: [backend/src/modules/audit/audit.routes.ts](../backend/src/modules/audit/audit.routes.ts).
+- CI check names dùng cho required checks: [.github/workflows/ci.yml](../.github/workflows/ci.yml).
+- Branch protection / required checks / secret scanning là trạng thái GitHub remote, không thể kết luận chỉ từ local repo.
+
 ---
 
-## 12. Validation rules tối thiểu
+## 14. Validation rules tối thiểu
 
-## 12.1. Auth
+## 14.1. Auth
 - email hợp lệ
 - password đủ độ mạnh
 - identityNumber theo regex cấu hình
 
-## 12.2. Registration
+## 14.2. Registration
 - `parcelNumber` bắt buộc
 - `mapSheetNumber` bắt buộc
 - `area > 0`
 - ít nhất 1 `attachedFileId`
 
-## 12.3. Transfer
+## 14.3. Transfer
 - phải có `landId`
 - phải có `contractFileId`
 - phải có thông tin bên nhận tối thiểu: `fullName`, `identityNumber`
 
-## 12.4. Status transitions
+## 14.4. Status transitions
 Các chuyển trạng thái không hợp lệ phải trả `409 Conflict`.
 
 Ví dụ:
@@ -584,11 +784,12 @@ Ví dụ:
 
 ---
 
-## 13. Quy tắc phân quyền endpoint
+## 15. Quy tắc phân quyền endpoint
 
 | Endpoint nhóm | Role tối thiểu |
 |---|---|
 | Auth self-service | CITIZEN, BUSINESS |
+| Auth refresh/logout/password reset | Tất cả role đã xác thực hoặc self-service |
 | Tạo/nộp hồ sơ đăng ký | CITIZEN, BUSINESS |
 | Tiếp nhận hồ sơ | RECEPTION_OFFICER |
 | Xác nhận cấp xã | COMMUNE_OFFICER |
@@ -596,10 +797,30 @@ Ví dụ:
 | Ký/phê duyệt | APPROVAL_AUTHORITY |
 | Dashboard / reports | ADMIN, LAND_REGISTRY_OFFICER |
 | OCR result nội bộ | RECEPTION_OFFICER, COMMUNE_OFFICER, LAND_REGISTRY_OFFICER |
+| User/Organization management | ADMIN |
+| Audit APIs | ADMIN, LAND_REGISTRY_OFFICER |
+| Land parcel management Sprint 2 | RECEPTION_OFFICER, COMMUNE_OFFICER, LAND_REGISTRY_OFFICER, APPROVAL_AUTHORITY, ADMIN |
+| Dashboard summary | Tất cả role đã xác thực (payload theo role) |
 
 ---
 
-## 14. Những gì không được thay đổi tự ý
+## 16. Quy ước lỗi chuẩn (`US-111`)
+- Validation lỗi: `400`.
+- Không có quyền: `403`.
+- Không tìm thấy tài nguyên: `404`.
+- Trùng dữ liệu ràng buộc unique: `409`.
+- Mọi lỗi phải tuân envelope:
+```json
+{
+  "success": false,
+  "message": "Conflict error",
+  "errors": []
+}
+```
+
+---
+
+## 17. Những gì không được thay đổi tự ý
 
 - Không đổi tên enum trạng thái nếu chưa cập nhật toàn bộ backend, frontend, tests và docs.
 - Không thay đổi request/response shape nếu chưa cập nhật file này.
@@ -608,7 +829,7 @@ Ví dụ:
 
 ---
 
-## 15. Mapping API sang module code
+## 18. Mapping API sang module code
 
 | Module | Trách nhiệm |
 |---|---|
@@ -620,4 +841,3 @@ Ví dụ:
 | `ocr` | OCR jobs, extraction, warnings |
 | `dashboard` | Dashboard, reports |
 | `audit` | Lịch sử thay đổi |
-
