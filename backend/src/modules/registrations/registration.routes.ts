@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { badRequest, created, ok } from "../../lib/response.js";
+import { badRequest, created, forbidden, ok } from "../../lib/response.js";
 import { demoStore, type RegistrationStatus } from "../../lib/store/demo-store.js";
 import { AUTH_ROLES, requireAuth, requireRoles, type AuthenticatedRequest } from "../auth/auth.middleware.js";
 
@@ -47,13 +47,20 @@ const listSchema = z.object({
 export const registrationRouter = Router();
 const allAuthenticatedRoles = [...AUTH_ROLES.citizen, ...AUTH_ROLES.officers];
 
+function isCitizenRole(role: string) {
+  return AUTH_ROLES.citizen.includes(role as (typeof AUTH_ROLES.citizen)[number]);
+}
+
 registrationRouter.use(requireAuth);
 
 registrationRouter.get("/", requireRoles(allAuthenticatedRoles), (req, res) => {
   const parsed = listSchema.safeParse(req.query);
   if (!parsed.success) return badRequest(res, "Validation error", parsed.error.issues);
   const status = parsed.data.status as RegistrationStatus | undefined;
-  return ok(res, { items: demoStore.listRegistrations(status), total: demoStore.listRegistrations(status).length });
+  const user = (req as AuthenticatedRequest).user;
+  const items = demoStore.listRegistrations(status);
+  const scopedItems = isCitizenRole(user.role) ? items.filter((item) => item.applicantId === user.userId) : items;
+  return ok(res, { items: scopedItems, total: scopedItems.length });
 });
 
 registrationRouter.post("/", requireRoles(AUTH_ROLES.citizen), (req, res) => {
@@ -86,20 +93,27 @@ registrationRouter.post("/", requireRoles(AUTH_ROLES.citizen), (req, res) => {
 });
 
 registrationRouter.get("/:id", requireRoles(allAuthenticatedRoles), (req, res) => {
+  const user = (req as AuthenticatedRequest).user;
   const record = demoStore.getRegistration(String(req.params.id));
   if (!record) return badRequest(res, "Không tìm thấy hồ sơ đăng ký");
+  if (isCitizenRole(user.role) && record.applicantId !== user.userId) {
+    return forbidden(res, "Bạn không có quyền xem hồ sơ này");
+  }
   return ok(res, record);
 });
 
 registrationRouter.post("/:id/submit", requireRoles(AUTH_ROLES.citizen), (req, res) => {
   const parsed = updateStatusSchema.safeParse(req.body ?? {});
   if (!parsed.success) return badRequest(res, "Validation error", parsed.error.issues);
+  const user = (req as AuthenticatedRequest).user;
+  const existing = demoStore.getRegistration(String(req.params.id));
+  if (!existing) return badRequest(res, "Không tìm thấy hồ sơ đăng ký");
+  if (existing.applicantId !== user.userId) return forbidden(res, "Bạn không có quyền nộp hồ sơ này");
   const record = demoStore.updateRegistrationStatus(
     String(req.params.id),
     "CHO_TIEP_NHAN",
     parsed.data.note ?? "Người dân đã nộp hồ sơ vào luồng tiếp nhận"
   );
-  if (!record) return badRequest(res, "Không tìm thấy hồ sơ đăng ký");
   return ok(res, record, "Đã chuyển hồ sơ sang trạng thái chờ tiếp nhận");
 });
 

@@ -61,7 +61,7 @@ export function LoginPage() {
     <section className="login-shell">
       <div>
         <h2>Đăng nhập UrbanChain-VN</h2>
-        <p>Phiên demo Sprint 1 dùng tài khoản mẫu theo vai trò trong API contract.</p>
+        <p>Phiên demo Sprint 2 dùng tài khoản mẫu theo vai trò trong API contract.</p>
         <form className="card row-gap" onSubmit={onSubmit}>
           <label>Email
             <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />

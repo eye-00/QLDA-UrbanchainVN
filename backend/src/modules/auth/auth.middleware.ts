@@ -1,7 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { forbidden, unauthorized } from "../../lib/response.js";
-import { demoStore, type UserRole } from "../../lib/store/demo-store.js";
+import { UserRole } from "@prisma/client";
+import { prisma } from "../../lib/prisma.js";
+import { forbiddenError, unauthorizedError } from "../../lib/errors.js";
 
 export interface AuthUser {
   userId: string;
@@ -23,12 +24,19 @@ interface JwtPayload {
 export const AUTH_ROLES = {
   citizen: ["CITIZEN", "BUSINESS"],
   officers: ["RECEPTION_OFFICER", "COMMUNE_OFFICER", "LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "ADMIN"],
-  dashboard: ["LAND_REGISTRY_OFFICER", "ADMIN"],
+  dashboard: ["CITIZEN", "BUSINESS", "RECEPTION_OFFICER", "COMMUNE_OFFICER", "LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "ADMIN"],
   admin: ["ADMIN"]
 } as const satisfies Record<string, readonly UserRole[]>;
 
 function getJwtSecret() {
-  return process.env.JWT_SECRET || "dev-secret";
+  const configuredSecret = process.env.JWT_SECRET?.trim();
+  if (process.env.NODE_ENV === "production") {
+    if (!configuredSecret) throw new Error("JWT_SECRET must be configured in production");
+    if (configuredSecret === "dev-secret") {
+      throw new Error("JWT_SECRET must not use development default in production");
+    }
+  }
+  return configuredSecret || "dev-secret";
 }
 
 export function signAccessToken(user: AuthUser) {
@@ -41,30 +49,36 @@ export function signAccessToken(user: AuthUser) {
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const header = req.header("authorization");
   const token = header?.startsWith("Bearer ") ? header.slice("Bearer ".length) : null;
-  if (!token) return unauthorized(res);
+  if (!token) return next(unauthorizedError());
 
   try {
     const payload = jwt.verify(token, getJwtSecret()) as JwtPayload;
-    const user = demoStore.getUserById(payload.sub);
-    if (!user || user.status !== "ACTIVE") return unauthorized(res, "Invalid session");
+    prisma.user
+      .findUnique({ where: { id: payload.sub } })
+      .then((user) => {
+        if (!user || user.status !== "ACTIVE") {
+          return next(unauthorizedError("Invalid session"));
+        }
 
-    (req as AuthenticatedRequest).user = {
-      userId: user.userId,
-      fullName: user.fullName,
-      email: user.email,
-      role: user.role
-    };
-    return next();
+        (req as AuthenticatedRequest).user = {
+          userId: user.id,
+          fullName: user.fullName,
+          email: user.email,
+          role: user.role
+        };
+        return next();
+      })
+      .catch(() => next(unauthorizedError("Invalid or expired token")));
   } catch {
-    return unauthorized(res, "Invalid or expired token");
+    return next(unauthorizedError("Invalid or expired token"));
   }
 }
 
 export function requireRoles(roles: readonly UserRole[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     const user = (req as AuthenticatedRequest).user;
-    if (!user) return unauthorized(res);
-    if (!roles.includes(user.role)) return forbidden(res, "Role is not allowed for this action");
+    if (!user) return next(unauthorizedError());
+    if (!roles.includes(user.role)) return next(forbiddenError("Role is not allowed for this action"));
     return next();
   };
 }
