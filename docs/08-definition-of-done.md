@@ -62,7 +62,7 @@ Mot backlog item duoc xem la Done khi:
   - `README.md`
 - Backlog closure Sprint 2 co bang `Done/Partial/Missing` + evidence.
 
-## Sprint 2 Closure Note (2026-04-28)
+## Sprint 2 Closure Note (2026-04-28, cập nhật remote gate 19:20 ICT)
 
 ### Co the verify local
 - Backend sprint 2 implementation va regression:
@@ -76,10 +76,10 @@ Mot backlog item duoc xem la Done khi:
   - [frontend/test/toast-behavior.test.ts](../frontend/test/toast-behavior.test.ts)
   - [frontend/test/api-error-envelope.test.ts](../frontend/test/api-error-envelope.test.ts)
 
-### Phu thuoc GitHub remote (khong verify day du bang local)
-- Branch protection rules cua nhanh `develop`.
-- Required checks da duoc bat va pass tren chuoi PR merge Sprint 2 (`backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`).
-- Secret scanning / push protection status pass tren repository.
+### Verify GitHub remote (da xac nhan)
+- PR closeout Sprint 2: [#1](https://github.com/eye-00/QLDA-UrbanchainVN/pull/1) da merge vao `develop`.
+- Required checks tren PR #1 da pass: `changes`, `backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`.
+- Merge commit tren `develop`: `f211a90`.
 
 ### Trang thai closure ghi nhan
-- Nhom US Sprint 2 Must+Should: `Partial` (local implementation/test/docs da co; con phu thuoc remote gate de chot Done).
+- Nhom US Sprint 2 Must+Should: `Done`.
