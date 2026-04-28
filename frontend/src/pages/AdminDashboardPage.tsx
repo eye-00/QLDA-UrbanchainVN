@@ -23,7 +23,7 @@ export function AdminDashboardPage() {
       const summary = await apiGet<SummaryResponse>('/dashboard/summary');
       setData(summary);
     } catch (error) {
-      showToast('error', error instanceof Error ? error.message : 'Không tải được dashboard');
+      showToast('error', error instanceof Error ? error.message : 'Không tải được bảng điều khiển');
     } finally {
       setLoading(false);
     }
@@ -36,14 +36,14 @@ export function AdminDashboardPage() {
   return (
     <section>
       <div className="section-header">
-        <h2>Dashboard theo vai trò</h2>
+        <h2>Bảng điều khiển theo vai trò</h2>
         <button type="button" onClick={() => void load()} disabled={loading}>
           {loading ? 'Đang tải...' : 'Làm mới'}
         </button>
       </div>
 
       {!data ? (
-        <div className="empty-state">Đang tải dữ liệu dashboard...</div>
+        <div className="empty-state">Đang tải dữ liệu bảng điều khiển...</div>
       ) : (
         <>
           <div className="card">

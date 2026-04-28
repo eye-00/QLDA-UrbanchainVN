@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../lib/api';
 import { UserRole } from '../auth/roles';
 import { useToast } from '../ui/ToastContext';
+import { getAccountStatusLabel } from '../ui/statusLabels';
 import {
   buildUserCreatePayload,
   buildUserQueryString,
@@ -97,7 +98,7 @@ export function UserManagementPage() {
       const data = await apiGet<UserListResponse>(path);
       setItems(data.items);
     } catch (error) {
-      showToast('error', error instanceof Error ? error.message : 'Không tải được danh sách user');
+      showToast('error', error instanceof Error ? error.message : 'Không tải được danh sách người dùng');
     } finally {
       setLoading(false);
     }
@@ -201,7 +202,7 @@ export function UserManagementPage() {
           </select>
         </label>
         <button type="submit" disabled={loading}>
-          {loading ? 'Đang xử lý...' : 'Tạo user'}
+          {loading ? 'Đang xử lý...' : 'Tạo người dùng'}
         </button>
       </form>
 
@@ -243,8 +244,8 @@ export function UserManagementPage() {
           Trạng thái
           <select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}>
             <option value="">Tất cả</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="LOCKED">LOCKED</option>
+            <option value="ACTIVE">{getAccountStatusLabel('ACTIVE')}</option>
+            <option value="LOCKED">{getAccountStatusLabel('LOCKED')}</option>
           </select>
         </label>
         <button type="button" onClick={() => void loadUsers()} disabled={loading}>
@@ -259,7 +260,9 @@ export function UserManagementPage() {
           <div className="card" key={item.userId}>
             <div className="card-title-row">
               <strong>{item.fullName}</strong>
-              <span className={`badge ${item.status === 'LOCKED' ? 'badge-danger' : 'badge-success'}`}>{item.status}</span>
+              <span className={`badge ${item.status === 'LOCKED' ? 'badge-danger' : 'badge-success'}`}>
+                {getAccountStatusLabel(item.status)}
+              </span>
             </div>
             <div>Email: {item.email}</div>
             <div>Vai trò: {item.role}</div>

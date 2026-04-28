@@ -3,7 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { validateLoginForm } from '../auth/validators';
 
-const demoAccounts = [
+const sampleAccounts = [
   ['citizen@urbanchain.vn', 'Công dân'],
   ['reception@urbanchain.vn', 'Tiếp nhận'],
   ['registry@urbanchain.vn', 'VPĐKĐĐ'],
@@ -61,7 +61,7 @@ export function LoginPage() {
     <section className="login-shell">
       <div>
         <h2>Đăng nhập UrbanChain-VN</h2>
-        <p>Phiên demo Sprint 2 dùng tài khoản mẫu theo vai trò trong API contract.</p>
+        <p>Phiên mô phỏng Sprint 2 dùng tài khoản mẫu theo vai trò trong đặc tả API.</p>
         <form className="card row-gap" onSubmit={onSubmit}>
           <label>Email
             <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
@@ -73,16 +73,16 @@ export function LoginPage() {
         </form>
         <div className="card row-gap">
           <h3>VNeID mô phỏng</h3>
-          <p className="muted">Xác thực danh tính demo cho công dân, không kết nối VNeID thật.</p>
+          <p className="muted">Xác thực danh tính mô phỏng cho công dân, không kết nối VNeID thật.</p>
           <button type="button" disabled={loading} onClick={onVneidMockLogin}>
-            Đăng nhập bằng VNeID mock
+            Đăng nhập bằng VNeID mô phỏng
           </button>
         </div>
         {message && <p className="error-notice">{message}</p>}
       </div>
       <div className="card">
-        <h3>Tài khoản demo</h3>
-        {demoAccounts.map(([account, label]) => (
+        <h3>Tài khoản mẫu</h3>
+        {sampleAccounts.map(([account, label]) => (
           <button className="account-button" type="button" key={account} onClick={() => setEmail(account)}>
             <span>{label}</span>
             <small>{account}</small>

@@ -43,7 +43,7 @@ export function App() {
         <nav>
           {user ? (
             <>
-              <Link to="/dashboard">Dashboard</Link>
+              <Link to="/dashboard">Bảng điều khiển</Link>
               {hasRole(user.role, CITIZEN_ROLES) && <Link to="/registrations/create">Đăng ký lần đầu</Link>}
               {hasRole(user.role, ADMIN_ONLY_ROLES) && <Link to="/admin/users">Quản lý người dùng</Link>}
               {hasRole(user.role, ADMIN_ONLY_ROLES) && <Link to="/admin/organizations">Quản lý đơn vị</Link>}
@@ -66,7 +66,7 @@ export function App() {
         )}
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/forbidden" element={<div className="card"><h2>Không có quyền truy cập</h2><p>Tài khoản hiện tại không được phép mở chức năng này.</p></div>} />
+          <Route path="/forbidden" element={<div className="card"><h2>Không có quyền truy cập</h2><p>Tài khoản hiện tại không được phép sử dụng chức năng này.</p></div>} />
           <Route path="/" element={<RequireAuth><HomeEntry /></RequireAuth>} />
           <Route path="/registrations/create" element={<RequireAuth roles={CITIZEN_ROLES}><CitizenRegistrationPage /></RequireAuth>} />
           <Route path="/dashboard" element={<RequireAuth roles={DASHBOARD_ROLES}><AdminDashboardPage /></RequireAuth>} />

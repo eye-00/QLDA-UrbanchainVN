@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import { useToast } from '../ui/ToastContext';
+import { getAccountStatusLabel } from '../ui/statusLabels';
 import {
   buildOrganizationCreatePayload,
   buildOrganizationUpdatePayload
@@ -133,7 +134,7 @@ export function OrganizationManagementPage() {
   async function onAssign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!assignment.userId || !assignment.organizationId) {
-      showToast('error', 'Vui lòng chọn user và đơn vị');
+      showToast('error', 'Vui lòng chọn người dùng và đơn vị');
       return;
     }
     setLoading(true);
@@ -141,10 +142,10 @@ export function OrganizationManagementPage() {
       await apiPatch(`/users/${assignment.userId}`, {
         organizationId: assignment.organizationId
       });
-      showToast('success', 'Đã gán user vào đơn vị');
+      showToast('success', 'Đã gán người dùng vào đơn vị');
       await loadData();
     } catch (error) {
-      showToast('error', error instanceof Error ? error.message : 'Không gán được user');
+      showToast('error', error instanceof Error ? error.message : 'Không gán được người dùng');
     } finally {
       setLoading(false);
     }
@@ -176,11 +177,11 @@ export function OrganizationManagementPage() {
       </form>
 
       <form className="card form-grid-4" onSubmit={onAssign}>
-        <h3>Gán user vào đơn vị</h3>
+        <h3>Gán người dùng vào đơn vị</h3>
         <label>
-          User
+          Người dùng
           <select value={assignment.userId} onChange={(event) => setAssignment({ ...assignment, userId: event.target.value })}>
-            <option value="">Chọn user</option>
+            <option value="">Chọn người dùng</option>
             {users.map((item) => (
               <option key={item.userId} value={item.userId}>
                 {item.fullName} ({item.email})
@@ -205,7 +206,7 @@ export function OrganizationManagementPage() {
           </select>
         </label>
         <button type="submit" disabled={loading}>
-          Gán user
+          Gán người dùng
         </button>
       </form>
 
@@ -219,7 +220,7 @@ export function OrganizationManagementPage() {
                 {item.code} - {item.name}
               </strong>
               <span className={`badge ${item.isActive ? 'badge-success' : 'badge-danger'}`}>
-                {item.isActive ? 'ACTIVE' : 'INACTIVE'}
+                {getAccountStatusLabel(item.isActive ? 'ACTIVE' : 'INACTIVE')}
               </span>
             </div>
             <div>Mô tả: {item.description ?? 'Không có'}</div>

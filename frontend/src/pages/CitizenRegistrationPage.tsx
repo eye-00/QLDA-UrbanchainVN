@@ -24,15 +24,15 @@ type CreateRegistrationResponse = {
 };
 
 const initialForm = {
-  fullName: 'Nguyen Van A',
+  fullName: 'Nguyễn Văn A',
   identityNumber: '0482xxxxxxx',
   mapSheetNumber: '05',
   parcelNumber: '123',
   area: '120.5',
   landUsePurpose: 'ODT',
-  address: '54 Nguyen Luong Bang',
-  districtName: 'Lien Chieu',
-  communeName: 'Hoa Khanh'
+  address: '54 Nguyễn Lương Bằng',
+  districtName: 'Liên Chiểu',
+  communeName: 'Hòa Khánh'
 };
 
 export function CitizenRegistrationPage() {
@@ -60,7 +60,7 @@ export function CitizenRegistrationPage() {
     setMessage('');
     try {
       const payload = {
-        applicantId: 'usr_demo',
+        applicantId: 'usr_mo_phong',
         landInfo: {
           provinceCode: '48',
           districtName: form.districtName,
@@ -91,7 +91,7 @@ export function CitizenRegistrationPage() {
   return (
     <section>
       <h2>Đăng ký đất đai lần đầu</h2>
-      <p>Luồng demo theo MVP: tạo hồ sơ, tiếp nhận, duyệt, cấp bản ghi đất đai.</p>
+      <p>Luồng mô phỏng theo MVP: tạo hồ sơ, tiếp nhận, duyệt và cấp bản ghi đất đai.</p>
       <form onSubmit={onSubmit} className="card form-grid">
         <label>Họ tên người sử dụng đất
           <input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
@@ -125,7 +125,7 @@ export function CitizenRegistrationPage() {
       {message && <p className="notice">{message}</p>}
 
       <div className="section-header">
-        <h3>Danh sách hồ sơ demo</h3>
+        <h3>Danh sách hồ sơ mô phỏng</h3>
         <button type="button" onClick={() => void loadRegistrations()}>Làm mới</button>
       </div>
       {items.map((item) => (

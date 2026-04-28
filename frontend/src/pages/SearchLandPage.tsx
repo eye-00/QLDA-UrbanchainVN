@@ -54,7 +54,7 @@ export function SearchLandPage() {
           <div>Diện tích: {item.area} m²</div>
           <div>Mục đích: {item.landUsePurpose}</div>
           <div>Địa chỉ: {item.address}</div>
-          {item.txHash && <div>Transaction hash: {item.txHash}</div>}
+          {item.txHash && <div>Mã giao dịch (transaction hash): {item.txHash}</div>}
         </div>
       ))}
     </section>
