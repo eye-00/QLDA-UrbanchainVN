@@ -1,0 +1,68 @@
+name: Nightly Regression
+
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+jobs:
+  full-regression:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: urbanchain
+          MYSQL_USER: urbanchain
+          MYSQL_PASSWORD: urbanchain
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: mysql://urbanchain:urbanchain@127.0.0.1:3307/urbanchain
+      JWT_SECRET: ci-secret
+      NODE_ENV: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Run DB migrations
+        run: npm run db:migrate
+
+      - name: Seed DB
+        run: npm run db:seed
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Upload summary artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nightly-summary
+          path: |
+            docs/04-backlog-mvp.md
+            docs/08-definition-of-done.md

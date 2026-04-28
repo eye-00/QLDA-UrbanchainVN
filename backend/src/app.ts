@@ -3,12 +3,16 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import { errorHandler, notFoundHandler } from "./lib/errors.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { registrationRouter } from "./modules/registrations/registration.routes.js";
 import { fileRouter } from "./modules/files/file.routes.js";
 import { transferRouter } from "./modules/transfers/transfer.routes.js";
 import { landRouter } from "./modules/lands/land.routes.js";
 import { dashboardRouter } from "./modules/dashboard/dashboard.routes.js";
+import { userRouter } from "./modules/users/user.routes.js";
+import { organizationRouter } from "./modules/organizations/organization.routes.js";
+import { auditRouter } from "./modules/audit/audit.routes.js";
 
 dotenv.config();
 
@@ -26,6 +30,11 @@ export function createApp() {
   app.use("/api/v1/transfers", transferRouter);
   app.use("/api/v1/lands", landRouter);
   app.use("/api/v1/dashboard", dashboardRouter);
+  app.use("/api/v1/users", userRouter);
+  app.use("/api/v1/organizations", organizationRouter);
+  app.use("/api/v1/audit", auditRouter);
+  app.use(notFoundHandler);
+  app.use(errorHandler);
 
   return app;
 }

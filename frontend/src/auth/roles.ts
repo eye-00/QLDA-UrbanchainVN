@@ -25,4 +25,7 @@ export const OFFICER_ROLES: UserRole[] = [
   'APPROVAL_AUTHORITY',
   'ADMIN'
 ];
-export const DASHBOARD_ROLES: UserRole[] = ['LAND_REGISTRY_OFFICER', 'ADMIN'];
+export const ALL_AUTH_ROLES: UserRole[] = [...CITIZEN_ROLES, ...OFFICER_ROLES];
+export const DASHBOARD_ROLES: UserRole[] = ALL_AUTH_ROLES;
+export const ADMIN_ONLY_ROLES: UserRole[] = ['ADMIN'];
+export const LAND_MANAGEMENT_ROLES: UserRole[] = OFFICER_ROLES;
