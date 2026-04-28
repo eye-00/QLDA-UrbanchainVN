@@ -94,26 +94,41 @@ async function seedRegistrationAndFile() {
   });
 
   const registration = await prisma.registration.upsert({
-    where: { code: "REG-SEED-0001" },
+    where: { code: "reg_demo_001" },
     update: {
       applicantId: citizen.id,
+      provinceCode: "48",
+      communeName: "Hoa Khanh",
       parcelNumber: "123",
       mapSheetNumber: "05",
       area: new Prisma.Decimal("120.50"),
       landUsePurpose: "ODT",
       address: "54 Nguyen Luong Bang",
+      ownerType: "INDIVIDUAL",
+      ownerFullName: "Nguyen Van A",
+      ownerIdentityNumber: "0482xxxxxxx",
+      ownerAddress: "Da Nang",
+      noteHistory: ["Ho so demo da duoc seed"],
       status: "CHO_TIEP_NHAN",
       ipfsCid: "bafybeigdyrzt-seed-001",
       documentHash: "0xabc001"
     },
     create: {
-      code: "REG-SEED-0001",
+      id: "reg_demo_001",
+      code: "reg_demo_001",
       applicantId: citizen.id,
+      provinceCode: "48",
+      communeName: "Hoa Khanh",
       parcelNumber: "123",
       mapSheetNumber: "05",
       area: new Prisma.Decimal("120.50"),
       landUsePurpose: "ODT",
       address: "54 Nguyen Luong Bang",
+      ownerType: "INDIVIDUAL",
+      ownerFullName: "Nguyen Van A",
+      ownerIdentityNumber: "0482xxxxxxx",
+      ownerAddress: "Da Nang",
+      noteHistory: ["Ho so demo da duoc seed"],
       status: "CHO_TIEP_NHAN",
       ipfsCid: "bafybeigdyrzt-seed-001",
       documentHash: "0xabc001"

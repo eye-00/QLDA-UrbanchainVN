@@ -128,11 +128,18 @@ model Registration {
   code           String             @unique
   applicantId    String
   landCode       String?
+  provinceCode   String
+  communeName    String
   parcelNumber   String
   mapSheetNumber String
   area           Decimal            @db.Decimal(10,2)
   landUsePurpose String
   address        String
+  ownerType      String
+  ownerFullName  String
+  ownerIdentityNumber String?
+  ownerAddress   String?
+  noteHistory    Json?
   status         RegistrationStatus @default(MOI_TAO)
   ipfsCid        String?
   documentHash   String?
