@@ -57,6 +57,29 @@ If Docker Desktop is not running, start it before `npm run infra:up`.
 - `npm --workspace backend run test`
 - `npm --workspace frontend run test`
 
+### Sprint 3 phase 1 verification commands (Registration core)
+- `npm run db:generate`
+- `npm run db:migrate`
+- `npm run db:seed`
+- `npm --workspace backend run build`
+- `npm --workspace backend run test -- sprint3-registration.test.ts`
+- `npm --workspace backend run test -- auth-rbac.test.ts`
+
+### Sprint 3 phase 2 smoke checks (registration review UI)
+- Cán bộ vào màn `Hồ sơ xử lý` để:
+  - xem danh sách hồ sơ chờ xử lý,
+  - lọc theo trạng thái/từ khóa,
+  - mở chi tiết hồ sơ với timeline trạng thái và thực hiện thao tác theo vai trò.
+- Công dân vào màn `Đăng ký lần đầu` có thể:
+  - tạo hồ sơ mới,
+  - gửi hồ sơ từ trạng thái `MOI_TAO` hoặc `CAN_BO_SUNG`.
+  - xem ghi chú cập nhật gần nhất của hồ sơ.
+
+### Sprint 2 smoke checks (địa giới 2 cấp + Việt hóa UI)
+- Kiểm tra các màn hình `Bảng điều khiển`, `Quản lý người dùng`, `Quản lý đơn vị`, `Quản lý thửa đất`, `Tra cứu thửa đất`, `Đăng ký lần đầu` hiển thị tiếng Việt có dấu.
+- Form địa giới chỉ còn 2 cấp: `Tỉnh/Thành phố` và `Xã/Phường/Đặc khu`.
+- Khi API địa giới không phản hồi, UI tự chuyển sang nhập tay để không chặn luồng nghiệp vụ.
+
 ### Sprint 2 closure evidence (local vs remote)
 - Local evidence for users/org/lands/dashboard/toast:
   - `backend/test/sprint2.test.ts`
@@ -67,6 +90,13 @@ If Docker Desktop is not running, start it before `npm run infra:up`.
   - `frontend/test/sprint2-crud-flows.test.ts`
   - `frontend/test/toast-behavior.test.ts`
   - `frontend/test/api-error-envelope.test.ts`
+  - `frontend/test/dashboard-labels.test.ts`
+  - `frontend/test/vn-address.test.ts`
+  - `frontend/src/App.tsx`
+  - `frontend/src/styles.css`
+  - `frontend/src/lib/vnAddress.ts`
+  - `docs/10-sprint-closure-matrix.md`
+  - `docs/11-sprint-closure-verification.md`
 - Remote-only gates (GitHub):
   - required checks on PR chain (`backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`),
   - branch protection on target branch,

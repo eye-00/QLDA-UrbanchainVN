@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../lib/api';
-import { UserRole } from '../auth/roles';
+import { ROLE_LABELS, UserRole } from '../auth/roles';
 import { useToast } from '../ui/ToastContext';
 import { getAccountStatusLabel } from '../ui/statusLabels';
 import {
@@ -165,7 +165,15 @@ export function UserManagementPage() {
 
   return (
     <section>
-      <h2>Quản lý người dùng</h2>
+      <div className="section-header">
+        <div>
+          <h2>Quản lý người dùng</h2>
+          <p className="section-subtitle">
+            Tạo, cập nhật, khóa/mở khóa tài khoản và lọc danh sách theo vai trò hoặc đơn vị.
+          </p>
+        </div>
+      </div>
+
       <form className="card form-grid-4" onSubmit={onCreateUser}>
         <label>
           Họ tên
@@ -180,7 +188,7 @@ export function UserManagementPage() {
           <select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as UserRole })}>
             {roleOptions.map((role) => (
               <option value={role} key={role}>
-                {role}
+                {ROLE_LABELS[role]}
               </option>
             ))}
           </select>
@@ -221,7 +229,7 @@ export function UserManagementPage() {
             <option value="">Tất cả</option>
             {roleOptions.map((role) => (
               <option value={role} key={role}>
-                {role}
+                {ROLE_LABELS[role]}
               </option>
             ))}
           </select>
@@ -256,27 +264,47 @@ export function UserManagementPage() {
       {items.length === 0 ? (
         <div className="empty-state">Chưa có dữ liệu người dùng.</div>
       ) : (
-        items.map((item) => (
-          <div className="card" key={item.userId}>
-            <div className="card-title-row">
-              <strong>{item.fullName}</strong>
-              <span className={`badge ${item.status === 'LOCKED' ? 'badge-danger' : 'badge-success'}`}>
-                {getAccountStatusLabel(item.status)}
-              </span>
-            </div>
-            <div>Email: {item.email}</div>
-            <div>Vai trò: {item.role}</div>
-            <div>Đơn vị: {item.organization ? `${item.organization.code} - ${item.organization.name}` : 'Chưa gán'}</div>
-            <div className="action-row">
-              <button type="button" onClick={() => startEdit(item)} disabled={loading}>
-                Sửa
-              </button>
-              <button type="button" onClick={() => void onToggleStatus(item)} disabled={loading}>
-                {item.status === 'ACTIVE' ? 'Khóa' : 'Mở khóa'}
-              </button>
-            </div>
+        <div className="card">
+          <div className="data-table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Họ tên</th>
+                  <th>Email</th>
+                  <th>Vai trò</th>
+                  <th>Đơn vị</th>
+                  <th>Trạng thái</th>
+                  <th>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.userId}>
+                    <td>{item.fullName}</td>
+                    <td>{item.email}</td>
+                    <td>{ROLE_LABELS[item.role]}</td>
+                    <td>{item.organization ? `${item.organization.code} - ${item.organization.name}` : 'Chưa gán'}</td>
+                    <td>
+                      <span className={`badge ${item.status === 'LOCKED' ? 'badge-danger' : 'badge-success'}`}>
+                        {getAccountStatusLabel(item.status)}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="action-row">
+                        <button type="button" className="btn btn-outline" onClick={() => startEdit(item)} disabled={loading}>
+                          Cập nhật
+                        </button>
+                        <button type="button" onClick={() => void onToggleStatus(item)} disabled={loading}>
+                          {item.status === 'ACTIVE' ? 'Khóa tài khoản' : 'Mở khóa'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ))
+        </div>
       )}
 
       {editingId && (
@@ -307,7 +335,7 @@ export function UserManagementPage() {
             >
               {roleOptions.map((role) => (
                 <option value={role} key={role}>
-                  {role}
+                  {ROLE_LABELS[role]}
                 </option>
               ))}
             </select>

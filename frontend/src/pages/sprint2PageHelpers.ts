@@ -38,7 +38,6 @@ export type OrganizationEditForm = {
 export type LandForm = {
   parcelCode: string;
   provinceCode: string;
-  districtName: string;
   communeName: string;
   mapSheetNumber: string;
   parcelNumber: string;
@@ -51,7 +50,6 @@ export type LandForm = {
 export type LandFilters = {
   keyword: string;
   provinceCode: string;
-  districtName: string;
   communeName: string;
 };
 
@@ -113,11 +111,9 @@ export function buildLandQueryString(filters: LandFilters) {
   const query = new URLSearchParams();
   const keyword = trimOrEmpty(filters.keyword);
   const provinceCode = trimOrEmpty(filters.provinceCode);
-  const districtName = trimOrEmpty(filters.districtName);
   const communeName = trimOrEmpty(filters.communeName);
   if (keyword) query.set('keyword', keyword);
   if (provinceCode) query.set('provinceCode', provinceCode);
-  if (districtName) query.set('districtName', districtName);
   if (communeName) query.set('communeName', communeName);
   return query.toString();
 }
@@ -126,7 +122,6 @@ export function buildLandPayload(form: LandForm) {
   return {
     parcelCode: trimOrEmpty(form.parcelCode),
     provinceCode: trimOrEmpty(form.provinceCode),
-    districtName: trimOrEmpty(form.districtName),
     communeName: trimOrEmpty(form.communeName),
     mapSheetNumber: trimOrEmpty(form.mapSheetNumber),
     parcelNumber: trimOrEmpty(form.parcelNumber),

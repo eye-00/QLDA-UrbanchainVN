@@ -60,7 +60,6 @@ export interface RegistrationRecord {
   ownerType: string;
   identityNumber?: string;
   provinceCode: string;
-  districtName: string;
   communeName: string;
   parcelNumber: string;
   mapSheetNumber: string;
@@ -141,7 +140,7 @@ export class DemoStore {
     const demoUsers: UserRecord[] = [
       {
         userId: "usr_demo",
-        fullName: "Nguyen Van A",
+        fullName: "Nguyễn Văn A",
         email: "citizen@urbanchain.vn",
         password: "StrongPassword@123",
         role: "CITIZEN",
@@ -151,7 +150,7 @@ export class DemoStore {
       },
       {
         userId: "usr_reception",
-        fullName: "Can bo tiep nhan",
+        fullName: "Cán bộ tiếp nhận",
         email: "reception@urbanchain.vn",
         password: "StrongPassword@123",
         role: "RECEPTION_OFFICER",
@@ -159,7 +158,7 @@ export class DemoStore {
       },
       {
         userId: "usr_land_registry",
-        fullName: "Can bo VPDKDD",
+        fullName: "Cán bộ VPĐKĐĐ",
         email: "registry@urbanchain.vn",
         password: "StrongPassword@123",
         role: "LAND_REGISTRY_OFFICER",
@@ -167,7 +166,7 @@ export class DemoStore {
       },
       {
         userId: "usr_approval",
-        fullName: "Can bo phe duyet",
+        fullName: "Cán bộ phê duyệt",
         email: "approval@urbanchain.vn",
         password: "StrongPassword@123",
         role: "APPROVAL_AUTHORITY",
@@ -175,7 +174,7 @@ export class DemoStore {
       },
       {
         userId: "usr_admin",
-        fullName: "Quan tri he thong",
+        fullName: "Quản trị hệ thống",
         email: "admin@urbanchain.vn",
         password: "StrongPassword@123",
         role: "ADMIN",
@@ -199,17 +198,16 @@ export class DemoStore {
       id: "reg_demo_001",
       code: "REG-DEMO-001",
       applicantId: "usr_demo",
-      ownerFullName: "Nguyen Van A",
+      ownerFullName: "Nguyễn Văn A",
       ownerType: "INDIVIDUAL",
       identityNumber: "0482xxxxxxx",
       provinceCode: "48",
-      districtName: "Lien Chieu",
-      communeName: "Hoa Khanh",
+      communeName: "Hòa Khánh",
       parcelNumber: "123",
       mapSheetNumber: "05",
       area: 120.5,
       landUsePurpose: "ODT",
-      address: "54 Nguyen Luong Bang",
+      address: "54 Nguyễn Lương Bằng",
       fileIds: [{ id: file.id, documentType: file.documentType }],
       status: "CHO_TIEP_NHAN",
       notes: ["Ho so demo duoc tao san de kiem thu"],

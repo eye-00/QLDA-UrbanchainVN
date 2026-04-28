@@ -91,7 +91,6 @@ describe('Sprint 2 CRUD helper flows', () => {
       buildLandPayload({
         parcelCode: ' LAND-001 ',
         provinceCode: ' 48 ',
-        districtName: ' Lien Chieu ',
         communeName: ' Hoa Khanh ',
         mapSheetNumber: ' 05 ',
         parcelNumber: ' 123 ',
@@ -103,7 +102,6 @@ describe('Sprint 2 CRUD helper flows', () => {
     ).toEqual({
       parcelCode: 'LAND-001',
       provinceCode: '48',
-      districtName: 'Lien Chieu',
       communeName: 'Hoa Khanh',
       mapSheetNumber: '05',
       parcelNumber: '123',
@@ -126,9 +124,8 @@ describe('Sprint 2 CRUD helper flows', () => {
       buildLandQueryString({
         keyword: ' LAND-001 ',
         provinceCode: '48',
-        districtName: 'Lien Chieu',
         communeName: ''
       })
-    ).toBe('keyword=LAND-001&provinceCode=48&districtName=Lien+Chieu');
+    ).toBe('keyword=LAND-001&provinceCode=48');
   });
 });

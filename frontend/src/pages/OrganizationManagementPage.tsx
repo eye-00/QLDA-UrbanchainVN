@@ -153,7 +153,15 @@ export function OrganizationManagementPage() {
 
   return (
     <section>
-      <h2>Quản lý đơn vị</h2>
+      <div className="section-header">
+        <div>
+          <h2>Quản lý đơn vị</h2>
+          <p className="section-subtitle">
+            Quản trị danh mục đơn vị, gán người dùng vào đơn vị và theo dõi trạng thái hoạt động.
+          </p>
+        </div>
+      </div>
+
       <form className="card form-grid-4" onSubmit={onCreate}>
         <label>
           Mã đơn vị
@@ -213,28 +221,51 @@ export function OrganizationManagementPage() {
       {organizations.length === 0 ? (
         <div className="empty-state">Chưa có đơn vị nào.</div>
       ) : (
-        organizations.map((item) => (
-          <div className="card" key={item.id}>
-            <div className="card-title-row">
-              <strong>
-                {item.code} - {item.name}
-              </strong>
-              <span className={`badge ${item.isActive ? 'badge-success' : 'badge-danger'}`}>
-                {getAccountStatusLabel(item.isActive ? 'ACTIVE' : 'INACTIVE')}
-              </span>
-            </div>
-            <div>Mô tả: {item.description ?? 'Không có'}</div>
-            <div>Số người dùng: {item.userCount}</div>
-            <div className="action-row">
-              <button type="button" onClick={() => startEdit(item)} disabled={loading}>
-                Sửa
-              </button>
-              <button type="button" onClick={() => void onSoftDelete(item.id)} disabled={loading || !item.isActive}>
-                Vô hiệu hóa
-              </button>
-            </div>
+        <div className="card">
+          <div className="data-table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Mã đơn vị</th>
+                  <th>Tên đơn vị</th>
+                  <th>Mô tả</th>
+                  <th>Số người dùng</th>
+                  <th>Trạng thái</th>
+                  <th>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {organizations.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.code}</td>
+                    <td>{item.name}</td>
+                    <td>{item.description ?? 'Không có'}</td>
+                    <td>{item.userCount}</td>
+                    <td>
+                      <span className={`badge ${item.isActive ? 'badge-success' : 'badge-danger'}`}>
+                        {getAccountStatusLabel(item.isActive ? 'ACTIVE' : 'INACTIVE')}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="action-row">
+                        <button type="button" className="btn btn-outline" onClick={() => startEdit(item)} disabled={loading}>
+                          Cập nhật
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void onSoftDelete(item.id)}
+                          disabled={loading || !item.isActive}
+                        >
+                          Vô hiệu hóa
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ))
+        </div>
       )}
 
       {editId && (

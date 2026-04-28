@@ -106,7 +106,6 @@ model LandParcel {
   id            String   @id @default(cuid())
   parcelCode    String
   provinceCode  String
-  districtName  String
   communeName   String
   mapSheetNumber String
   parcelNumber  String
@@ -120,7 +119,7 @@ model LandParcel {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  @@unique([parcelCode, provinceCode, districtName, communeName], name: "land_parcel_unique_code_area")
+  @@unique([parcelCode, provinceCode, communeName], name: "land_parcel_unique_code_area")
 }
 
 model Registration {
@@ -128,11 +127,18 @@ model Registration {
   code           String             @unique
   applicantId    String
   landCode       String?
+  provinceCode   String
+  communeName    String
   parcelNumber   String
   mapSheetNumber String
   area           Decimal            @db.Decimal(10,2)
   landUsePurpose String
   address        String
+  ownerType      String
+  ownerFullName  String
+  ownerIdentityNumber String?
+  ownerAddress   String?
+  noteHistory    Json?
   status         RegistrationStatus @default(MOI_TAO)
   ipfsCid        String?
   documentHash   String?
