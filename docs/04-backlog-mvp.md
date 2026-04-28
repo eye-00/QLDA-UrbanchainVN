@@ -349,14 +349,14 @@ Mỗi dòng backlog giữ đúng cấu trúc từ Excel:
 
 **Agent tham gia chính:** AI_07 (Frontend Citizen) (30), AI_06 (Database & IPFS) (18), AI_04 (Backend API) (18), AI_15 (Compliance) (6)
 
-### Sprint 2 closure snapshot (2026-04-28)
+### Sprint 2 closure snapshot (2026-04-28, cập nhật remote gate 19:20 ICT)
 
 | Nhóm US Sprint 2 (Must+Should) | Trạng thái closure hiện tại | Verify local | Phụ thuộc GitHub remote | Evidence |
 |---|---|---|---|---|
 | Users/Organizations/Lands APIs (`US-019..027`, `US-031`, `US-111`) | Done | Backend test Sprint 2 pass cục bộ | Cần required checks pass trên PR chain | [backend/src/modules/users/user.routes.ts](../backend/src/modules/users/user.routes.ts), [backend/src/modules/organizations/organization.routes.ts](../backend/src/modules/organizations/organization.routes.ts), [backend/src/modules/lands/land.routes.ts](../backend/src/modules/lands/land.routes.ts), [backend/test/sprint2.test.ts](../backend/test/sprint2.test.ts) |
 | Dashboard theo role (`US-098`) + route guard frontend | Done | Có test role mapping/frontend và backend dashboard | Cần xác nhận pass checks trên PR merge chain | [backend/src/modules/dashboard/dashboard.routes.ts](../backend/src/modules/dashboard/dashboard.routes.ts), [frontend/test/auth-routes.test.ts](../frontend/test/auth-routes.test.ts), [frontend/test/app.test.ts](../frontend/test/app.test.ts) |
 | UX CRUD + toast (`US-105`) | Done | Có test helper CRUD + toast behavior + conflict handling | Không có blocker local; vẫn phụ thuộc gate remote để chốt release | [frontend/test/sprint2-crud-flows.test.ts](../frontend/test/sprint2-crud-flows.test.ts), [frontend/test/toast-behavior.test.ts](../frontend/test/toast-behavior.test.ts), [frontend/test/api-error-envelope.test.ts](../frontend/test/api-error-envelope.test.ts), [frontend/src/ui/ToastContext.tsx](../frontend/src/ui/ToastContext.tsx) |
-| Full Gate đóng sprint (CI + branch protection + secret scanning) | Partial | Có command local lint/build/test | Branch protection, required checks, secret scan chỉ xác nhận trên GitHub | [README.md - Sprint 2 verification commands](../README.md#sprint-2-verification-commands), [.github/workflows/ci.yml](../.github/workflows/ci.yml), [docs/08-definition-of-done.md](./08-definition-of-done.md) |
+| Full Gate đóng sprint (CI + branch protection + secret scanning) | Done | Có command local lint/build/test | PR closeout Sprint 2 đã merge vào `develop`, CI checks pass trên PR #1 | [README.md - Sprint 2 verification commands](../README.md#sprint-2-verification-commands), [.github/workflows/ci.yml](../.github/workflows/ci.yml), [docs/08-definition-of-done.md](./08-definition-of-done.md), [PR #1](https://github.com/eye-00/QLDA-UrbanchainVN/pull/1) |
 
 ### Epic 2: Số hóa & IPFS
 
