@@ -2,6 +2,12 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../lib/api';
 import { UserRole } from '../auth/roles';
 import { useToast } from '../ui/ToastContext';
+import {
+  buildUserCreatePayload,
+  buildUserQueryString,
+  buildUserUpdatePayload,
+  getNextUserStatus
+} from './sprint2PageHelpers';
 
 type OrganizationOption = {
   id: string;
@@ -76,12 +82,7 @@ export function UserManagementPage() {
   });
 
   const queryString = useMemo(() => {
-    const query = new URLSearchParams();
-    if (filters.keyword.trim()) query.set('keyword', filters.keyword.trim());
-    if (filters.role) query.set('role', filters.role);
-    if (filters.organizationId) query.set('organizationId', filters.organizationId);
-    if (filters.status) query.set('status', filters.status);
-    return query.toString();
+    return buildUserQueryString(filters);
   }, [filters]);
 
   async function loadOrganizations() {
@@ -110,13 +111,7 @@ export function UserManagementPage() {
     event.preventDefault();
     setLoading(true);
     try {
-      await apiPost<UserItem>('/users', {
-        fullName: form.fullName,
-        email: form.email,
-        password: form.password,
-        role: form.role,
-        organizationId: form.organizationId || null
-      });
+      await apiPost<UserItem>('/users', buildUserCreatePayload(form));
       showToast('success', 'Đã tạo người dùng');
       setForm(initialCreateForm);
       await loadUsers();
@@ -142,12 +137,7 @@ export function UserManagementPage() {
     if (!editingId) return;
     setLoading(true);
     try {
-      await apiPatch<UserItem>(`/users/${editingId}`, {
-        fullName: editForm.fullName,
-        email: editForm.email,
-        role: editForm.role,
-        organizationId: editForm.organizationId || null
-      });
+      await apiPatch<UserItem>(`/users/${editingId}`, buildUserUpdatePayload(editForm));
       showToast('success', 'Đã cập nhật người dùng');
       setEditingId(null);
       await loadUsers();
@@ -161,7 +151,7 @@ export function UserManagementPage() {
   async function onToggleStatus(user: UserItem) {
     setLoading(true);
     try {
-      const nextStatus = user.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
+      const nextStatus = getNextUserStatus(user.status);
       await apiPatch<UserItem>(`/users/${user.userId}/status`, { status: nextStatus });
       showToast('success', nextStatus === 'LOCKED' ? 'Đã khóa tài khoản' : 'Đã mở khóa tài khoản');
       await loadUsers();

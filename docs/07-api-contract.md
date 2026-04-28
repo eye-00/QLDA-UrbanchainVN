@@ -334,6 +334,18 @@ Endpoint tương thích luồng cũ, nhận query `q`.
 - Unique key: `parcelCode + provinceCode + districtName + communeName`.
 - Khi trùng, API trả `409 Conflict` với error envelope chuẩn.
 
+## 6.7. Sprint 2 contract verification snapshot (2026-04-28)
+- Base path giữ nguyên: `/api/v1`.
+- Response envelope giữ chuẩn:
+  - success: `{ success: true, message, data }`
+  - error: `{ success: false, message, errors }`
+- Endpoint nhóm Sprint 2 đã map với implementation:
+  - `/users`, `/users/:id`, `/users/:id/status`
+  - `/organizations`, `/organizations/:id`
+  - `/lands`, `/lands/:id`, `/lands/search`
+  - `/dashboard/summary`
+- `409 Conflict` cho duplicate parcel được giữ ổn định theo `US-031`.
+
 ---
 
 ## 7. File APIs

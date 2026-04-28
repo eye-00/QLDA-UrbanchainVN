@@ -1,6 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import { useToast } from '../ui/ToastContext';
+import {
+  buildOrganizationCreatePayload,
+  buildOrganizationUpdatePayload
+} from './sprint2PageHelpers';
 
 type OrganizationItem = {
   id: string;
@@ -76,11 +80,7 @@ export function OrganizationManagementPage() {
     event.preventDefault();
     setLoading(true);
     try {
-      await apiPost('/organizations', {
-        code: form.code,
-        name: form.name,
-        description: form.description || undefined
-      });
+      await apiPost('/organizations', buildOrganizationCreatePayload(form));
       showToast('success', 'Đã tạo đơn vị');
       setForm(initialCreateForm);
       await loadData();
@@ -106,12 +106,7 @@ export function OrganizationManagementPage() {
     if (!editId) return;
     setLoading(true);
     try {
-      await apiPatch(`/organizations/${editId}`, {
-        code: editForm.code,
-        name: editForm.name,
-        description: editForm.description || null,
-        isActive: editForm.isActive
-      });
+      await apiPatch(`/organizations/${editId}`, buildOrganizationUpdatePayload(editForm));
       showToast('success', 'Đã cập nhật đơn vị');
       setEditId(null);
       await loadData();

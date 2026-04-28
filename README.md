@@ -57,6 +57,21 @@ If Docker Desktop is not running, start it before `npm run infra:up`.
 - `npm --workspace backend run test`
 - `npm --workspace frontend run test`
 
+### Sprint 2 closure evidence (local vs remote)
+- Local evidence for users/org/lands/dashboard/toast:
+  - `backend/test/sprint2.test.ts`
+  - `backend/src/modules/users/user.routes.ts`
+  - `backend/src/modules/organizations/organization.routes.ts`
+  - `backend/src/modules/lands/land.routes.ts`
+  - `backend/src/modules/dashboard/dashboard.routes.ts`
+  - `frontend/test/sprint2-crud-flows.test.ts`
+  - `frontend/test/toast-behavior.test.ts`
+  - `frontend/test/api-error-envelope.test.ts`
+- Remote-only gates (GitHub):
+  - required checks on PR chain (`backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`),
+  - branch protection on target branch,
+  - secret scanning / push protection status.
+
 ### Sprint 1 verification commands
 - `npm run db:generate`
 - `npm --workspace backend run test`

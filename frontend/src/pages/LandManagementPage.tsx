@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../ui/ToastContext';
+import { buildLandPayload, buildLandQueryString } from './sprint2PageHelpers';
 
 type LandItem = {
   id: string;
@@ -66,12 +67,7 @@ export function LandManagementPage() {
   const [editForm, setEditForm] = useState(initialCreateForm);
 
   const queryString = useMemo(() => {
-    const query = new URLSearchParams();
-    if (filterForm.keyword.trim()) query.set('keyword', filterForm.keyword.trim());
-    if (filterForm.provinceCode.trim()) query.set('provinceCode', filterForm.provinceCode.trim());
-    if (filterForm.districtName.trim()) query.set('districtName', filterForm.districtName.trim());
-    if (filterForm.communeName.trim()) query.set('communeName', filterForm.communeName.trim());
-    return query.toString();
+    return buildLandQueryString(filterForm);
   }, [filterForm]);
 
   async function loadLands() {
@@ -105,18 +101,7 @@ export function LandManagementPage() {
     event.preventDefault();
     setLoading(true);
     try {
-      await apiPost('/lands', {
-        parcelCode: createForm.parcelCode,
-        provinceCode: createForm.provinceCode,
-        districtName: createForm.districtName,
-        communeName: createForm.communeName,
-        mapSheetNumber: createForm.mapSheetNumber,
-        parcelNumber: createForm.parcelNumber,
-        area: Number(createForm.area),
-        landUsePurpose: createForm.landUsePurpose,
-        address: createForm.address,
-        ownerUserId: createForm.ownerUserId || null
-      });
+      await apiPost('/lands', buildLandPayload(createForm));
       showToast('success', 'Đã tạo thửa đất');
       setCreateForm(initialCreateForm);
       await loadLands();
@@ -148,18 +133,7 @@ export function LandManagementPage() {
     if (!editId) return;
     setLoading(true);
     try {
-      await apiPatch(`/lands/${editId}`, {
-        parcelCode: editForm.parcelCode,
-        provinceCode: editForm.provinceCode,
-        districtName: editForm.districtName,
-        communeName: editForm.communeName,
-        mapSheetNumber: editForm.mapSheetNumber,
-        parcelNumber: editForm.parcelNumber,
-        area: Number(editForm.area),
-        landUsePurpose: editForm.landUsePurpose,
-        address: editForm.address,
-        ownerUserId: editForm.ownerUserId || null
-      });
+      await apiPatch(`/lands/${editId}`, buildLandPayload(editForm));
       showToast('success', 'Đã cập nhật thửa đất');
       setEditId(null);
       await loadLands();

@@ -8,6 +8,8 @@ type ToastItem = {
   message: string;
 };
 
+export const TOAST_AUTO_DISMISS_MS = 3200;
+
 type ToastContextValue = {
   showToast: (type: ToastType, message: string) => void;
 };
@@ -18,15 +20,23 @@ function makeToastId() {
   return `${Date.now()}-${Math.round(Math.random() * 10000)}`;
 }
 
+export function appendToastItem(items: ToastItem[], item: ToastItem) {
+  return [...items, item];
+}
+
+export function removeToastItemById(items: ToastItem[], id: string) {
+  return items.filter((item) => item.id !== id);
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
 
   const showToast = useCallback((type: ToastType, message: string) => {
     const id = makeToastId();
-    setItems((prev) => [...prev, { id, type, message }]);
-    window.setTimeout(() => {
-      setItems((prev) => prev.filter((item) => item.id !== id));
-    }, 3200);
+    setItems((prev) => appendToastItem(prev, { id, type, message }));
+    globalThis.setTimeout(() => {
+      setItems((prev) => removeToastItemById(prev, id));
+    }, TOAST_AUTO_DISMISS_MS);
   }, []);
 
   const value = useMemo<ToastContextValue>(() => ({ showToast }), [showToast]);
