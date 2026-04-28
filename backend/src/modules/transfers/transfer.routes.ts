@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { badRequest, created, ok } from "../../lib/response.js";
+import { badRequest, created, forbidden, ok } from "../../lib/response.js";
 import { demoStore } from "../../lib/store/demo-store.js";
 import { AUTH_ROLES, requireAuth, requireRoles, type AuthenticatedRequest } from "../auth/auth.middleware.js";
 
@@ -18,11 +18,31 @@ const updateSchema = z.object({
 export const transferRouter = Router();
 const allAuthenticatedRoles = [...AUTH_ROLES.citizen, ...AUTH_ROLES.officers];
 
+function isCitizenRole(role: string) {
+  return AUTH_ROLES.citizen.includes(role as (typeof AUTH_ROLES.citizen)[number]);
+}
+
+function findTransferById(id: string) {
+  return demoStore.listTransfers().find((item) => item.id === id) ?? null;
+}
+
 transferRouter.use(requireAuth);
 
-transferRouter.get("/", requireRoles(allAuthenticatedRoles), (_req, res) => {
+transferRouter.get("/", requireRoles(allAuthenticatedRoles), (req, res) => {
+  const user = (req as AuthenticatedRequest).user;
   const items = demoStore.listTransfers();
-  return ok(res, { items, total: items.length });
+  const scopedItems = isCitizenRole(user.role) ? items.filter((item) => item.fromUserId === user.userId) : items;
+  return ok(res, { items: scopedItems, total: scopedItems.length });
+});
+
+transferRouter.get("/:id", requireRoles(allAuthenticatedRoles), (req, res) => {
+  const user = (req as AuthenticatedRequest).user;
+  const transfer = findTransferById(String(req.params.id));
+  if (!transfer) return badRequest(res, "Không tìm thấy hồ sơ biến động");
+  if (isCitizenRole(user.role) && transfer.fromUserId !== user.userId) {
+    return forbidden(res, "Bạn không có quyền xem hồ sơ biến động này");
+  }
+  return ok(res, transfer);
 });
 
 transferRouter.post("/", requireRoles(AUTH_ROLES.citizen), (req, res) => {
@@ -41,12 +61,15 @@ transferRouter.post("/", requireRoles(AUTH_ROLES.citizen), (req, res) => {
 transferRouter.post("/:id/confirm", requireRoles(AUTH_ROLES.citizen), (req, res) => {
   const parsed = updateSchema.safeParse(req.body ?? {});
   if (!parsed.success) return badRequest(res, "Validation error", parsed.error.issues);
+  const user = (req as AuthenticatedRequest).user;
+  const existing = findTransferById(String(req.params.id));
+  if (!existing) return badRequest(res, "Không tìm thấy hồ sơ biến động");
+  if (existing.fromUserId !== user.userId) return forbidden(res, "Bạn không có quyền xác nhận hồ sơ này");
   const transfer = demoStore.updateTransferStatus(
     String(req.params.id),
     "DA_TIEP_NHAN",
     parsed.data.note ?? "Bên nhận đã xác nhận giao dịch"
   );
-  if (!transfer) return badRequest(res, "Không tìm thấy hồ sơ biến động");
   return ok(res, transfer, "Đã xác nhận hồ sơ chuyển nhượng");
 });
 
