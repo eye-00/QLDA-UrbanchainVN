@@ -1,6 +1,6 @@
 # Remote Gate Evidence (Sprint 1-2-3)
 
-Cập nhật: 2026-04-28
+Cập nhật: 2026-04-29
 Repo: `eye-00/QLDA-UrbanchainVN` (public)
 
 ## 1) Required checks evidence (GitHub Actions)
@@ -31,13 +31,23 @@ Chi tiết job URLs:
 
 Ghi chú: PR docs-only nên các lane code được skip theo điều kiện workflow.
 
-### PR #3 (Sprint 3 phase 1 - open)
+### PR #3 (Sprint 3 phase 1)
 - PR: [#3](https://github.com/eye-00/QLDA-UrbanchainVN/pull/3)
 - Kết quả checks hiện tại:
   - `backend-ci`: pass
   - `frontend-ci`: skipped
   - `contracts-ci`: skipped
   - `docs-check`: skipped
+  - `changes`: pass
+
+### PR #4 (Sprint 2/3 closeout merge)
+- PR: [#4](https://github.com/eye-00/QLDA-UrbanchainVN/pull/4)
+- Merge commit: `e894775`
+- Kết quả checks:
+  - `backend-ci`: pass
+  - `frontend-ci`: pass
+  - `contracts-ci`: skipped (path filter)
+  - `docs-check`: pass
   - `changes`: pass
 
 ## 2) Branch protection evidence (đã bật)
@@ -64,15 +74,13 @@ Verify API:
 
 ## 4) Trạng thái remote gate hiện tại
 
-- `Required checks`: **có evidence pass** trên PR chain Sprint 2.
+- `Required checks`: **có evidence pass** trên PR chain Sprint 2 + Sprint 3 closeout.
 - `Branch protection` trên `develop`: **đã bật và enforce required checks**.
 - `Secret scanning + push protection`: **đã bật**.
 
-=> Remote gate không còn blocker hạ tầng.
+=> Remote gate không còn blocker hạ tầng, và đã có evidence pass cho nhánh closeout mới nhất.
 
 ## 5) Hành động tiếp theo
 
-Để chốt `Done` theo DoD:
-1. Re-run/verify PR checks cho các patch còn mở theo policy mới (branch protection đã bật).
-2. Cập nhật lại ma trận trạng thái US trong `docs/12-us-audit-sprint1-3.md` từ `Partial (remote)` sang trạng thái mới theo evidence hiện hành.
-3. Đóng gap `Missing` còn lại của Sprint 2 và Sprint 3 theo `docs/13-us-gap-remediation-plan.md`.
+1. Duy trì branch protection + required checks như hiện tại cho Sprint 4+.
+2. Giữ cập nhật docs audit (`docs/12`, `docs/13`) sau mỗi PR thay đổi trạng thái US.
