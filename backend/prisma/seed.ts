@@ -11,9 +11,9 @@ function hashPassword(password: string) {
 
 async function seedOrganizations() {
   const organizations = [
-    { code: "ORG-RECEPTION", name: "Bo phan tiep nhan", description: "Don vi tiep nhan ho so" },
-    { code: "ORG-LAND", name: "Chi nhanh VPDKDD", description: "Don vi tham dinh chuyen mon" },
-    { code: "ORG-APPROVAL", name: "Co quan phe duyet", description: "Don vi ky cap ket qua" }
+    { code: "ORG-RECEPTION", name: "Bộ phận tiếp nhận", description: "Đơn vị tiếp nhận hồ sơ" },
+    { code: "ORG-LAND", name: "Chi nhánh VPĐKĐĐ", description: "Đơn vị thẩm định chuyên môn" },
+    { code: "ORG-APPROVAL", name: "Cơ quan phê duyệt", description: "Đơn vị ký cấp kết quả" }
   ];
 
   for (const org of organizations) {
@@ -33,35 +33,35 @@ async function seedUsers() {
   const users = [
     {
       email: "citizen@urbanchain.vn",
-      fullName: "Nguyen Van A",
+      fullName: "Nguyễn Văn A",
       role: "CITIZEN" as const,
       identityNumber: "0482xxxxxxx",
       organizationId: null as string | null
     },
     {
       email: "reception@urbanchain.vn",
-      fullName: "Can bo tiep nhan",
+      fullName: "Cán bộ tiếp nhận",
       role: "RECEPTION_OFFICER" as const,
       identityNumber: null,
       organizationId: receptionOrg.id
     },
     {
       email: "registry@urbanchain.vn",
-      fullName: "Can bo VPDKDD",
+      fullName: "Cán bộ VPĐKĐĐ",
       role: "LAND_REGISTRY_OFFICER" as const,
       identityNumber: null,
       organizationId: landOrg.id
     },
     {
       email: "approval@urbanchain.vn",
-      fullName: "Can bo phe duyet",
+      fullName: "Cán bộ phê duyệt",
       role: "APPROVAL_AUTHORITY" as const,
       identityNumber: null,
       organizationId: approvalOrg.id
     },
     {
       email: "admin@urbanchain.vn",
-      fullName: "Quan tri he thong",
+      fullName: "Quản trị hệ thống",
       role: "ADMIN" as const,
       identityNumber: null,
       organizationId: approvalOrg.id
@@ -94,26 +94,41 @@ async function seedRegistrationAndFile() {
   });
 
   const registration = await prisma.registration.upsert({
-    where: { code: "REG-SEED-0001" },
+    where: { code: "reg_demo_001" },
     update: {
       applicantId: citizen.id,
+      provinceCode: "48",
+      communeName: "Hòa Khánh",
       parcelNumber: "123",
       mapSheetNumber: "05",
       area: new Prisma.Decimal("120.50"),
       landUsePurpose: "ODT",
-      address: "54 Nguyen Luong Bang",
+      address: "54 Nguyễn Lương Bằng",
+      ownerType: "INDIVIDUAL",
+      ownerFullName: "Nguyễn Văn A",
+      ownerIdentityNumber: "0482xxxxxxx",
+      ownerAddress: "Đà Nẵng",
+      noteHistory: ["Hồ sơ demo đã được seed"],
       status: "CHO_TIEP_NHAN",
       ipfsCid: "bafybeigdyrzt-seed-001",
       documentHash: "0xabc001"
     },
     create: {
-      code: "REG-SEED-0001",
+      id: "reg_demo_001",
+      code: "reg_demo_001",
       applicantId: citizen.id,
+      provinceCode: "48",
+      communeName: "Hòa Khánh",
       parcelNumber: "123",
       mapSheetNumber: "05",
       area: new Prisma.Decimal("120.50"),
       landUsePurpose: "ODT",
-      address: "54 Nguyen Luong Bang",
+      address: "54 Nguyễn Lương Bằng",
+      ownerType: "INDIVIDUAL",
+      ownerFullName: "Nguyễn Văn A",
+      ownerIdentityNumber: "0482xxxxxxx",
+      ownerAddress: "Đà Nẵng",
+      noteHistory: ["Hồ sơ demo đã được seed"],
       status: "CHO_TIEP_NHAN",
       ipfsCid: "bafybeigdyrzt-seed-001",
       documentHash: "0xabc001"
@@ -156,7 +171,6 @@ async function seedLandParcels() {
       land_parcel_unique_code_area: {
         parcelCode: "LAND-DEMO-001",
         provinceCode: "48",
-        districtName: "Lien Chieu",
         communeName: "Hoa Khanh"
       }
     },
@@ -171,7 +185,6 @@ async function seedLandParcels() {
     create: {
       parcelCode: "LAND-DEMO-001",
       provinceCode: "48",
-      districtName: "Lien Chieu",
       communeName: "Hoa Khanh",
       mapSheetNumber: "05",
       parcelNumber: "123",

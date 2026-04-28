@@ -311,7 +311,6 @@ Danh sách thửa đất với bộ lọc.
 ### Query params
 - `keyword`
 - `provinceCode`
-- `districtName`
 - `communeName`
 - `ownerUserId`
 - `landUsePurpose`
@@ -331,7 +330,7 @@ Lấy chi tiết thửa đất.
 Endpoint tương thích luồng cũ, nhận query `q`.
 
 ## 6.6. Quy tắc chống trùng thửa (`US-031`)
-- Unique key: `parcelCode + provinceCode + districtName + communeName`.
+- Unique key: `parcelCode + provinceCode + communeName`.
 - Khi trùng, API trả `409 Conflict` với error envelope chuẩn.
 
 ## 6.7. Sprint 2 contract verification snapshot (2026-04-28)
@@ -377,6 +376,25 @@ Lấy metadata file.
 ## 7.3. GET /files/:fileId/download
 Tải file từ gateway hoặc signed URL.
 
+## 7.4. GET /files/:fileId/integrity
+Kiểm tra tính toàn vẹn metadata tệp (`cid`, `hash`, `storageStatus`).
+
+### Response data
+```json
+{
+  "fileId": "fil_001",
+  "cid": "bafy...",
+  "hash": "0xabc123",
+  "storageStatus": "UPLOADED_IPFS",
+  "checks": {
+    "hasCid": true,
+    "hasHash": true,
+    "storageStatusValid": true
+  },
+  "isValid": true
+}
+```
+
 ---
 
 ## 8. Registration APIs – Đăng ký đất đai lần đầu
@@ -390,7 +408,6 @@ Tạo hồ sơ đăng ký lần đầu.
   "applicantId": "usr_001",
   "landInfo": {
     "provinceCode": "48",
-    "districtName": "Lien Chieu",
     "communeName": "Hoa Khanh",
     "parcelNumber": "123",
     "mapSheetNumber": "05",
@@ -399,6 +416,7 @@ Tạo hồ sơ đăng ký lần đầu.
     "address": "54 Nguyen Luong Bang"
   },
   "ownerInfo": {
+    "ownerType": "INDIVIDUAL",
     "fullName": "Nguyen Van A",
     "identityNumber": "0482xxxxxxxx",
     "address": "Da Nang"
@@ -406,6 +424,8 @@ Tạo hồ sơ đăng ký lần đầu.
   "attachedFileIds": ["fil_001", "fil_002"]
 }
 ```
+
+> Compatibility note: backend hien cho phep ca `attachedFileIds` va `fileIds` de tuong thich nguoc UI.
 
 ### Response data
 ```json
@@ -521,6 +541,29 @@ Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
   "tokenId": "1001"
 }
 ```
+
+## 8.10. GET /registrations/:registrationId/notifications
+Lấy lịch sử thông báo kết quả xử lý hồ sơ theo RBAC/ownership.
+
+### Response data
+```json
+{
+  "items": [
+    {
+      "id": "log_001",
+      "status": "CAN_BO_SUNG",
+      "note": "Thiếu bản scan giấy tờ nguồn gốc đất",
+      "message": "Hồ sơ đã được cập nhật sang trạng thái CAN_BO_SUNG: Thiếu bản scan giấy tờ nguồn gốc đất",
+      "createdAt": "2026-04-28T12:00:00.000Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### Notification rule
+- Mỗi thay đổi trạng thái hồ sơ phải ghi audit event `REGISTRATION_STATUS_UPDATED`.
+- Đồng thời phát sinh nhật ký thông báo `REGISTRATION_NOTIFICATION_SENT` để người dùng tra cứu lịch sử cập nhật.
 
 ---
 

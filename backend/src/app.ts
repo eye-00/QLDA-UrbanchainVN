@@ -3,6 +3,8 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { errorHandler, notFoundHandler } from "./lib/errors.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { registrationRouter } from "./modules/registrations/registration.routes.js";
@@ -14,7 +16,8 @@ import { userRouter } from "./modules/users/user.routes.js";
 import { organizationRouter } from "./modules/organizations/organization.routes.js";
 import { auditRouter } from "./modules/audit/audit.routes.js";
 
-dotenv.config();
+const backendEnvPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".env");
+dotenv.config({ path: backendEnvPath });
 
 export function createApp() {
   const app = express();

@@ -29,3 +29,4 @@ export const ALL_AUTH_ROLES: UserRole[] = [...CITIZEN_ROLES, ...OFFICER_ROLES];
 export const DASHBOARD_ROLES: UserRole[] = ALL_AUTH_ROLES;
 export const ADMIN_ONLY_ROLES: UserRole[] = ['ADMIN'];
 export const LAND_MANAGEMENT_ROLES: UserRole[] = OFFICER_ROLES;
+export const REGISTRATION_REVIEW_ROLES: UserRole[] = OFFICER_ROLES;

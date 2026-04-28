@@ -1,4 +1,4 @@
-import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
 import {
@@ -6,6 +6,7 @@ import {
   CITIZEN_ROLES,
   DASHBOARD_ROLES,
   LAND_MANAGEMENT_ROLES,
+  REGISTRATION_REVIEW_ROLES,
   ROLE_LABELS,
   UserRole
 } from './auth/roles';
@@ -15,10 +16,28 @@ import { LoginPage } from './pages/LoginPage';
 import { UserManagementPage } from './pages/UserManagementPage';
 import { OrganizationManagementPage } from './pages/OrganizationManagementPage';
 import { LandManagementPage } from './pages/LandManagementPage';
+import { SearchLandPage } from './pages/SearchLandPage';
+import { RegistrationReviewPage } from './pages/RegistrationReviewPage';
 
 function hasRole(role: UserRole | undefined, roles: UserRole[]) {
   return Boolean(role && roles.includes(role));
 }
+
+type NavItem = {
+  to: string;
+  label: string;
+  roles?: UserRole[];
+};
+
+const NAV_ITEMS: NavItem[] = [
+  { to: '/dashboard', label: 'Bảng điều khiển', roles: DASHBOARD_ROLES },
+  { to: '/registrations/create', label: 'Đăng ký lần đầu', roles: CITIZEN_ROLES },
+  { to: '/admin/users', label: 'Người dùng', roles: ADMIN_ONLY_ROLES },
+  { to: '/admin/organizations', label: 'Đơn vị', roles: ADMIN_ONLY_ROLES },
+  { to: '/lands', label: 'Thửa đất', roles: LAND_MANAGEMENT_ROLES },
+  { to: '/registrations/review', label: 'Hồ sơ xử lý', roles: REGISTRATION_REVIEW_ROLES },
+  { to: '/lands/search', label: 'Tra cứu thửa đất', roles: DASHBOARD_ROLES }
+];
 
 function HomeEntry() {
   const { user } = useAuth();
@@ -27,54 +46,94 @@ function HomeEntry() {
   return <Navigate to="/dashboard" replace />;
 }
 
+const PAGE_LABELS: Record<string, string> = {
+  '/': 'Trang chủ',
+  '/login': 'Đăng nhập hệ thống',
+  '/dashboard': 'Bảng điều khiển',
+  '/registrations/create': 'Nộp hồ sơ đăng ký lần đầu',
+  '/admin/users': 'Quản lý người dùng',
+  '/admin/organizations': 'Quản lý đơn vị',
+  '/lands': 'Quản lý thửa đất',
+  '/registrations/review': 'Xử lý hồ sơ đăng ký',
+  '/lands/search': 'Tra cứu thửa đất',
+  '/forbidden': 'Không có quyền truy cập'
+};
+
 export function App() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const currentPageLabel = PAGE_LABELS[location.pathname] ?? 'UrbanChain-VN';
 
   async function handleLogout() {
     await logout();
     navigate('/login', { replace: true });
   }
 
-  return (
-    <div className="layout">
-      <aside className="sidebar">
-        <h1>UrbanChain-VN</h1>
-        <nav>
-          {user ? (
-            <>
-              <Link to="/dashboard">Bảng điều khiển</Link>
-              {hasRole(user.role, CITIZEN_ROLES) && <Link to="/registrations/create">Đăng ký lần đầu</Link>}
-              {hasRole(user.role, ADMIN_ONLY_ROLES) && <Link to="/admin/users">Quản lý người dùng</Link>}
-              {hasRole(user.role, ADMIN_ONLY_ROLES) && <Link to="/admin/organizations">Quản lý đơn vị</Link>}
-              {hasRole(user.role, LAND_MANAGEMENT_ROLES) && <Link to="/lands">Quản lý thửa đất</Link>}
-            </>
-          ) : (
-            <Link to="/login">Đăng nhập</Link>
-          )}
-        </nav>
-      </aside>
-      <main className="content">
-        {user && (
-          <header className="topbar">
-            <div>
-              <strong>{user.fullName}</strong>
-              <span>{ROLE_LABELS[user.role]}</span>
-            </div>
-            <button type="button" onClick={() => void handleLogout()}>Đăng xuất</button>
-          </header>
-        )}
+  const visibleNavItems = NAV_ITEMS.filter((item) => !item.roles || hasRole(user?.role, item.roles));
+
+  if (!user) {
+    return (
+      <main className="guest-shell">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/forbidden" element={<div className="card"><h2>Không có quyền truy cập</h2><p>Tài khoản hiện tại không được phép sử dụng chức năng này.</p></div>} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </main>
+    );
+  }
+
+  return (
+    <div className="app-shell">
+      <aside className="app-sidebar">
+        <div className="brand-block">
+          <h1>UrbanChain-VN</h1>
+          <p>Quản lý đất đai số hóa</p>
+        </div>
+        <nav className="sidebar-nav">
+          {visibleNavItems.map((item) => (
+            <Link key={item.to} to={item.to} className={location.pathname === item.to ? 'active' : ''}>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      </aside>
+      <main className="app-main">
+        <header className="app-topbar">
+          <div className="topbar-title">
+            <strong>{currentPageLabel}</strong>
+            <span>{ROLE_LABELS[user.role]}</span>
+          </div>
+          <div className="topbar-actions">
+            <span className="topbar-user">{user.fullName}</span>
+            <button type="button" className="btn btn-outline" onClick={() => void handleLogout()}>
+              Đăng xuất
+            </button>
+          </div>
+        </header>
+        <section className="page-content">
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/forbidden"
+            element={
+              <div className="card">
+                <h2>Không có quyền truy cập</h2>
+                <p>Tài khoản hiện tại không được phép sử dụng chức năng này.</p>
+              </div>
+            }
+          />
           <Route path="/" element={<RequireAuth><HomeEntry /></RequireAuth>} />
           <Route path="/registrations/create" element={<RequireAuth roles={CITIZEN_ROLES}><CitizenRegistrationPage /></RequireAuth>} />
           <Route path="/dashboard" element={<RequireAuth roles={DASHBOARD_ROLES}><AdminDashboardPage /></RequireAuth>} />
           <Route path="/admin/users" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><UserManagementPage /></RequireAuth>} />
           <Route path="/admin/organizations" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><OrganizationManagementPage /></RequireAuth>} />
           <Route path="/lands" element={<RequireAuth roles={LAND_MANAGEMENT_ROLES}><LandManagementPage /></RequireAuth>} />
+          <Route path="/registrations/review" element={<RequireAuth roles={REGISTRATION_REVIEW_ROLES}><RegistrationReviewPage /></RequireAuth>} />
+          <Route path="/lands/search" element={<RequireAuth roles={DASHBOARD_ROLES}><SearchLandPage /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </section>
       </main>
     </div>
   );

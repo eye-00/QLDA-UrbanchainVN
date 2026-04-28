@@ -354,9 +354,10 @@ Mỗi dòng backlog giữ đúng cấu trúc từ Excel:
 | Nhóm US Sprint 2 (Must+Should) | Trạng thái closure hiện tại | Verify local | Phụ thuộc GitHub remote | Evidence |
 |---|---|---|---|---|
 | Users/Organizations/Lands APIs (`US-019..027`, `US-031`, `US-111`) | Done | Backend test Sprint 2 pass cục bộ | Cần required checks pass trên PR chain | [backend/src/modules/users/user.routes.ts](../backend/src/modules/users/user.routes.ts), [backend/src/modules/organizations/organization.routes.ts](../backend/src/modules/organizations/organization.routes.ts), [backend/src/modules/lands/land.routes.ts](../backend/src/modules/lands/land.routes.ts), [backend/test/sprint2.test.ts](../backend/test/sprint2.test.ts) |
+| Chuẩn hóa địa giới 2 cấp + Việt hóa UI dashboard/land/registration/search | Done | Test frontend helper + smoke UI local pass | Cần required checks pass trên PR chain | [frontend/src/App.tsx](../frontend/src/App.tsx), [frontend/src/styles.css](../frontend/src/styles.css), [frontend/src/pages/AdminDashboardPage.tsx](../frontend/src/pages/AdminDashboardPage.tsx), [frontend/src/pages/LandManagementPage.tsx](../frontend/src/pages/LandManagementPage.tsx), [frontend/src/pages/CitizenRegistrationPage.tsx](../frontend/src/pages/CitizenRegistrationPage.tsx), [frontend/src/lib/vnAddress.ts](../frontend/src/lib/vnAddress.ts), [frontend/test/vn-address.test.ts](../frontend/test/vn-address.test.ts), [frontend/test/dashboard-labels.test.ts](../frontend/test/dashboard-labels.test.ts) |
 | Dashboard theo role (`US-098`) + route guard frontend | Done | Có test role mapping/frontend và backend dashboard | Cần xác nhận pass checks trên PR merge chain | [backend/src/modules/dashboard/dashboard.routes.ts](../backend/src/modules/dashboard/dashboard.routes.ts), [frontend/test/auth-routes.test.ts](../frontend/test/auth-routes.test.ts), [frontend/test/app.test.ts](../frontend/test/app.test.ts) |
 | UX CRUD + toast (`US-105`) | Done | Có test helper CRUD + toast behavior + conflict handling | Không có blocker local; vẫn phụ thuộc gate remote để chốt release | [frontend/test/sprint2-crud-flows.test.ts](../frontend/test/sprint2-crud-flows.test.ts), [frontend/test/toast-behavior.test.ts](../frontend/test/toast-behavior.test.ts), [frontend/test/api-error-envelope.test.ts](../frontend/test/api-error-envelope.test.ts), [frontend/src/ui/ToastContext.tsx](../frontend/src/ui/ToastContext.tsx) |
-| Full Gate đóng sprint (CI + branch protection + secret scanning) | Done | Có command local lint/build/test | PR closeout Sprint 2 đã merge vào `develop`, CI checks pass trên PR #1 | [README.md - Sprint 2 verification commands](../README.md#sprint-2-verification-commands), [.github/workflows/ci.yml](../.github/workflows/ci.yml), [docs/08-definition-of-done.md](./08-definition-of-done.md), [PR #1](https://github.com/eye-00/QLDA-UrbanchainVN/pull/1) |
+| Full Gate đóng sprint (CI + branch protection + secret scanning) | Done | Có command local lint/build/test + report verify local | PR closeout Sprint 2 đã merge vào `develop`, CI checks pass trên PR #1 | [README.md - Sprint 2 verification commands](../README.md#sprint-2-verification-commands), [.github/workflows/ci.yml](../.github/workflows/ci.yml), [docs/08-definition-of-done.md](./08-definition-of-done.md), [docs/10-sprint-closure-matrix.md](./10-sprint-closure-matrix.md), [docs/11-sprint-closure-verification.md](./11-sprint-closure-verification.md), [PR #1](https://github.com/eye-00/QLDA-UrbanchainVN/pull/1) |
 
 ### Epic 2: Số hóa & IPFS
 
@@ -510,6 +511,26 @@ Mỗi dòng backlog giữ đúng cấu trúc từ Excel:
 | Epic 4: Duyệt hồ sơ | 48 |
 
 **Agent tham gia chính:** AI_08 (Frontend Admin) (30), AI_04 (Backend API) (24), AI_07 (Frontend Citizen) (12), AI_06 (Database & IPFS) (6)
+
+### Sprint 3 progress snapshot (2026-04-28)
+
+| Nhóm US Sprint 3 (phase hiện tại) | Trạng thái | Verify local | Ghi chú |
+|---|---|---|---|
+| US-127..132 (Gửi hồ sơ đăng ký) | In Progress | `POST /registrations`, `POST /registrations/:id/submit` + citizen UI đã kết nối | Cần full regression backend DB để chốt Done |
+| US-145..156 (Danh sách + lọc hồ sơ chờ xử lý) | In Progress | Trang cán bộ xử lý hồ sơ + filter status/keyword + mapping quyền theo role đã triển khai ở frontend | Cần QA E2E theo role officer |
+| US-157..160 (Xem chi tiết hồ sơ đăng ký) | In Progress | Màn chi tiết hồ sơ có stepper trạng thái, panel thông tin và action groups theo role (accept/supplement/commune/tax/approve/reject/sync) | Cần remote CI checks + evidence merge chain |
+
+### Sprint 1-2-3 US audit snapshot (2026-04-28)
+
+| Sprint | Done | Partial | Missing | Tổng US | % Có đáp ứng (Done+Partial) |
+|---|---:|---:|---:|---:|---:|
+| Sprint 1 | 90 | 0 | 0 | 90 | 100% |
+| Sprint 2 | 0 | 72 | 0 | 72 | 100% |
+| Sprint 3 | 0 | 72 | 0 | 72 | 100% |
+
+- Báo cáo chi tiết từng US: [docs/12-us-audit-sprint1-3.md](./12-us-audit-sprint1-3.md).
+- Kế hoạch bù thiếu/đóng gap: [docs/13-us-gap-remediation-plan.md](./13-us-gap-remediation-plan.md).
+- Lưu ý: trạng thái `Partial` chưa được nâng `Done` nếu chưa có evidence remote gate (required checks, branch protection, secret scanning).
 
 ### Epic 3: Đăng ký đất đai lần đầu
 

@@ -164,7 +164,6 @@ describe("Sprint 2 user, organization, land and dashboard", () => {
       body: JSON.stringify({
         parcelCode,
         provinceCode: "48",
-        districtName: "Lien Chieu",
         communeName: "Hoa Khanh",
         mapSheetNumber: "07",
         parcelNumber: "777",
@@ -202,7 +201,6 @@ describe("Sprint 2 user, organization, land and dashboard", () => {
       body: JSON.stringify({
         parcelCode,
         provinceCode: "48",
-        districtName: "Lien Chieu",
         communeName: "Hoa Khanh",
         mapSheetNumber: "08",
         parcelNumber: "888",
@@ -213,6 +211,38 @@ describe("Sprint 2 user, organization, land and dashboard", () => {
     });
     expect(duplicateLand.response.status).toBe(409);
     expect(duplicateLand.body.success).toBe(false);
+  });
+
+  it("supports file integrity check for uploaded legal documents", async () => {
+    const citizenToken = await login("citizen@urbanchain.vn");
+    const formData = new FormData();
+    formData.set("documentType", "LAND_CERT_SUPPORT");
+    formData.set("ownerType", "USER");
+    formData.set("originalName", `integrity-${Date.now()}.pdf`);
+    formData.set("file", new Blob(["demo"], { type: "application/pdf" }), "integrity.pdf");
+
+    const uploaded = await api("/api/v1/files/upload", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${citizenToken}`
+      },
+      body: formData
+    });
+
+    expect(uploaded.response.status).toBe(201);
+    const fileId = uploaded.body.data.id as string;
+
+    const integrity = await api(`/api/v1/files/${fileId}/integrity`, {
+      headers: {
+        Authorization: `Bearer ${citizenToken}`
+      }
+    });
+
+    expect(integrity.response.status).toBe(200);
+    expect(integrity.body.data.fileId).toBe(fileId);
+    expect(integrity.body.data.isValid).toBe(true);
+    expect(integrity.body.data.checks.hasCid).toBe(true);
+    expect(integrity.body.data.checks.hasHash).toBe(true);
   });
 
   it("returns role-based dashboard summary payload", async () => {

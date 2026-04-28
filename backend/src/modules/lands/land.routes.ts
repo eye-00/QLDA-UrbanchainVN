@@ -15,7 +15,6 @@ const listSchema = z.object({
   keyword: z.string().optional(),
   ownerUserId: z.string().optional(),
   provinceCode: z.string().optional(),
-  districtName: z.string().optional(),
   communeName: z.string().optional(),
   landUsePurpose: z.string().optional(),
   page: z.coerce.number().int().positive().default(1),
@@ -25,7 +24,6 @@ const listSchema = z.object({
 const createSchema = z.object({
   parcelCode: z.string().min(3),
   provinceCode: z.string().min(1),
-  districtName: z.string().min(1),
   communeName: z.string().min(1),
   mapSheetNumber: z.string().min(1),
   parcelNumber: z.string().min(1),
@@ -46,7 +44,6 @@ function toLandItem(item: {
   id: string;
   parcelCode: string;
   provinceCode: string;
-  districtName: string;
   communeName: string;
   mapSheetNumber: string;
   parcelNumber: string;
@@ -64,7 +61,6 @@ function toLandItem(item: {
     id: item.id,
     parcelCode: item.parcelCode,
     provinceCode: item.provinceCode,
-    districtName: item.districtName,
     communeName: item.communeName,
     mapSheetNumber: item.mapSheetNumber,
     parcelNumber: item.parcelNumber,
@@ -90,14 +86,13 @@ landRouter.get(
     const parsed = listSchema.safeParse(req.query);
     if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
 
-    const { page, pageSize, keyword, ownerUserId, provinceCode, districtName, communeName, landUsePurpose } =
+    const { page, pageSize, keyword, ownerUserId, provinceCode, communeName, landUsePurpose } =
       parsed.data;
     const skip = (page - 1) * pageSize;
 
     const where: Prisma.LandParcelWhereInput = {
       ...(ownerUserId ? { ownerUserId } : {}),
       ...(provinceCode ? { provinceCode } : {}),
-      ...(districtName ? { districtName: { contains: districtName } } : {}),
       ...(communeName ? { communeName: { contains: communeName } } : {}),
       ...(landUsePurpose ? { landUsePurpose: { contains: landUsePurpose } } : {}),
       ...(keyword
@@ -134,11 +129,10 @@ landRouter.get(
     const parsed = listSchema.safeParse({ ...req.query, keyword, q: undefined });
     if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
 
-    const { page, pageSize, ownerUserId, provinceCode, districtName, communeName, landUsePurpose } = parsed.data;
+    const { page, pageSize, ownerUserId, provinceCode, communeName, landUsePurpose } = parsed.data;
     const where: Prisma.LandParcelWhereInput = {
       ...(ownerUserId ? { ownerUserId } : {}),
       ...(provinceCode ? { provinceCode } : {}),
-      ...(districtName ? { districtName: { contains: districtName } } : {}),
       ...(communeName ? { communeName: { contains: communeName } } : {}),
       ...(landUsePurpose ? { landUsePurpose: { contains: landUsePurpose } } : {}),
       ...(keyword
@@ -177,7 +171,6 @@ landRouter.post(
         data: {
           parcelCode: parsed.data.parcelCode.toUpperCase(),
           provinceCode: parsed.data.provinceCode,
-          districtName: parsed.data.districtName,
           communeName: parsed.data.communeName,
           mapSheetNumber: parsed.data.mapSheetNumber,
           parcelNumber: parsed.data.parcelNumber,
@@ -199,7 +192,6 @@ landRouter.post(
         payload: {
           parcelCode: land.parcelCode,
           provinceCode: land.provinceCode,
-          districtName: land.districtName,
           communeName: land.communeName
         }
       });
@@ -231,7 +223,6 @@ landRouter.patch(
         data: {
           ...(parsed.data.parcelCode !== undefined ? { parcelCode: parsed.data.parcelCode.toUpperCase() } : {}),
           ...(parsed.data.provinceCode !== undefined ? { provinceCode: parsed.data.provinceCode } : {}),
-          ...(parsed.data.districtName !== undefined ? { districtName: parsed.data.districtName } : {}),
           ...(parsed.data.communeName !== undefined ? { communeName: parsed.data.communeName } : {}),
           ...(parsed.data.mapSheetNumber !== undefined ? { mapSheetNumber: parsed.data.mapSheetNumber } : {}),
           ...(parsed.data.parcelNumber !== undefined ? { parcelNumber: parsed.data.parcelNumber } : {}),
@@ -253,7 +244,6 @@ landRouter.patch(
         payload: {
           parcelCode: land.parcelCode,
           provinceCode: land.provinceCode,
-          districtName: land.districtName,
           communeName: land.communeName
         }
       });

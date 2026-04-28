@@ -5,6 +5,7 @@ import {
   CITIZEN_ROLES,
   DASHBOARD_ROLES,
   LAND_MANAGEMENT_ROLES,
+  REGISTRATION_REVIEW_ROLES,
   ROLE_LABELS
 } from '../src/auth/roles';
 
@@ -16,6 +17,7 @@ describe('auth route role mapping', () => {
     expect(LAND_MANAGEMENT_ROLES).toContain('RECEPTION_OFFICER');
     expect(LAND_MANAGEMENT_ROLES).toContain('ADMIN');
     expect(LAND_MANAGEMENT_ROLES).not.toContain('CITIZEN');
+    expect(REGISTRATION_REVIEW_ROLES).toEqual(LAND_MANAGEMENT_ROLES);
   });
 
   it('has labels for all route guard roles', () => {
