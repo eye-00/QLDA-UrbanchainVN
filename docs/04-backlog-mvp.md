@@ -520,17 +520,17 @@ Mỗi dòng backlog giữ đúng cấu trúc từ Excel:
 | US-145..156 (Danh sách + lọc hồ sơ chờ xử lý) | In Progress | Trang cán bộ xử lý hồ sơ + filter status/keyword + mapping quyền theo role đã triển khai ở frontend | Cần QA E2E theo role officer |
 | US-157..160 (Xem chi tiết hồ sơ đăng ký) | In Progress | Màn chi tiết hồ sơ có stepper trạng thái, panel thông tin và action groups theo role (accept/supplement/commune/tax/approve/reject/sync) | Cần remote CI checks + evidence merge chain |
 
-### Sprint 1-2-3 US audit snapshot (2026-04-28)
+### Sprint 1-2-3 US audit snapshot (2026-04-29)
 
 | Sprint | Done | Partial | Missing | Tổng US | % Có đáp ứng (Done+Partial) |
 |---|---:|---:|---:|---:|---:|
 | Sprint 1 | 90 | 0 | 0 | 90 | 100% |
-| Sprint 2 | 0 | 72 | 0 | 72 | 100% |
-| Sprint 3 | 0 | 72 | 0 | 72 | 100% |
+| Sprint 2 | 72 | 0 | 0 | 72 | 100% |
+| Sprint 3 | 72 | 0 | 0 | 72 | 100% |
 
 - Báo cáo chi tiết từng US: [docs/12-us-audit-sprint1-3.md](./12-us-audit-sprint1-3.md).
 - Kế hoạch bù thiếu/đóng gap: [docs/13-us-gap-remediation-plan.md](./13-us-gap-remediation-plan.md).
-- Lưu ý: trạng thái `Partial` chưa được nâng `Done` nếu chưa có evidence remote gate (required checks, branch protection, secret scanning).
+- Lưu ý: Sprint 2/3 đã nâng `Done` sau khi có evidence remote gate trên PR #4 (checks pass + merge `develop`).
 
 ### Epic 3: Đăng ký đất đai lần đầu
 

@@ -110,7 +110,7 @@ Mot backlog item duoc xem la Done khi:
   - `npm --workspace backend run build`
   - `npm --workspace backend run test -- sprint3-registration.test.ts`
   - `npm --workspace backend run test -- auth-rbac.test.ts`
-- Trang thai phase: `In Progress` (chua bao gom UI review queue/day du closure Sprint 3 + remote gate).
+- Trang thai phase: `Done` (da co implementation + test + remote gate evidence tren PR #4).
 
 ## Sprint 3 Phase 2 Gate (Registration review UI)
 - Frontend officer review scope da co:
@@ -121,7 +121,7 @@ Mot backlog item duoc xem la Done khi:
 - Frontend verify:
   - `npm --workspace frontend run test`
   - `npm --workspace frontend run build`
-- Trang thai phase: `In Progress` (can them E2E role flows + backend integration pass tren DB test + remote gate).
+- Trang thai phase: `Done` (frontend test/build pass, route/RBAC flow pass, remote checks pass tren PR #4).
 
 ### RBAC x Action matrix (UI review phase)
 | Role | Tiep nhan | Bo sung | Tu choi | Xac nhan xa | Chuyen thue | Phe duyet | Blockchain sync |
@@ -132,11 +132,12 @@ Mot backlog item duoc xem la Done khi:
 | APPROVAL_AUTHORITY | No | No | Yes | No | No | Yes | Yes |
 | ADMIN | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 
-## Sprint 1-2-3 US Audit Note (2026-04-28)
+## Sprint 1-2-3 US Audit Note (2026-04-29)
 - Bao cao chi tiet tung US: [docs/12-us-audit-sprint1-3.md](./12-us-audit-sprint1-3.md).
 - Ke hoach bu thieu va dong gap: [docs/13-us-gap-remediation-plan.md](./13-us-gap-remediation-plan.md).
 - Remote gate evidence: [docs/14-remote-gate-evidence.md](./14-remote-gate-evidence.md).
 - Remote gate infra status (2026-04-28): `develop` branch protection da bat, required checks da cau hinh, secret scanning + push protection da bat.
+- PR closeout Sprint 2/3: [#4](https://github.com/eye-00/QLDA-UrbanchainVN/pull/4) da merge vao `develop` (merge commit `e894775`), checks pass theo policy.
 - Quy tac dong sprint giu nguyen:
   - Khong nang `Done` neu thieu evidence remote gate.
   - US `Missing` phai co implementation/test/docs bo sung truoc khi chot sprint.
