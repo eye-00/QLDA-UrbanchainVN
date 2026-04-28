@@ -48,6 +48,7 @@ contract UrbanLandRegistry is ERC721, AccessControl, Pausable {
     uint256 private _nextTokenId = 1;
     mapping(uint256 => LandRecord) private _landRecords;
     mapping(string => uint256) public tokenIdByRegistrationCode;
+    mapping(string => uint256) public tokenIdByLandCode;
     mapping(string => bool) public usedTransferCode;
     mapping(uint256 => TransferRecord[]) private _transferHistory;
 
@@ -99,9 +100,19 @@ contract UrbanLandRegistry is ERC721, AccessControl, Pausable {
         LandStatus status,
         address tokenOwner
     ) external onlyRole(REGISTRAR_ROLE) whenNotPaused returns (uint256 tokenId) {
+        uint256 existingLandTokenId = tokenIdByLandCode[landCode];
+
         require(bytes(registrationCode).length > 0, "registrationCode required");
         require(bytes(landCode).length > 0, "landCode required");
+        require(parcelRef != bytes32(0), "parcelRef required");
+        require(ownerRef != bytes32(0), "ownerRef required");
+        require(bytes(documentCid).length > 0, "documentCid required");
+        require(documentHash != bytes32(0), "documentHash required");
         require(tokenIdByRegistrationCode[registrationCode] == 0, "registration already used");
+        require(
+            existingLandTokenId == 0 || !_landRecords[existingLandTokenId].active,
+            "landCode already active"
+        );
         require(tokenOwner != address(0), "tokenOwner required");
 
         tokenId = _nextTokenId++;
@@ -118,10 +129,11 @@ contract UrbanLandRegistry is ERC721, AccessControl, Pausable {
             landStatus: status,
             issuedAt: uint64(block.timestamp),
             lastUpdatedAt: uint64(block.timestamp),
-            active: true
+            active: status != LandStatus.CANCELLED_REF
         });
 
         tokenIdByRegistrationCode[registrationCode] = tokenId;
+        tokenIdByLandCode[landCode] = tokenId;
         emit LandRegistered(registrationCode, tokenId, landCode, ownerRef, documentCid, documentHash);
     }
 
@@ -135,10 +147,19 @@ contract UrbanLandRegistry is ERC721, AccessControl, Pausable {
         address newTokenOwner
     ) external onlyRole(TRANSFER_AGENT_ROLE) whenNotPaused {
         require(_ownerOf(tokenId) != address(0), "token does not exist");
+        require(bytes(transferCode).length > 0, "transferCode required");
+        require(fromOwnerRef != bytes32(0), "fromOwnerRef required");
+        require(toOwnerRef != bytes32(0), "toOwnerRef required");
+        require(fromOwnerRef == _landRecords[tokenId].ownerRef, "fromOwnerRef mismatch");
+        require(toOwnerRef != fromOwnerRef, "ownerRef unchanged");
+        require(bytes(supportingCid).length > 0, "supportingCid required");
+        require(supportingHash != bytes32(0), "supportingHash required");
+        require(_landRecords[tokenId].active, "land inactive");
         require(!usedTransferCode[transferCode], "transfer code used");
         require(newTokenOwner != address(0), "new owner required");
 
         address currentOwner = ownerOf(tokenId);
+        require(newTokenOwner != currentOwner, "owner unchanged");
         _transfer(currentOwner, newTokenOwner, tokenId);
         usedTransferCode[transferCode] = true;
 
@@ -182,8 +203,21 @@ contract UrbanLandRegistry is ERC721, AccessControl, Pausable {
         require(_ownerOf(tokenId) != address(0), "token does not exist");
         LandStatus oldStatus = _landRecords[tokenId].landStatus;
         _landRecords[tokenId].landStatus = newStatus;
+        _landRecords[tokenId].active = newStatus != LandStatus.CANCELLED_REF;
         _landRecords[tokenId].lastUpdatedAt = uint64(block.timestamp);
         emit LandStatusUpdated(tokenId, oldStatus, newStatus);
+    }
+
+    function transferFrom(address, address, uint256) public pure override {
+        revert("direct transfer disabled");
+    }
+
+    function approve(address, uint256) public pure override {
+        revert("approve disabled");
+    }
+
+    function setApprovalForAll(address, bool) public pure override {
+        revert("approve disabled");
     }
 
     function getLandRecord(uint256 tokenId) external view returns (LandRecord memory) {

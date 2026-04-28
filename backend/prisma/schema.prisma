@@ -17,6 +17,11 @@ enum UserRole {
   ADMIN
 }
 
+enum UserStatus {
+  ACTIVE
+  LOCKED
+}
+
 enum RegistrationStatus {
   MOI_TAO
   CHO_TIEP_NHAN
@@ -49,14 +54,73 @@ enum TransferStatus {
 }
 
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
+  id             String         @id @default(cuid())
+  email          String         @unique
   fullName       String
   role           UserRole
+  status         UserStatus     @default(ACTIVE)
+  passwordHash   String
+  failedLoginAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  lastLoginAt    DateTime?
+  passwordResetTokenHash String?
+  passwordResetExpiresAt DateTime?
   identityNumber String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  organizationId String?
+  organization   Organization?  @relation(fields: [organizationId], references: [id])
   registrations  Registration[]
+  ownedParcels   LandParcel[]   @relation("ParcelOwner")
+  sessions       AuthSession[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model AuthSession {
+  id               String   @id @default(cuid())
+  userId           String
+  refreshTokenHash String
+  refreshTokenFingerprint String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  lastUsedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([refreshTokenFingerprint, revokedAt, expiresAt])
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model LandParcel {
+  id            String   @id @default(cuid())
+  parcelCode    String
+  provinceCode  String
+  districtName  String
+  communeName   String
+  mapSheetNumber String
+  parcelNumber  String
+  area          Decimal  @db.Decimal(10,2)
+  landUsePurpose String
+  address       String
+  latitude      Decimal? @db.Decimal(10,7)
+  longitude     Decimal? @db.Decimal(10,7)
+  ownerUserId   String?
+  owner         User?    @relation("ParcelOwner", fields: [ownerUserId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([parcelCode, provinceCode, districtName, communeName], name: "land_parcel_unique_code_area")
 }
 
 model Registration {
