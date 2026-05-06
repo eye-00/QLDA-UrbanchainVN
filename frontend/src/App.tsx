@@ -18,6 +18,7 @@ import { OrganizationManagementPage } from './pages/OrganizationManagementPage';
 import { LandManagementPage } from './pages/LandManagementPage';
 import { SearchLandPage } from './pages/SearchLandPage';
 import { RegistrationReviewPage } from './pages/RegistrationReviewPage';
+import { WalletManagementPage } from './pages/WalletManagementPage';
 
 function hasRole(role: UserRole | undefined, roles: UserRole[]) {
   return Boolean(role && roles.includes(role));
@@ -32,6 +33,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Bảng điều khiển', roles: DASHBOARD_ROLES },
   { to: '/registrations/create', label: 'Đăng ký lần đầu', roles: CITIZEN_ROLES },
+  { to: '/wallets', label: 'Ví blockchain', roles: CITIZEN_ROLES },
   { to: '/admin/users', label: 'Người dùng', roles: ADMIN_ONLY_ROLES },
   { to: '/admin/organizations', label: 'Đơn vị', roles: ADMIN_ONLY_ROLES },
   { to: '/lands', label: 'Thửa đất', roles: LAND_MANAGEMENT_ROLES },
@@ -51,6 +53,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/login': 'Đăng nhập hệ thống',
   '/dashboard': 'Bảng điều khiển',
   '/registrations/create': 'Nộp hồ sơ đăng ký lần đầu',
+  '/wallets': 'Quản lý ví blockchain',
   '/admin/users': 'Quản lý người dùng',
   '/admin/organizations': 'Quản lý đơn vị',
   '/lands': 'Quản lý thửa đất',
@@ -125,6 +128,7 @@ export function App() {
           />
           <Route path="/" element={<RequireAuth><HomeEntry /></RequireAuth>} />
           <Route path="/registrations/create" element={<RequireAuth roles={CITIZEN_ROLES}><CitizenRegistrationPage /></RequireAuth>} />
+          <Route path="/wallets" element={<RequireAuth roles={CITIZEN_ROLES}><WalletManagementPage /></RequireAuth>} />
           <Route path="/dashboard" element={<RequireAuth roles={DASHBOARD_ROLES}><AdminDashboardPage /></RequireAuth>} />
           <Route path="/admin/users" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><UserManagementPage /></RequireAuth>} />
           <Route path="/admin/organizations" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><OrganizationManagementPage /></RequireAuth>} />

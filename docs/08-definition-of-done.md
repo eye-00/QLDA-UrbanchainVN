@@ -16,6 +16,10 @@ Mot backlog item duoc xem la Done khi:
   - user LOCKED khong login duoc,
   - refresh/logout lifecycle hoat dong,
   - ownership scope cho du lieu ca nhan.
+- Sprint 1 Epic 13 (wallet):
+  - wallet connect + challenge + verify (EIP-191) hoat dong,
+  - nonce one-time co TTL va tu choi replay,
+  - khong luu private key/seed phrase/chu ky tho trong log.
 - Audit APIs hoat dong dung RBAC (`/audit/access-logs`, `/audit/user-actions`, `/audit/rbac-changes`).
 - Lint/build/test pass o root:
   - `npm run lint`

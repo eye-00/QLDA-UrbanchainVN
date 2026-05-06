@@ -15,6 +15,17 @@ Cập nhật: 2026-04-29 00:10:00
 | Sprint 2 | 72 | 0 | 0 | 72 | 100% |
 | Sprint 3 | 72 | 0 | 0 | 72 | 100% |
 
+## Bổ sung backlog ví blockchain (Sprint 1 Epic 13)
+
+- Backlog mới bổ sung nhóm `US-547..558` cho Sprint 1 (kết nối ví + xác minh chữ ký).
+- Trạng thái hiện tại: `Partial` (đã có implementation + local test, chờ remote gate PR để nâng `Done`).
+- Evidence local:
+  - [backend/src/modules/wallets/wallet.routes.ts](../backend/src/modules/wallets/wallet.routes.ts)
+  - [backend/test/sprint1-wallet.test.ts](../backend/test/sprint1-wallet.test.ts)
+  - [frontend/src/pages/WalletManagementPage.tsx](../frontend/src/pages/WalletManagementPage.tsx)
+  - [frontend/test/wallet-helpers.test.ts](../frontend/test/wallet-helpers.test.ts)
+  - [docs/07-api-contract.md](./07-api-contract.md)
+
 ## Ma trận chi tiết từng US
 
 | US_ID | Sprint | Feature | Acceptance | Evidence_Code | Evidence_Test | Evidence_Docs | Status | Risk | Remote_Dependency |

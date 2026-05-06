@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { apiGet, apiPost } from '../lib/api';
 import { useToast } from '../ui/ToastContext';
 import { getRegistrationStatusBadgeClass, getRegistrationStatusLabel } from '../ui/registrationStatus';
@@ -151,6 +152,11 @@ export function CitizenRegistrationPage() {
           <p className="section-subtitle">
             Khai báo thông tin thửa đất theo địa giới 2 cấp và theo dõi trạng thái hồ sơ sau khi nộp.
           </p>
+        </div>
+        <div className="action-row">
+          <Link to="/wallets" className="btn-link btn-link-outline">
+            Quản lý ví
+          </Link>
         </div>
       </div>
       {locationNotice && <p className="notice">{locationNotice}</p>}
