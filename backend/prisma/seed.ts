@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import { BlockchainNetwork, Prisma, PrismaClient, WalletStatus } from "@prisma/client";
 import { randomBytes, scryptSync } from "node:crypto";
 
 const prisma = new PrismaClient();
@@ -196,11 +196,92 @@ async function seedLandParcels() {
   });
 }
 
+async function seedWallets() {
+  const citizen = await prisma.user.findUniqueOrThrow({
+    where: { email: "citizen@urbanchain.vn" }
+  });
+
+  const verifiedWallet = await prisma.walletAccount.upsert({
+    where: {
+      wallet_network_address_unique: {
+        network: BlockchainNetwork.SEPOLIA,
+        address: "0x1234567890123456789012345678901234567890"
+      }
+    },
+    update: {
+      userId: citizen.id,
+      status: WalletStatus.VERIFIED,
+      isDefault: true,
+      verifiedAt: new Date(),
+      lastVerifiedAt: new Date()
+    },
+    create: {
+      userId: citizen.id,
+      network: BlockchainNetwork.SEPOLIA,
+      address: "0x1234567890123456789012345678901234567890",
+      status: WalletStatus.VERIFIED,
+      isDefault: true,
+      verifiedAt: new Date(),
+      lastVerifiedAt: new Date()
+    }
+  });
+
+  const pendingWallet = await prisma.walletAccount.upsert({
+    where: {
+      wallet_network_address_unique: {
+        network: BlockchainNetwork.HARDHAT,
+        address: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+      }
+    },
+    update: {
+      userId: citizen.id,
+      status: WalletStatus.PENDING_VERIFICATION,
+      isDefault: false
+    },
+    create: {
+      userId: citizen.id,
+      network: BlockchainNetwork.HARDHAT,
+      address: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+      status: WalletStatus.PENDING_VERIFICATION,
+      isDefault: false
+    }
+  });
+
+  await prisma.walletVerificationChallenge.deleteMany({
+    where: { walletId: pendingWallet.id }
+  });
+
+  const issuedAt = new Date();
+  const nonce = randomBytes(16).toString("hex");
+  const message = [
+    "UrbanChain-VN Wallet Verification",
+    `Address: ${pendingWallet.address}`,
+    `Nonce: ${nonce}`,
+    `IssuedAt: ${issuedAt.toISOString()}`,
+    "Purpose: Verify wallet ownership for account linking only."
+  ].join("\n");
+
+  await prisma.walletVerificationChallenge.create({
+    data: {
+      walletId: pendingWallet.id,
+      nonce,
+      message,
+      expiresAt: new Date(issuedAt.getTime() + 10 * 60 * 1000)
+    }
+  });
+
+  await prisma.walletAccount.update({
+    where: { id: verifiedWallet.id },
+    data: { isDefault: true }
+  });
+}
+
 async function main() {
   await seedOrganizations();
   await seedUsers();
   await seedRegistrationAndFile();
   await seedLandParcels();
+  await seedWallets();
 }
 
 main()

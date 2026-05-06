@@ -22,6 +22,18 @@ enum UserStatus {
   LOCKED
 }
 
+enum WalletStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  INACTIVE
+}
+
+enum BlockchainNetwork {
+  SEPOLIA
+  HARDHAT
+  GANACHE
+}
+
 enum RegistrationStatus {
   MOI_TAO
   CHO_TIEP_NHAN
@@ -71,6 +83,7 @@ model User {
   registrations  Registration[]
   ownedParcels   LandParcel[]   @relation("ParcelOwner")
   sessions       AuthSession[]
+  wallets        WalletAccount[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -176,6 +189,37 @@ model FileAsset {
   registrationId String?
   registration   Registration? @relation(fields: [registrationId], references: [id])
   createdAt      DateTime @default(now())
+}
+
+model WalletAccount {
+  id               String                      @id @default(cuid())
+  userId           String
+  address          String
+  network          BlockchainNetwork
+  status           WalletStatus                @default(PENDING_VERIFICATION)
+  isDefault        Boolean                     @default(false)
+  verifiedAt       DateTime?
+  lastVerifiedAt   DateTime?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  user             User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenges       WalletVerificationChallenge[]
+
+  @@unique([network, address], name: "wallet_network_address_unique")
+  @@index([userId, network, isDefault])
+}
+
+model WalletVerificationChallenge {
+  id         String        @id @default(cuid())
+  walletId   String
+  nonce      String
+  message    String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime      @default(now())
+  wallet     WalletAccount @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, usedAt, expiresAt])
 }
 
 model AuditLog {

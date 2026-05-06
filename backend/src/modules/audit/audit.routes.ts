@@ -80,7 +80,8 @@ auditRouter.get(
       { action: { startsWith: "REGISTRATION_" } },
       { action: { startsWith: "TRANSFER_" } },
       { action: { startsWith: "FILE_" } },
-      { action: { startsWith: "AUTH_PASSWORD_" } }
+      { action: { startsWith: "AUTH_PASSWORD_" } },
+      { action: { startsWith: "WALLET_" } }
     ];
     if (parsed.data.action) where.action = { contains: parsed.data.action };
     return ok(res, await fetchAuditLogs(parsed.data, where));
