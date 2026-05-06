@@ -261,6 +261,29 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.btn-link {
+  min-height: 40px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  padding: 8px 14px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.btn-link-outline {
+  border-color: var(--color-border-strong);
+  background: #fff;
+  color: var(--color-text);
+}
+
+.btn-link-outline:hover {
+  background: var(--color-surface-soft);
+}
+
 .btn {
   min-height: 40px;
 }

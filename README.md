@@ -105,6 +105,7 @@ If Docker Desktop is not running, start it before `npm run infra:up`.
 ### Sprint 1 verification commands
 - `npm run db:generate`
 - `npm --workspace backend run test`
+- `npm --workspace backend run test -- sprint1-wallet.test.ts`
 - `npm --workspace frontend run test`
 - `npm --workspace contracts run test`
 
@@ -115,9 +116,18 @@ If Docker Desktop is not running, start it before `npm run infra:up`.
 - `POST /api/v1/auth/password/reset-confirm`
 - `POST /api/v1/auth/change-password`
 
+### Sprint 1 wallet endpoints (Epic 13)
+- `POST /api/v1/wallets/connect`
+- `POST /api/v1/wallets/:id/challenge`
+- `POST /api/v1/wallets/:id/verify`
+- `GET /api/v1/wallets/me`
+- `PATCH /api/v1/wallets/:id/default`
+
 ### Sprint 1 closure evidence (local vs remote)
 - Local evidence for US auth/test/audit:
   - `backend/test/auth-rbac.test.ts`
+  - `backend/test/sprint1-wallet.test.ts`
+  - `backend/src/modules/wallets/wallet.routes.ts`
   - `backend/src/modules/auth/auth.routes.ts`
   - `backend/src/modules/audit/audit.routes.ts`
   - `.github/workflows/ci.yml`

@@ -239,6 +239,78 @@ Lấy hồ sơ người dùng hiện tại.
 - API trả mã `400` với error envelope chuẩn.
 - Hệ thống hỗ trợ auto-lock theo số lần đăng nhập sai vượt ngưỡng.
 
+## 4.10. Wallet APIs (Sprint 1 Epic 13)
+
+> Nhóm API chỉ cho `CITIZEN` và `BUSINESS`, dùng để liên kết và xác minh quyền sở hữu ví.
+
+### POST /wallets/connect
+Liên kết ví EVM với tài khoản hiện tại (chưa xác minh).
+
+#### Request
+```json
+{
+  "address": "0x1234567890123456789012345678901234567890",
+  "network": "SEPOLIA"
+}
+```
+
+#### Quy tắc
+- Validate địa chỉ EVM hợp lệ.
+- Unique `(network,address)` toàn hệ thống.
+- Không lưu private key/seed phrase.
+- Trạng thái khởi tạo: `PENDING_VERIFICATION`.
+
+### POST /wallets/:id/challenge
+Tạo challenge ký xác minh (nonce one-time, có hạn dùng).
+
+#### Response data
+```json
+{
+  "walletId": "wal_001",
+  "challengeId": "wch_001",
+  "message": "UrbanChain-VN Wallet Verification\n...",
+  "nonce": "f8a0...",
+  "expiresAt": "2026-05-06T03:35:00.000Z"
+}
+```
+
+### POST /wallets/:id/verify
+Xác minh chữ ký theo EIP-191 bằng `ethers.verifyMessage`.
+
+#### Request
+```json
+{
+  "signature": "0x..."
+}
+```
+
+#### Quy tắc
+- Chỉ xác minh trên challenge chưa dùng và chưa hết hạn.
+- Chữ ký sai hoặc challenge hết hạn trả lỗi `400`.
+- Xác minh thành công cập nhật trạng thái ví `VERIFIED`.
+
+### GET /wallets/me
+Lấy danh sách ví thuộc user hiện tại.
+
+### PATCH /wallets/:id/default
+Đặt ví mặc định (chỉ cho ví `VERIFIED`).
+
+#### Quy tắc
+- Mỗi user chỉ có 1 ví mặc định trên mỗi network tại một thời điểm.
+- Ví không thuộc user hiện tại trả `403`.
+
+### Wallet status
+- `PENDING_VERIFICATION`
+- `VERIFIED`
+- `INACTIVE`
+
+### Wallet audit actions
+- `WALLET_CONNECTED`
+- `WALLET_CHALLENGE_CREATED`
+- `WALLET_VERIFIED`
+- `WALLET_DEFAULT_CHANGED`
+- `WALLET_VERIFY_FAILED`
+
 ---
 
 ## 5. User & Organization APIs (Sprint 2)
