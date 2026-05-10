@@ -97,6 +97,38 @@ Mot backlog item duoc xem la Done khi:
 ### Trang thai closure ghi nhan
 - Nhom US Sprint 2 Must+Should: `Done`.
 
+## Sprint 2 Legal-Aligned Gate (2026-05-10)
+
+### Co the verify local
+- Legal entities + migration + seed:
+  - [backend/prisma/schema.prisma](../backend/prisma/schema.prisma)
+  - [backend/prisma/migrations/20260510120000_sprint2_legal_core/migration.sql](../backend/prisma/migrations/20260510120000_sprint2_legal_core/migration.sql)
+  - [backend/prisma/seed.ts](../backend/prisma/seed.ts)
+- Legal APIs/guards:
+  - [backend/src/modules/legal/legal.routes.ts](../backend/src/modules/legal/legal.routes.ts)
+  - [backend/src/modules/registrations/registration.routes.ts](../backend/src/modules/registrations/registration.routes.ts)
+  - [backend/src/modules/files/file.routes.ts](../backend/src/modules/files/file.routes.ts)
+- Frontend legal UX:
+  - [frontend/src/pages/RegistrationReviewPage.tsx](../frontend/src/pages/RegistrationReviewPage.tsx)
+  - [frontend/src/pages/CitizenRegistrationPage.tsx](../frontend/src/pages/CitizenRegistrationPage.tsx)
+  - [frontend/src/ui/registrationStatus.ts](../frontend/src/ui/registrationStatus.ts)
+- Test evidence:
+  - [backend/test/sprint2-legal.test.ts](../backend/test/sprint2-legal.test.ts)
+  - [backend/test/sprint3-registration.test.ts](../backend/test/sprint3-registration.test.ts)
+  - [frontend/test/registration-review-helpers.test.ts](../frontend/test/registration-review-helpers.test.ts)
+
+### Gate command status (local)
+- `npm run db:generate` ✅
+- `npm run db:migrate` ✅
+- `npm run db:seed` ✅
+- `npm run lint` ✅ (còn warning hooks frontend, không fail gate)
+- `npm run build` ✅
+- `npm test` ✅
+
+### Trang thai closure ghi nhan
+- `LEG-S2-001..005`: `Done (local)`.
+- Sprint 2 legal-aligned overall: `Partial` cho đến khi pass required checks remote trên chuỗi PR (`backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`).
+
 ## Sprint 3 Phase 1 Gate (Registration core)
 - Data + API core da duoc mo:
   - `POST /registrations`
