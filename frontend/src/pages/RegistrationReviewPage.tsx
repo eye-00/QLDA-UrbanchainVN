@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { apiGet, apiPost } from '../lib/api';
+import { apiGet, apiPatch, apiPost } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../ui/ToastContext';
 import { getRegistrationStatusBadgeClass, getRegistrationStatusLabel } from '../ui/registrationStatus';
@@ -17,6 +17,8 @@ type RegistrationItem = {
   code: string;
   applicantId: string;
   status: string;
+  procedureCode?: string | null;
+  legalBasisCode?: string | null;
   landInfo: {
     provinceCode: string;
     communeName: string;
@@ -41,6 +43,21 @@ type RegistrationListResponse = {
   total: number;
 };
 
+type PaymentObligationItem = {
+  id: string;
+  type: 'INTAKE_FEE' | 'LAND_FINANCIAL_OBLIGATION';
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  legalBasisCode: string;
+  referenceNo: string | null;
+  amount: number | null;
+  note: string | null;
+};
+
+type PaymentObligationListResponse = {
+  items: PaymentObligationItem[];
+  total: number;
+};
+
 const STATUS_FILTER_OPTIONS = [
   'CHO_TIEP_NHAN',
   'CAN_BO_SUNG',
@@ -49,8 +66,14 @@ const STATUS_FILTER_OPTIONS = [
   'DA_XAC_NHAN_CAP_XA',
   'DANG_THAM_DINH_VPDKDD',
   'CHO_THUE',
+  'CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH',
+  'DA_HOAN_THANH_NGHIA_VU_TAI_CHINH',
   'CHO_KY_CAP',
+  'DA_KY_CAP',
+  'DA_CAP_NHAT_HO_SO_DIA_CHINH',
+  'DA_GHI_BLOCKCHAIN',
   'DA_CAP',
+  'DA_TRA_KET_QUA',
   'TU_CHOI'
 ];
 
@@ -71,6 +94,8 @@ export function RegistrationReviewPage() {
   const [approvalNumber, setApprovalNumber] = useState('');
   const [chainCid, setChainCid] = useState('');
   const [chainHash, setChainHash] = useState('');
+  const [legalBasisCode, setLegalBasisCode] = useState('');
+  const [paymentObligations, setPaymentObligations] = useState<PaymentObligationItem[]>([]);
 
   const selected = useMemo(() => items.find((item) => item.id === selectedId) ?? null, [items, selectedId]);
   const queryString = useMemo(() => buildRegistrationReviewQuery(filters), [filters]);
@@ -101,11 +126,40 @@ export function RegistrationReviewPage() {
     void loadRegistrations();
   }, []);
 
+  useEffect(() => {
+    if (!selected) {
+      setPaymentObligations([]);
+      return;
+    }
+    setLegalBasisCode(selected.legalBasisCode ?? selected.procedureCode ?? '');
+    void loadPaymentObligations(selected.id);
+  }, [selected?.id]);
+
+  async function loadPaymentObligations(registrationId: string) {
+    try {
+      const data = await apiGet<PaymentObligationListResponse>(`/registrations/${registrationId}/payment-obligations`);
+      setPaymentObligations(data.items);
+    } catch {
+      setPaymentObligations([]);
+    }
+  }
+
+  function resolveLegalBasisCode() {
+    const value = legalBasisCode.trim();
+    if (value) return value;
+    if (selected?.procedureCode) return selected.procedureCode;
+    return `LEGAL-${Date.now()}`;
+  }
+
   async function executeAction(path: string, body: Record<string, unknown>, successMessage: string) {
     if (!selected) return;
     setLoading(true);
     try {
-      await apiPost(`/registrations/${selected.id}${path}`, body);
+      const payload = {
+        ...body,
+        legalBasisCode: typeof body.legalBasisCode === 'string' ? body.legalBasisCode : resolveLegalBasisCode()
+      };
+      await apiPost(`/registrations/${selected.id}${path}`, payload);
       showToast('success', successMessage);
       setActionNote('');
       setTaxReferenceNo('');
@@ -113,6 +167,7 @@ export function RegistrationReviewPage() {
       setChainCid('');
       setChainHash('');
       await loadRegistrations();
+      await loadPaymentObligations(selected.id);
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Không thực hiện được thao tác.');
     } finally {
@@ -272,6 +327,14 @@ export function RegistrationReviewPage() {
           <div className="row-gap">
             <h3>Thao tác xử lý</h3>
             <label>
+              Căn cứ pháp lý
+              <input
+                value={legalBasisCode}
+                onChange={(event) => setLegalBasisCode(event.target.value)}
+                placeholder="VD: QĐ3380-2025-UBND"
+              />
+            </label>
+            <label>
               Ghi chú xử lý
               <input
                 value={actionNote}
@@ -354,6 +417,58 @@ export function RegistrationReviewPage() {
               </div>
             )}
 
+            {permissions.canConfirmPayment && (
+              <div className="row-gap">
+                <h4>Ghi nhận nghĩa vụ tài chính</h4>
+                {paymentObligations.length === 0 ? (
+                  <div className="empty-state">Chưa có nghĩa vụ tài chính cần xử lý.</div>
+                ) : (
+                  <div className="action-stack">
+                    {paymentObligations.map((item) => (
+                      <div key={item.id} className="action-row action-row-spread">
+                        <div>
+                          <strong>{item.type === 'INTAKE_FEE' ? 'Phí tiếp nhận' : 'Nghĩa vụ tài chính đất đai'}</strong>
+                          <div className="muted">
+                            {item.referenceNo ?? 'Chưa có mã tham chiếu'} - {item.amount ? `${item.amount.toLocaleString('vi-VN')} đ` : 'Chưa có số tiền'}
+                          </div>
+                        </div>
+                        <div className="action-row">
+                          <span className={`badge ${item.status === 'CONFIRMED' ? 'badge-success' : item.status === 'CANCELLED' ? 'badge-danger' : 'badge-warning'}`}>
+                            {item.status === 'PENDING' ? 'Đang chờ' : item.status === 'CONFIRMED' ? 'Đã xác nhận' : 'Đã hủy'}
+                          </span>
+                          {item.status === 'PENDING' && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!selected) return;
+                                setLoading(true);
+                                try {
+                                  await apiPatch(`/registrations/${selected.id}/payment-obligations/${item.id}/status`, {
+                                    status: 'CONFIRMED',
+                                    legalBasisCode: resolveLegalBasisCode(),
+                                    note: actionNote || undefined
+                                  });
+                                  showToast('success', 'Đã xác nhận hoàn thành nghĩa vụ tài chính.');
+                                  await loadRegistrations();
+                                  await loadPaymentObligations(selected.id);
+                                } catch (error) {
+                                  showToast('error', error instanceof Error ? error.message : 'Không xác nhận được nghĩa vụ tài chính.');
+                                } finally {
+                                  setLoading(false);
+                                }
+                              }}
+                            >
+                              Xác nhận hoàn thành
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {permissions.canApprove && (
               <div className="form-grid">
                 <label>
@@ -416,6 +531,24 @@ export function RegistrationReviewPage() {
                     Đồng bộ blockchain
                   </button>
                 </div>
+              </div>
+            )}
+
+            {permissions.canCadastralUpdate && (
+              <div className="action-row">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() =>
+                    void executeAction(
+                      '/cadastral-update',
+                      { note: actionNote || 'Đã cập nhật hồ sơ địa chính off-chain' },
+                      'Đã ghi nhận cập nhật hồ sơ địa chính.'
+                    )
+                  }
+                >
+                  Ghi nhận cập nhật địa chính
+                </button>
               </div>
             )}
           </div>
