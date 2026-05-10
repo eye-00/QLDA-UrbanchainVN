@@ -6,7 +6,7 @@ import { prisma } from "../../lib/prisma.js";
 import { ok } from "../../lib/response.js";
 import { requireAuth, requireRoles } from "../auth/auth.middleware.js";
 
-const AUDIT_VIEW_ROLES: UserRole[] = ["LAND_REGISTRY_OFFICER", "ADMIN"];
+const AUDIT_VIEW_ROLES: UserRole[] = ["LAND_REGISTRY_OFFICER", "AUDITOR", "ADMIN"];
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),

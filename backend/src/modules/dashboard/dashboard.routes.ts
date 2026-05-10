@@ -101,6 +101,34 @@ dashboardRouter.get(
       });
     }
 
+    if (user.role === "TAX_OFFICER") {
+      const [waitingTax, completedTax, cancelledTax] = await Promise.all([
+        prisma.registrationPaymentObligation.count({ where: { type: "LAND_FINANCIAL_OBLIGATION", status: "PENDING" } }),
+        prisma.registrationPaymentObligation.count({ where: { type: "LAND_FINANCIAL_OBLIGATION", status: "CONFIRMED" } }),
+        prisma.registrationPaymentObligation.count({ where: { type: "LAND_FINANCIAL_OBLIGATION", status: "CANCELLED" } })
+      ]);
+      return ok(res, {
+        role: user.role,
+        summary: {
+          obligations: { waitingTax, completedTax, cancelledTax }
+        }
+      });
+    }
+
+    if (user.role === "AUDITOR") {
+      const [totalAuditLogs, legalTransitionLogs, blockchainSyncLogs] = await Promise.all([
+        prisma.auditLog.count(),
+        prisma.auditLog.count({ where: { action: "REGISTRATION_STATUS_UPDATED" } }),
+        prisma.auditLog.count({ where: { action: "REGISTRATION_BLOCKCHAIN_SYNCED" } })
+      ]);
+      return ok(res, {
+        role: user.role,
+        summary: {
+          audits: { totalAuditLogs, legalTransitionLogs, blockchainSyncLogs }
+        }
+      });
+    }
+
     const [myRegistrations, myApprovedRegistrations, myTransfers, myCompletedTransfers] = await Promise.all([
       prisma.registration.count({ where: { applicantId: user.userId } }),
       prisma.registration.count({ where: { applicantId: user.userId, status: "DA_CAP" } }),

@@ -48,6 +48,7 @@ describe("Sprint 3 registration core workflow", () => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
+        procedureCode: "DKDD_LANDAU_3380",
         landInfo: {
           provinceCode: "48",
           communeName: "Hòa Khánh",
@@ -78,7 +79,7 @@ describe("Sprint 3 registration core workflow", () => {
         Authorization: `Bearer ${citizenToken}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ note: "Người dân nộp hồ sơ" })
+      body: JSON.stringify({ legalBasisCode: "QĐ3380-SUBMIT-01", note: "Người dân nộp hồ sơ" })
     });
     expect(submitted.response.status).toBe(200);
     expect(submitted.body.data.status).toBe("CHO_TIEP_NHAN");
@@ -89,6 +90,7 @@ describe("Sprint 3 registration core workflow", () => {
     const receptionToken = await login("reception@urbanchain.vn");
     const adminToken = await login("admin@urbanchain.vn");
     const registryToken = await login("registry@urbanchain.vn");
+    const taxToken = await login("tax@urbanchain.vn");
     const approvalToken = await login("approval@urbanchain.vn");
     const suffix = Date.now().toString();
 
@@ -99,6 +101,7 @@ describe("Sprint 3 registration core workflow", () => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
+        procedureCode: "DKDD_LANDAU_3380",
         landInfo: {
           provinceCode: "48",
           communeName: "Hòa Khánh",
@@ -122,7 +125,8 @@ describe("Sprint 3 registration core workflow", () => {
       headers: {
         Authorization: `Bearer ${citizenToken}`,
         "Content-Type": "application/json"
-      }
+      },
+      body: JSON.stringify({ legalBasisCode: "QĐ3380-SUBMIT-02" })
     });
     expect(submitted.response.status).toBe(200);
 
@@ -131,7 +135,8 @@ describe("Sprint 3 registration core workflow", () => {
       headers: {
         Authorization: `Bearer ${receptionToken}`,
         "Content-Type": "application/json"
-      }
+      },
+      body: JSON.stringify({ legalBasisCode: "QĐ3380-RECEPTION-ACCEPT" })
     });
     expect(accept.response.status).toBe(200);
     expect(accept.body.data.status).toBe("DA_TIEP_NHAN");
@@ -142,7 +147,7 @@ describe("Sprint 3 registration core workflow", () => {
         Authorization: `Bearer ${receptionToken}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ status: "CAN_BO_SUNG" })
+      body: JSON.stringify({ status: "CAN_BO_SUNG", legalBasisCode: "QĐ3380-RECEPTION-SUPP" })
     });
     expect(statusWithoutReason.response.status).toBe(400);
 
@@ -152,7 +157,7 @@ describe("Sprint 3 registration core workflow", () => {
         Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ confirmed: true })
+      body: JSON.stringify({ confirmed: true, legalBasisCode: "QĐ3380-COMMUNE-CONFIRM" })
     });
     expect(communeConfirm.response.status).toBe(200);
     expect(communeConfirm.body.data.status).toBe("DA_XAC_NHAN_CAP_XA");
@@ -164,11 +169,52 @@ describe("Sprint 3 registration core workflow", () => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
+        legalBasisCode: "QĐ3380-TAX-TRANSFER",
         taxReferenceNo: `TAX-${suffix}`
       })
     });
     expect(taxTransfer.response.status).toBe(200);
-    expect(taxTransfer.body.data.status).toBe("CHO_THUE");
+    expect(taxTransfer.body.data.status).toBe("CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH");
+
+    const obligations = await api(`/api/v1/registrations/${registrationId}/payment-obligations`, {
+      headers: {
+        Authorization: `Bearer ${taxToken}`
+      }
+    });
+    expect(obligations.response.status).toBe(200);
+    const landObligation = obligations.body.data.items.find(
+      (item: { type: string; status: string }) => item.type === "LAND_FINANCIAL_OBLIGATION" && item.status === "PENDING"
+    );
+    expect(Boolean(landObligation)).toBe(true);
+
+    const obligationConfirmed = await api(
+      `/api/v1/registrations/${registrationId}/payment-obligations/${landObligation.id}/status`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${taxToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          status: "CONFIRMED",
+          legalBasisCode: "QĐ3380-TAX-CONFIRM-S3"
+        })
+      }
+    );
+    expect(obligationConfirmed.response.status).toBe(200);
+
+    const toApprovalQueue = await api(`/api/v1/registrations/${registrationId}/status`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${registryToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        status: "CHO_KY_CAP",
+        legalBasisCode: "QĐ3380-TO-APPROVAL-S3"
+      })
+    });
+    expect(toApprovalQueue.response.status).toBe(200);
 
     const approve = await api(`/api/v1/registrations/${registrationId}/approve`, {
       method: "POST",
@@ -177,12 +223,27 @@ describe("Sprint 3 registration core workflow", () => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
+        legalBasisCode: "QĐ3380-APPROVE",
         approvalNumber: `QD-${suffix}`,
         approvalDate: "2026-04-28"
       })
     });
     expect(approve.response.status).toBe(200);
-    expect(approve.body.data.status).toBe("DA_CAP");
+    expect(approve.body.data.status).toBe("DA_KY_CAP");
+
+    const cadastralUpdated = await api(`/api/v1/registrations/${registrationId}/cadastral-update`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${registryToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-CADASTRAL-UPDATE",
+        note: "Đã cập nhật hồ sơ địa chính tại VPĐKĐĐ"
+      })
+    });
+    expect(cadastralUpdated.response.status).toBe(200);
+    expect(cadastralUpdated.body.data.status).toBe("DA_CAP_NHAT_HO_SO_DIA_CHINH");
 
     const sync = await api(`/api/v1/registrations/${registrationId}/blockchain-sync`, {
       method: "POST",
@@ -191,6 +252,7 @@ describe("Sprint 3 registration core workflow", () => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
+        legalBasisCode: "QĐ3380-BLOCKCHAIN-SYNC",
         cid: `bafy-s3-${suffix}`,
         metadataHash: `0x${suffix}`
       })
@@ -211,6 +273,7 @@ describe("Sprint 3 registration core workflow", () => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
+        procedureCode: "DKDD_LANDAU_3380",
         landInfo: {
           provinceCode: "48",
           communeName: "Hòa Khánh",
@@ -234,7 +297,8 @@ describe("Sprint 3 registration core workflow", () => {
       headers: {
         Authorization: `Bearer ${citizenToken}`,
         "Content-Type": "application/json"
-      }
+      },
+      body: JSON.stringify({ legalBasisCode: "QĐ3380-SUBMIT-03" })
     });
     expect(submitted.response.status).toBe(200);
 
@@ -246,6 +310,7 @@ describe("Sprint 3 registration core workflow", () => {
       },
       body: JSON.stringify({
         status: "CAN_BO_SUNG",
+        legalBasisCode: "QĐ3380-RECEPTION-SUPP-02",
         reason: "Thiếu bản scan giấy tờ nguồn gốc đất"
       })
     });
@@ -294,6 +359,7 @@ describe("Sprint 3 registration core workflow", () => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
+        procedureCode: "DKDD_LANDAU_3380",
         landInfo: {
           provinceCode: "48",
           communeName: "Hòa Khánh",
