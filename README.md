@@ -75,6 +75,18 @@ If Docker Desktop is not running, start it before `npm run infra:up`.
   - gửi hồ sơ từ trạng thái `MOI_TAO` hoặc `CAN_BO_SUNG`.
   - xem ghi chú cập nhật gần nhất của hồ sơ.
 
+### Sprint 4 verification commands (blockchain registration sync)
+- `npm --workspace backend run test -- test/sprint4-blockchain.client.test.ts`
+- `npm --workspace backend run test -- test/sprint3-registration.test.ts`
+- `npm --workspace frontend run test -- registration-blockchain-helpers.test.ts registration-review-helpers.test.ts`
+- `npm --workspace frontend run build`
+
+### Sprint 4 APIs bổ sung
+- `GET /api/v1/registrations/:registrationId/blockchain-status`
+  - Đối soát trạng thái on-chain/off-chain theo hồ sơ.
+- `POST /api/v1/registrations/:registrationId/blockchain-sync`
+  - Có precheck tránh ghi chain trùng hồ sơ/mã thửa.
+
 ### Sprint 2 smoke checks (địa giới 2 cấp + Việt hóa UI)
 - Kiểm tra các màn hình `Bảng điều khiển`, `Quản lý người dùng`, `Quản lý đơn vị`, `Quản lý thửa đất`, `Tra cứu thửa đất`, `Đăng ký lần đầu` hiển thị tiếng Việt có dấu.
 - Form địa giới chỉ còn 2 cấp: `Tỉnh/Thành phố` và `Xã/Phường/Đặc khu`.

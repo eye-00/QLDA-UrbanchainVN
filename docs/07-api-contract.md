@@ -642,6 +642,10 @@ Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
 }
 ```
 
+### Validation rules
+- Từ chối `409 Conflict` nếu hồ sơ đã có `txHash`/`tokenId` off-chain.
+- Từ chối `409 Conflict` nếu precheck phát hiện `registrationCode` hoặc `landCode` đã tồn tại on-chain.
+
 ## 8.10. GET /registrations/:registrationId/notifications
 Lấy lịch sử thông báo kết quả xử lý hồ sơ theo RBAC/ownership.
 
@@ -742,6 +746,33 @@ Ghi nhận đã cập nhật hồ sơ địa chính off-chain trước bước b
 ### Legal guard bắt buộc
 - Mọi bước submit/chuyển trạng thái xử lý phải truyền `legalBasisCode`.
 - `blockchain-sync` chỉ được phép sau khi hồ sơ đạt điều kiện off-chain (`DA_CAP_NHAT_HO_SO_DIA_CHINH`).
+
+## 8.20. GET /registrations/:registrationId/blockchain-status
+Đối soát trạng thái on-chain/off-chain cho hồ sơ đăng ký.
+
+### Response data
+```json
+{
+  "registrationId": "reg_001",
+  "registrationCode": "REG-2026-0001",
+  "landCode": "LAND-2026-0001",
+  "offChain": {
+    "status": "DA_GHI_BLOCKCHAIN",
+    "tokenId": 1001,
+    "txHash": "0x123456"
+  },
+  "onChain": {
+    "mode": "rpc",
+    "contractAddress": "0xabc...",
+    "registrationTokenId": 1001,
+    "landTokenId": 1001
+  },
+  "inSync": true
+}
+```
+
+### RBAC
+- `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`, `ADMIN`, `AUDITOR`.
 
 ---
 
