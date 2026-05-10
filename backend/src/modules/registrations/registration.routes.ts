@@ -11,7 +11,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
 import { asyncHandler, badRequestError, conflictError, forbiddenError, notFoundError } from "../../lib/errors.js";
-import { mintRegistrationRecord } from "../../lib/blockchain/urban-land-registry.client.js";
+import { lookupRegistrationOnChain, mintRegistrationRecord } from "../../lib/blockchain/urban-land-registry.client.js";
 import { created, ok } from "../../lib/response.js";
 import { prisma } from "../../lib/prisma.js";
 import { AUTH_ROLES, requireAuth, requireRoles, type AuthenticatedRequest } from "../auth/auth.middleware.js";
@@ -1244,12 +1244,17 @@ registrationRouter.post(
         network: walletNetwork
       }
     });
+    const effectiveLandCode = existing.landCode ?? `LAND-${existing.code}`;
+    const onChainLookup = await lookupRegistrationOnChain(existing.code, effectiveLandCode);
+    if (onChainLookup.registrationTokenId || onChainLookup.landTokenId) {
+      throw conflictError("Bản ghi blockchain đã tồn tại cho hồ sơ hoặc mã thửa đất");
+    }
 
     let chainResult;
     try {
       chainResult = await mintRegistrationRecord({
         registrationCode: existing.code,
-        landCode: existing.landCode ?? `LAND-${existing.code}`,
+        landCode: effectiveLandCode,
         provinceCode: existing.provinceCode,
         communeName: existing.communeName,
         mapSheetNumber: existing.mapSheetNumber,
@@ -1303,7 +1308,13 @@ registrationRouter.post(
         tokenId: updated.tokenId,
         blockchainMode: chainResult.mode,
         walletNetwork,
-        ownerWalletAddress: ownerWallet?.address ?? null
+        ownerWalletAddress: ownerWallet?.address ?? null,
+        onChainPrecheck: {
+          mode: onChainLookup.mode,
+          contractAddress: onChainLookup.contractAddress,
+          registrationTokenId: onChainLookup.registrationTokenId,
+          landTokenId: onChainLookup.landTokenId
+        }
       }
     });
     await writeRegistrationNotificationLog(updated.id, user, updated.status, "Đã đồng bộ metadata hồ sơ lên blockchain");
@@ -1355,6 +1366,53 @@ registrationRouter.post(
       }
     });
     return ok(res, toRegistrationItem(updated), "Đã cập nhật yêu cầu bổ sung hồ sơ");
+  })
+);
+
+registrationRouter.get(
+  "/:id/blockchain-status",
+  requireRoles(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "ADMIN", "AUDITOR"]),
+  asyncHandler(async (req, res) => {
+    const user = (req as AuthenticatedRequest).user;
+    const existing = await findRegistrationByParam(String(req.params.id));
+    if (!existing) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
+
+    const effectiveLandCode = existing.landCode ?? `LAND-${existing.code}`;
+    const onChain = await lookupRegistrationOnChain(existing.code, effectiveLandCode);
+    const offChainLinked = Boolean(existing.txHash || existing.tokenId);
+    const onChainLinked = Boolean(onChain.registrationTokenId || onChain.landTokenId);
+    const inSync = offChainLinked === onChainLinked;
+
+    await writeAuditLog({
+      actorId: user.userId,
+      action: "REGISTRATION_BLOCKCHAIN_STATUS_CHECKED",
+      entityType: "REGISTRATION",
+      entityId: existing.id,
+      payload: {
+        registrationCode: existing.code,
+        landCode: effectiveLandCode,
+        offChainLinked,
+        onChainLinked,
+        inSync
+      }
+    });
+
+    return ok(
+      res,
+      {
+        registrationId: existing.id,
+        registrationCode: existing.code,
+        landCode: effectiveLandCode,
+        offChain: {
+          status: existing.status,
+          tokenId: existing.tokenId,
+          txHash: existing.txHash
+        },
+        onChain,
+        inSync
+      },
+      "Đã đối soát trạng thái on-chain/off-chain"
+    );
   })
 );
 

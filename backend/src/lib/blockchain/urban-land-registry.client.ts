@@ -4,7 +4,8 @@ type BlockchainSyncMode = "mock" | "rpc";
 
 const CONTRACT_ABI = [
   "function registerLand(string registrationCode,string landCode,bytes32 parcelRef,bytes32 ownerRef,string documentCid,bytes32 documentHash,string metadataUri,uint8 status,address tokenOwner) returns (uint256)",
-  "function tokenIdByRegistrationCode(string registrationCode) view returns (uint256)"
+  "function tokenIdByRegistrationCode(string registrationCode) view returns (uint256)",
+  "function tokenIdByLandCode(string landCode) view returns (uint256)"
 ] as const;
 
 const ACTIVE_LAND_STATUS = 2;
@@ -29,6 +30,13 @@ type ChainMintResult = {
   tokenId: number | null;
   contractAddress: string | null;
   tokenOwnerAddress: string | null;
+};
+
+type ChainLookupResult = {
+  mode: BlockchainSyncMode;
+  contractAddress: string | null;
+  registrationTokenId: number | null;
+  landTokenId: number | null;
 };
 
 function resolveMode(): BlockchainSyncMode {
@@ -115,5 +123,37 @@ export async function mintRegistrationRecord(payload: RegistrationChainPayload):
     tokenId: Number(tokenIdValue),
     contractAddress,
     tokenOwnerAddress: ethers.getAddress(tokenOwnerAddress)
+  };
+}
+
+export async function lookupRegistrationOnChain(
+  registrationCode: string,
+  landCode: string
+): Promise<ChainLookupResult> {
+  const mode = resolveMode();
+  if (mode === "mock") {
+    return {
+      mode,
+      contractAddress: null,
+      registrationTokenId: null,
+      landTokenId: null
+    };
+  }
+
+  const { rpcUrl, contractAddress, signerPrivateKey } = resolveRpcConfig();
+  const provider = new ethers.JsonRpcProvider(rpcUrl);
+  const signer = new ethers.Wallet(signerPrivateKey, provider);
+  const contract = new ethers.Contract(contractAddress, CONTRACT_ABI, signer);
+
+  const [registrationTokenId, landTokenId] = await Promise.all([
+    contract.tokenIdByRegistrationCode(registrationCode) as Promise<bigint>,
+    contract.tokenIdByLandCode(landCode) as Promise<bigint>
+  ]);
+
+  return {
+    mode,
+    contractAddress,
+    registrationTokenId: registrationTokenId > 0n ? Number(registrationTokenId) : null,
+    landTokenId: landTokenId > 0n ? Number(landTokenId) : null
   };
 }

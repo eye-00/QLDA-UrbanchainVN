@@ -145,6 +145,9 @@ describe("UrbanLandRegistry", function () {
     await expect(registerDefaultLand(contract, citizen2.address, "REG-DUP-2", "LAND-DUP-1")).to.be.revertedWith(
       "landCode already active"
     );
+
+    expect(await contract.tokenIdByRegistrationCode("REG-DUP-1")).to.equal(1n);
+    expect(await contract.tokenIdByLandCode("LAND-DUP-1")).to.equal(1n);
   });
 
   it("rejects replay transferCode and invalid transfer payload", async function () {
