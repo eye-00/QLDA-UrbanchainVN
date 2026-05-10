@@ -1,4 +1,5 @@
 import {
+  BlockchainNetwork,
   DocumentVersionStatus,
   PaymentObligationStatus,
   PaymentObligationType,
@@ -10,6 +11,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
 import { asyncHandler, badRequestError, conflictError, forbiddenError, notFoundError } from "../../lib/errors.js";
+import { mintRegistrationRecord } from "../../lib/blockchain/urban-land-registry.client.js";
 import { created, ok } from "../../lib/response.js";
 import { prisma } from "../../lib/prisma.js";
 import { AUTH_ROLES, requireAuth, requireRoles, type AuthenticatedRequest } from "../auth/auth.middleware.js";
@@ -1217,6 +1219,9 @@ registrationRouter.post(
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
     if (!existing) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
+    if (existing.txHash || existing.tokenId) {
+      throw conflictError("Hồ sơ đã có bản ghi blockchain, không thể đồng bộ lặp lại");
+    }
 
     if (
       existing.status !== "DA_CAP_NHAT_HO_SO_DIA_CHINH" &&
@@ -1227,6 +1232,50 @@ registrationRouter.post(
 
     await ensureProcedureAndAuthority(existing, user.role);
 
+    const networkRaw = (process.env.BLOCKCHAIN_NETWORK ?? "SEPOLIA").trim().toUpperCase();
+    const walletNetwork = (Object.values(BlockchainNetwork) as string[]).includes(networkRaw)
+      ? (networkRaw as BlockchainNetwork)
+      : BlockchainNetwork.SEPOLIA;
+    const ownerWallet = await prisma.walletAccount.findFirst({
+      where: {
+        userId: existing.applicantId,
+        status: "VERIFIED",
+        isDefault: true,
+        network: walletNetwork
+      }
+    });
+
+    let chainResult;
+    try {
+      chainResult = await mintRegistrationRecord({
+        registrationCode: existing.code,
+        landCode: existing.landCode ?? `LAND-${existing.code}`,
+        provinceCode: existing.provinceCode,
+        communeName: existing.communeName,
+        mapSheetNumber: existing.mapSheetNumber,
+        parcelNumber: existing.parcelNumber,
+        ownerIdentityNumber: existing.ownerIdentityNumber,
+        applicantId: existing.applicantId,
+        documentCid: parsed.data.cid,
+        metadataHash: parsed.data.metadataHash,
+        tokenOwnerAddress: ownerWallet?.address
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Blockchain sync failed";
+      if (message.includes("verified default wallet")) {
+        throw badRequestError("Người nộp hồ sơ chưa có ví mặc định đã xác minh cho mạng blockchain hiện tại");
+      }
+      if (
+        message.includes("registration already used") ||
+        message.includes("landCode already active") ||
+        message.includes("already") ||
+        message.includes("duplicate")
+      ) {
+        throw conflictError("Bản ghi blockchain đã tồn tại cho hồ sơ hoặc thửa đất này");
+      }
+      throw conflictError(`Không đồng bộ được blockchain: ${message}`);
+    }
+
     const updated = await prisma.registration.update({
       where: { id: existing.id },
       data: {
@@ -1234,7 +1283,8 @@ registrationRouter.post(
         legalBasisCode: parsed.data.legalBasisCode,
         ipfsCid: parsed.data.cid,
         documentHash: parsed.data.metadataHash,
-        txHash: existing.txHash ?? `0x${Date.now().toString(16)}chain`,
+        txHash: chainResult.txHash,
+        tokenId: chainResult.tokenId ?? existing.tokenId,
         noteHistory: appendNoteHistory(existing.noteHistory, "Đã đồng bộ metadata hồ sơ lên blockchain")
       },
       include: { files: true }
@@ -1249,7 +1299,11 @@ registrationRouter.post(
         cid: parsed.data.cid,
         metadataHash: parsed.data.metadataHash,
         txHash: updated.txHash,
-        legalBasisCode: parsed.data.legalBasisCode
+        legalBasisCode: parsed.data.legalBasisCode,
+        tokenId: updated.tokenId,
+        blockchainMode: chainResult.mode,
+        walletNetwork,
+        ownerWalletAddress: ownerWallet?.address ?? null
       }
     });
     await writeRegistrationNotificationLog(updated.id, user, updated.status, "Đã đồng bộ metadata hồ sơ lên blockchain");
@@ -1258,6 +1312,7 @@ registrationRouter.post(
       res,
       {
         registrationId: updated.id,
+        tokenId: updated.tokenId,
         txHash: updated.txHash,
         cid: updated.ipfsCid,
         metadataHash: updated.documentHash
