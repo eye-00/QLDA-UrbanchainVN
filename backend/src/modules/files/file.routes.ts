@@ -76,6 +76,41 @@ fileRouter.post(
       }
     });
 
+    if (createdFile.registrationId) {
+      const aggregate = await prisma.registrationDocumentVersion.aggregate({
+        where: { registrationId: createdFile.registrationId },
+        _max: { versionNumber: true }
+      });
+      const nextVersionNumber = (aggregate._max.versionNumber ?? 0) + 1;
+
+      await prisma.registrationDocumentVersion.updateMany({
+        where: {
+          registrationId: createdFile.registrationId,
+          documentType: createdFile.documentType,
+          status: "ACTIVE"
+        },
+        data: {
+          status: "REPLACED",
+          updatedAt: new Date()
+        }
+      });
+
+      await prisma.registrationDocumentVersion.create({
+        data: {
+          registrationId: createdFile.registrationId,
+          versionNumber: nextVersionNumber,
+          documentType: createdFile.documentType,
+          storageStatus: createdFile.storageStatus,
+          cid: createdFile.cid,
+          hash: createdFile.hash,
+          status: "ACTIVE",
+          note: "Tạo version tự động từ API upload file",
+          fileAssetId: createdFile.id,
+          createdById: user.userId
+        }
+      });
+    }
+
     await writeAuditLog({
       actorId: user.userId,
       action: "FILE_UPLOADED",

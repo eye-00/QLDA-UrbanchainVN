@@ -15,6 +15,8 @@ const roleSchema = z.enum([
   "COMMUNE_OFFICER",
   "LAND_REGISTRY_OFFICER",
   "APPROVAL_AUTHORITY",
+  "TAX_OFFICER",
+  "AUDITOR",
   "ADMIN"
 ]);
 

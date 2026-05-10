@@ -60,6 +60,20 @@ async function seedUsers() {
       organizationId: approvalOrg.id
     },
     {
+      email: "tax@urbanchain.vn",
+      fullName: "Cán bộ thuế",
+      role: "TAX_OFFICER" as const,
+      identityNumber: null,
+      organizationId: approvalOrg.id
+    },
+    {
+      email: "auditor@urbanchain.vn",
+      fullName: "Cán bộ kiểm soát",
+      role: "AUDITOR" as const,
+      identityNumber: null,
+      organizationId: approvalOrg.id
+    },
+    {
       email: "admin@urbanchain.vn",
       fullName: "Quản trị hệ thống",
       role: "ADMIN" as const,
@@ -88,6 +102,49 @@ async function seedUsers() {
   }
 }
 
+async function seedLegalProcedures() {
+  const procedures = [
+    {
+      procedureCode: "DKDD_LANDAU_3380",
+      sourceDecision: "QD_3380_2025",
+      legalBasis: "QĐ 3380/2025 + NĐ 151/2025",
+      level: "LIEN_THONG" as const,
+      authorityActors: ["RECEPTION_OFFICER", "COMMUNE_OFFICER", "LAND_REGISTRY_OFFICER", "TAX_OFFICER", "APPROVAL_AUTHORITY"],
+      requiresTaxStep: true
+    },
+    {
+      procedureCode: "DKDD_LANDAU_DON_GIAN",
+      sourceDecision: "QD_2304_2024",
+      legalBasis: "QĐ 2304/2024",
+      level: "TINH" as const,
+      authorityActors: ["RECEPTION_OFFICER", "LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY"],
+      requiresTaxStep: false
+    }
+  ];
+
+  for (const item of procedures) {
+    await prisma.legalProcedure.upsert({
+      where: { procedureCode: item.procedureCode },
+      update: {
+        sourceDecision: item.sourceDecision,
+        legalBasis: item.legalBasis,
+        level: item.level,
+        authorityActors: item.authorityActors,
+        requiresTaxStep: item.requiresTaxStep,
+        isActive: true
+      },
+      create: {
+        procedureCode: item.procedureCode,
+        sourceDecision: item.sourceDecision,
+        legalBasis: item.legalBasis,
+        level: item.level,
+        authorityActors: item.authorityActors,
+        requiresTaxStep: item.requiresTaxStep
+      }
+    });
+  }
+}
+
 async function seedRegistrationAndFile() {
   const citizen = await prisma.user.findUniqueOrThrow({
     where: { email: "citizen@urbanchain.vn" }
@@ -108,6 +165,8 @@ async function seedRegistrationAndFile() {
       ownerFullName: "Nguyễn Văn A",
       ownerIdentityNumber: "0482xxxxxxx",
       ownerAddress: "Đà Nẵng",
+      procedureCode: "DKDD_LANDAU_3380",
+      legalBasisCode: "QĐ3380-STEP-RECEPTION",
       noteHistory: ["Hồ sơ demo đã được seed"],
       status: "CHO_TIEP_NHAN",
       ipfsCid: "bafybeigdyrzt-seed-001",
@@ -128,6 +187,8 @@ async function seedRegistrationAndFile() {
       ownerFullName: "Nguyễn Văn A",
       ownerIdentityNumber: "0482xxxxxxx",
       ownerAddress: "Đà Nẵng",
+      procedureCode: "DKDD_LANDAU_3380",
+      legalBasisCode: "QĐ3380-STEP-RECEPTION",
       noteHistory: ["Hồ sơ demo đã được seed"],
       status: "CHO_TIEP_NHAN",
       ipfsCid: "bafybeigdyrzt-seed-001",
@@ -279,6 +340,7 @@ async function seedWallets() {
 async function main() {
   await seedOrganizations();
   await seedUsers();
+  await seedLegalProcedures();
   await seedRegistrationAndFile();
   await seedLandParcels();
   await seedWallets();

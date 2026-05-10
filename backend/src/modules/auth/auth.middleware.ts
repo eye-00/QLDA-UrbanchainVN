@@ -23,8 +23,26 @@ interface JwtPayload {
 
 export const AUTH_ROLES = {
   citizen: ["CITIZEN", "BUSINESS"],
-  officers: ["RECEPTION_OFFICER", "COMMUNE_OFFICER", "LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "ADMIN"],
-  dashboard: ["CITIZEN", "BUSINESS", "RECEPTION_OFFICER", "COMMUNE_OFFICER", "LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "ADMIN"],
+  officers: [
+    "RECEPTION_OFFICER",
+    "COMMUNE_OFFICER",
+    "LAND_REGISTRY_OFFICER",
+    "APPROVAL_AUTHORITY",
+    "TAX_OFFICER",
+    "AUDITOR",
+    "ADMIN"
+  ],
+  dashboard: [
+    "CITIZEN",
+    "BUSINESS",
+    "RECEPTION_OFFICER",
+    "COMMUNE_OFFICER",
+    "LAND_REGISTRY_OFFICER",
+    "APPROVAL_AUTHORITY",
+    "TAX_OFFICER",
+    "AUDITOR",
+    "ADMIN"
+  ],
   admin: ["ADMIN"]
 } as const satisfies Record<string, readonly UserRole[]>;
 
