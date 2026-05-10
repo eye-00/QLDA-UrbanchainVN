@@ -181,6 +181,21 @@ describe("Sprint 2 legal-aligned core", () => {
     expect(created.response.status).toBe(201);
     const registrationId = created.body.data.registrationId as string;
 
+    const communeEvidenceForm = new FormData();
+    communeEvidenceForm.set("documentType", "COMMUNE_EVIDENCE");
+    communeEvidenceForm.set("ownerType", "REGISTRATION");
+    communeEvidenceForm.set("registrationId", registrationId);
+    communeEvidenceForm.set("file", new Blob(["commune-evidence"], { type: "application/pdf" }), "commune-evidence.pdf");
+
+    const communeEvidenceUpload = await api("/api/v1/files/upload", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${citizenToken}`
+      },
+      body: communeEvidenceForm
+    });
+    expect(communeEvidenceUpload.response.status).toBe(201);
+
     const addVersion = await api(`/api/v1/registrations/${registrationId}/document-versions`, {
       method: "POST",
       headers: {
@@ -248,7 +263,9 @@ describe("Sprint 2 legal-aligned core", () => {
       },
       body: JSON.stringify({
         confirmed: true,
-        legalBasisCode: "QĐ3380-COMMUNE-CONFIRM"
+        legalBasisCode: "QĐ3380-COMMUNE-CONFIRM",
+        notes: "UBND cấp xã xác nhận theo hồ sơ và chứng cứ đính kèm",
+        evidenceFileId: communeEvidenceUpload.body.data.id
       })
     });
     expect(communeConfirm.response.status).toBe(200);

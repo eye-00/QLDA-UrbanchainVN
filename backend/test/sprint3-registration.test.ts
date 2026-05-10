@@ -22,6 +22,24 @@ async function login(email: string, password = "StrongPassword@123") {
   return body.data.accessToken as string;
 }
 
+async function uploadRegistrationEvidence(token: string, registrationId: string, filename = "commune-evidence.pdf") {
+  const formData = new FormData();
+  formData.set("documentType", "COMMUNE_EVIDENCE");
+  formData.set("ownerType", "REGISTRATION");
+  formData.set("registrationId", registrationId);
+  formData.set("file", new Blob(["evidence"], { type: "application/pdf" }), filename);
+
+  const uploaded = await api("/api/v1/files/upload", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: formData
+  });
+  expect(uploaded.response.status).toBe(201);
+  return uploaded.body.data.id as string;
+}
+
 beforeAll(async () => {
   server = createApp().listen(0);
   await new Promise<void>((resolve) => server.once("listening", resolve));
@@ -119,6 +137,7 @@ describe("Sprint 3 registration core workflow", () => {
     });
     expect(created.response.status).toBe(201);
     const registrationId = created.body.data.registrationId as string;
+    const evidenceFileId = await uploadRegistrationEvidence(citizenToken, registrationId);
 
     const submitted = await api(`/api/v1/registrations/${registrationId}/submit`, {
       method: "POST",
@@ -157,7 +176,12 @@ describe("Sprint 3 registration core workflow", () => {
         Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ confirmed: true, legalBasisCode: "QĐ3380-COMMUNE-CONFIRM" })
+      body: JSON.stringify({
+        confirmed: true,
+        legalBasisCode: "QĐ3380-COMMUNE-CONFIRM",
+        notes: "UBND cấp xã xác nhận hồ sơ hợp lệ theo thẩm quyền",
+        evidenceFileId
+      })
     });
     expect(communeConfirm.response.status).toBe(200);
     expect(communeConfirm.body.data.status).toBe("DA_XAC_NHAN_CAP_XA");
@@ -331,6 +355,116 @@ describe("Sprint 3 registration core workflow", () => {
           item.status === "CAN_BO_SUNG" && item.message.includes("CAN_BO_SUNG")
       )
     ).toBe(true);
+  });
+
+  it("enforces legal supplement checklist and exposes document history timeline", async () => {
+    const citizenToken = await login("citizen@urbanchain.vn");
+    const receptionToken = await login("reception@urbanchain.vn");
+    const suffix = Date.now().toString();
+
+    const created = await api("/api/v1/registrations", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${citizenToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        procedureCode: "DKDD_LANDAU_3380",
+        landInfo: {
+          provinceCode: "48",
+          communeName: "Hòa Khánh",
+          parcelNumber: `LEGAL-S3-${suffix}`,
+          mapSheetNumber: "66",
+          area: 77,
+          landUsePurpose: "ODT",
+          address: "Số 6 Đường Demo"
+        },
+        ownerInfo: {
+          ownerType: "INDIVIDUAL",
+          fullName: "Nguyễn Văn Legal"
+        }
+      })
+    });
+    expect(created.response.status).toBe(201);
+    const registrationId = created.body.data.registrationId as string;
+
+    const uploadedFileId = await uploadRegistrationEvidence(citizenToken, registrationId, "history-evidence.pdf");
+
+    const submit = await api(`/api/v1/registrations/${registrationId}/submit`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${citizenToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ legalBasisCode: "QĐ3380-S3-SUBMIT-HISTORY" })
+    });
+    expect(submit.response.status).toBe(200);
+
+    const invalidSupplement = await api(`/api/v1/registrations/${registrationId}/request-supplement`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${receptionToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-S3-SUPP-INVALID",
+        note: "Thiếu hồ sơ"
+      })
+    });
+    expect(invalidSupplement.response.status).toBe(400);
+
+    const validSupplement = await api(`/api/v1/registrations/${registrationId}/request-supplement`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${receptionToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-S3-SUPP-VALID",
+        note: "Yêu cầu bổ sung hồ sơ theo phiếu kiểm tra",
+        missingItems: ["Thiếu bản scan giấy tờ nguồn gốc đất", "Thiếu minh chứng nghĩa vụ tài chính"],
+        deadlineAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
+      })
+    });
+    expect(validSupplement.response.status).toBe(200);
+    expect(validSupplement.body.data.status).toBe("CAN_BO_SUNG");
+
+    const history = await api(`/api/v1/registrations/${registrationId}/document-history`, {
+      headers: {
+        Authorization: `Bearer ${receptionToken}`
+      }
+    });
+    expect(history.response.status).toBe(200);
+    expect(history.body.data.total).toBeGreaterThan(0);
+    expect(
+      history.body.data.items.some(
+        (item: { type: string; detail: { status?: string; documentType?: string }; title: string }) =>
+          item.type === "DOCUMENT_VERSION" &&
+          item.detail.documentType === "COMMUNE_EVIDENCE" &&
+          item.detail.status === "LOCKED"
+      )
+    ).toBe(true);
+    expect(
+      history.body.data.items.some((item: { type: string; title: string }) => item.type === "SUBMIT_SNAPSHOT")
+    ).toBe(true);
+    expect(
+      history.body.data.items.some((item: { type: string; title: string }) => item.type === "STATUS_AUDIT")
+    ).toBe(true);
+
+    const badCommuneConfirm = await api(`/api/v1/registrations/${registrationId}/commune-confirm`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${receptionToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        confirmed: true,
+        legalBasisCode: "QĐ3380-S3-COMMUNE-BAD",
+        notes: "Xác nhận hồ sơ",
+        evidenceFileId: uploadedFileId
+      })
+    });
+    expect(badCommuneConfirm.response.status).toBe(403);
   });
 
   it("citizen cannot read another citizen registration", async () => {
