@@ -467,6 +467,209 @@ describe("Sprint 3 registration core workflow", () => {
     expect(badCommuneConfirm.response.status).toBe(403);
   });
 
+  it("supports blockchain status reconciliation and blocks duplicate sync", async () => {
+    process.env.BLOCKCHAIN_SYNC_MODE = "mock";
+    const citizenToken = await login("citizen@urbanchain.vn");
+    const receptionToken = await login("reception@urbanchain.vn");
+    const adminToken = await login("admin@urbanchain.vn");
+    const registryToken = await login("registry@urbanchain.vn");
+    const taxToken = await login("tax@urbanchain.vn");
+    const approvalToken = await login("approval@urbanchain.vn");
+    const suffix = Date.now().toString();
+
+    const created = await api("/api/v1/registrations", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${citizenToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        procedureCode: "DKDD_LANDAU_3380",
+        landInfo: {
+          provinceCode: "48",
+          communeName: "Hòa Khánh",
+          parcelNumber: `CHAIN-${suffix}`,
+          mapSheetNumber: "44",
+          area: 103.4,
+          landUsePurpose: "ODT",
+          address: "Số 4 Đường Demo"
+        },
+        ownerInfo: {
+          ownerType: "INDIVIDUAL",
+          fullName: "Nguyễn Văn Chain",
+          identityNumber: "0482chain"
+        }
+      })
+    });
+    expect(created.response.status).toBe(201);
+    const registrationId = created.body.data.registrationId as string;
+    const evidenceFileId = await uploadRegistrationEvidence(citizenToken, registrationId, "chain-evidence.pdf");
+
+    const submit = await api(`/api/v1/registrations/${registrationId}/submit`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${citizenToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ legalBasisCode: "QĐ3380-S4-SUBMIT" })
+    });
+    expect(submit.response.status).toBe(200);
+
+    const accept = await api(`/api/v1/registrations/${registrationId}/accept`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${receptionToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ legalBasisCode: "QĐ3380-S4-ACCEPT", note: "Tiếp nhận hồ sơ đầy đủ" })
+    });
+    expect(accept.response.status).toBe(200);
+
+    const communeConfirm = await api(`/api/v1/registrations/${registrationId}/commune-confirm`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        confirmed: true,
+        legalBasisCode: "QĐ3380-S4-COMMUNE",
+        notes: "Xác nhận địa giới 2 cấp hợp lệ",
+        evidenceFileId
+      })
+    });
+    expect(communeConfirm.response.status).toBe(200);
+
+    const taxTransfer = await api(`/api/v1/registrations/${registrationId}/tax-transfer`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${registryToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-S4-TAX-TRANSFER",
+        taxReferenceNo: `S4-TAX-${suffix}`
+      })
+    });
+    expect(taxTransfer.response.status).toBe(200);
+
+    const obligations = await api(`/api/v1/registrations/${registrationId}/payment-obligations`, {
+      headers: {
+        Authorization: `Bearer ${taxToken}`
+      }
+    });
+    expect(obligations.response.status).toBe(200);
+    const pendingObligation = obligations.body.data.items.find(
+      (item: { type: string; status: string }) => item.type === "LAND_FINANCIAL_OBLIGATION" && item.status === "PENDING"
+    );
+    expect(Boolean(pendingObligation)).toBe(true);
+
+    const obligationConfirmed = await api(
+      `/api/v1/registrations/${registrationId}/payment-obligations/${pendingObligation.id}/status`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${taxToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          status: "CONFIRMED",
+          legalBasisCode: "QĐ3380-S4-TAX-CONFIRM"
+        })
+      }
+    );
+    expect(obligationConfirmed.response.status).toBe(200);
+
+    const toApprovalQueue = await api(`/api/v1/registrations/${registrationId}/status`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${registryToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        status: "CHO_KY_CAP",
+        legalBasisCode: "QĐ3380-S4-TO-APPROVAL"
+      })
+    });
+    expect(toApprovalQueue.response.status).toBe(200);
+
+    const approve = await api(`/api/v1/registrations/${registrationId}/approve`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${approvalToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-S4-APPROVE",
+        approvalNumber: `S4-QD-${suffix}`,
+        approvalDate: "2026-05-10"
+      })
+    });
+    expect(approve.response.status).toBe(200);
+
+    const cadastralUpdated = await api(`/api/v1/registrations/${registrationId}/cadastral-update`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${registryToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-S4-CADASTRAL",
+        note: "Hoàn tất cập nhật địa chính trước khi sync chain"
+      })
+    });
+    expect(cadastralUpdated.response.status).toBe(200);
+
+    const precheckStatus = await api(`/api/v1/registrations/${registrationId}/blockchain-status`, {
+      headers: {
+        Authorization: `Bearer ${approvalToken}`
+      }
+    });
+    expect(precheckStatus.response.status).toBe(200);
+    expect(precheckStatus.body.data.inSync).toBe(true);
+    expect(precheckStatus.body.data.onChain.registrationTokenId).toBeNull();
+    expect(precheckStatus.body.data.offChain.txHash).toBeNull();
+
+    const sync = await api(`/api/v1/registrations/${registrationId}/blockchain-sync`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${approvalToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-S4-BLOCKCHAIN",
+        cid: `bafy-s4-${suffix}`,
+        metadataHash: `0x${suffix}`
+      })
+    });
+    expect(sync.response.status).toBe(200);
+    expect(sync.body.data.txHash).toBeTruthy();
+
+    const postSyncStatus = await api(`/api/v1/registrations/${registrationId}/blockchain-status`, {
+      headers: {
+        Authorization: `Bearer ${approvalToken}`
+      }
+    });
+    expect(postSyncStatus.response.status).toBe(200);
+    expect(postSyncStatus.body.data.inSync).toBe(false);
+    expect(postSyncStatus.body.data.offChain.txHash).toBeTruthy();
+    expect(postSyncStatus.body.data.onChain.registrationTokenId).toBeNull();
+
+    const duplicateSync = await api(`/api/v1/registrations/${registrationId}/blockchain-sync`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${approvalToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-S4-BLOCKCHAIN-RETRY",
+        cid: `bafy-s4-dup-${suffix}`,
+        metadataHash: `0xdup${suffix}`
+      })
+    });
+    expect(duplicateSync.response.status).toBe(409);
+  });
+
   it("citizen cannot read another citizen registration", async () => {
     const suffix = Date.now().toString();
     const citizenTwoEmail = `s3.scope.${suffix}@urbanchain.vn`;

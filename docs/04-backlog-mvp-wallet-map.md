@@ -735,6 +735,16 @@ Mỗi dòng backlog giữ đúng cấu trúc từ Excel:
 
 **Agent tham gia chính:** AI_02 (Blockchain Core Dev) (36), AI_04 (Backend API) (12), AI_07 (Frontend Citizen) (12), AI_08 (Frontend Admin) (6), AI_03 (Smart Contract Auditor) (6), AI_15 (Compliance) (6), AI_11 (QA Unit) (6), AI_12 (QA E2E) (6)
 
+### Sprint 4 closure snapshot (2026-05-10, đang chạy chuỗi PR)
+
+| Nhóm US Sprint 4 | Trạng thái closure hiện tại | Verify local | Phụ thuộc GitHub remote | Evidence |
+|---|---|---|---|---|
+| Blockchain core + sync mode | Done (local) | Có test contract + client blockchain mock/rpc | Cần checks pass và merge PR #20/#21 | [contracts/test/UrbanLandRegistry.ts](../contracts/test/UrbanLandRegistry.ts), [backend/src/lib/blockchain/urban-land-registry.client.ts](../backend/src/lib/blockchain/urban-land-registry.client.ts), [backend/test/sprint4-blockchain.client.test.ts](../backend/test/sprint4-blockchain.client.test.ts), [PR #20](https://github.com/eye-00/QLDA-UrbanchainVN/pull/20), [PR #21](https://github.com/eye-00/QLDA-UrbanchainVN/pull/21) |
+| Officer/citizen on-chain visibility UI | Done (local) | Có hiển thị tx/token + panel đối soát on/off-chain + test helper | Cần checks pass và merge PR #22 | [frontend/src/pages/CitizenRegistrationPage.tsx](../frontend/src/pages/CitizenRegistrationPage.tsx), [frontend/src/pages/RegistrationReviewPage.tsx](../frontend/src/pages/RegistrationReviewPage.tsx), [frontend/test/registration-blockchain-helpers.test.ts](../frontend/test/registration-blockchain-helpers.test.ts), [PR #22](https://github.com/eye-00/QLDA-UrbanchainVN/pull/22) |
+| QA/docs closeout Sprint 4 | Partial | Có test integration `blockchain-status` + duplicate sync tại local | Cần checks pass và merge PR #23 | [backend/test/sprint3-registration.test.ts](../backend/test/sprint3-registration.test.ts), [docs/07-api-contract.md](./07-api-contract.md), [docs/08-definition-of-done.md](./08-definition-of-done.md) |
+
+> Kết luận tạm thời: Sprint 4 đang ở trạng thái `In Progress`; chỉ nâng `Done` khi chuỗi PR #21 -> #22 -> #23 đã merge vào `develop` và required checks pass.
+
 ### Epic 4: Duyệt hồ sơ
 
 #### Feature: Bộ lọc hồ sơ theo trạng thái

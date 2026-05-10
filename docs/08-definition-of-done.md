@@ -192,3 +192,25 @@ Mot backlog item duoc xem la Done khi:
 - Quy tac dong sprint giu nguyen:
   - Khong nang `Done` neu thieu evidence remote gate.
   - US `Missing` phai co implementation/test/docs bo sung truoc khi chot sprint.
+
+## Sprint 4 Gate (Blockchain registration sync)
+
+### Local verification (2026-05-10)
+- Backend:
+  - `npm --workspace backend run build` ✅
+  - `npm run lint:backend` ✅
+  - `npm --workspace backend run test -- test/sprint4-blockchain.client.test.ts` ✅
+  - `npm --workspace backend run test -- test/sprint3-registration.test.ts` ✅
+- Frontend:
+  - `npm --workspace frontend run test` ✅
+  - `npm --workspace frontend run build` ✅
+  - `npm run lint:frontend` ✅ (warning hooks khong fail gate)
+
+### Scope implementation chain
+- PR #20 (core): blockchain client + sync mode.
+- PR #21 (hardening): on-chain duplicate precheck + `GET /registrations/:id/blockchain-status`.
+- PR #22 (frontend): hiển thị tx/token cho công dân + panel đối soát on/off-chain cho cán bộ.
+- PR #23 (qa/docs): test đối soát + cập nhật docs closeout.
+
+### Sprint 4 closure status
+- `In Progress` cho đến khi chuỗi PR #21 -> #22 -> #23 merge vào `develop` và required checks pass trên từng PR.

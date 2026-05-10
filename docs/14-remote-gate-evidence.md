@@ -116,3 +116,26 @@ Verify API:
   - `contracts-ci`: skipped
   - `docs-check`: pass
   - `changes`: pass
+
+## 7) Sprint 4 PR chain evidence (ongoing)
+
+### PR #20 (S4 core blockchain)
+- PR: [#20](https://github.com/eye-00/QLDA-UrbanchainVN/pull/20)
+- Trạng thái: merged (`8f5a63b`)
+- Checks đã pass trước merge:
+  - `backend-ci`: pass
+  - `changes`: pass
+
+### PR #21 (S4 hardening)
+- PR: [#21](https://github.com/eye-00/QLDA-UrbanchainVN/pull/21)
+- Trạng thái: open (đang chờ review/check)
+- Scope: duplicate precheck + endpoint `GET /registrations/:id/blockchain-status`.
+
+### PR #22 (S4 frontend on-chain visibility)
+- PR: [#22](https://github.com/eye-00/QLDA-UrbanchainVN/pull/22)
+- Trạng thái: open (đang chờ review/check)
+- Scope: hiển thị tx/token cho citizen + panel đối soát cho officer.
+
+### PR #23 (S4 QA/docs closeout)
+- Trạng thái: sẽ mở sau khi commit docs + QA patch hiện tại.
+- Scope: test tích hợp `blockchain-status`, docs closeout Sprint 4.
