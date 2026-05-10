@@ -1,6 +1,6 @@
 # US Gap Remediation Plan - Sprint 1, Sprint 2, Sprint 3
 
-Cập nhật: 2026-04-29 00:10:00
+Cập nhật: 2026-05-10 15:58:00
 
 ## 1) Tổng quan kết quả audit
 
@@ -8,22 +8,26 @@ Cập nhật: 2026-04-29 00:10:00
 |---|---:|---:|---:|---:|
 | Sprint 1 | 90 | 0 | 0 | 90 |
 | Sprint 2 | 72 | 0 | 0 | 72 |
-| Sprint 3 | 72 | 0 | 0 | 72 |
+| Sprint 3 | 58 | 14 | 0 | 72 |
 
-- Số US đang cần xác nhận qua remote checks cho patch mới: **0**
+- Số US đang cần xác nhận qua remote checks cho patch mới: **14**
 - Số US còn Missing: **0**
 
 ## 2) Blocker phân loại
 
-### P0 - Remote verification cho commit mới
-- Đã hoàn tất verify remote gate cho PR closeout: [PR #4](https://github.com/eye-00/QLDA-UrbanchainVN/pull/4).
-- Required checks đã pass: `backend-ci`, `frontend-ci`, `docs-check` (và `contracts-ci` được skip theo path filter).
-- Merge commit trên `develop`: `e894775`.
-- Evidence: [docs/14-remote-gate-evidence.md](./14-remote-gate-evidence.md).
+### P0 - Remote verification cho Sprint 3 legal hardening
+- Chuoi PR dang mo:
+  - [PR #16](https://github.com/eye-00/QLDA-UrbanchainVN/pull/16) - backend core (da pass backend-ci, con review bat buoc).
+  - [PR #17](https://github.com/eye-00/QLDA-UrbanchainVN/pull/17) - frontend legal UX (base tren PR #16, chua den gate develop).
+  - PR #18 - QA/docs closeout (se tao sau cap nhat docs + verify).
+- Blocker hien tai: chua co full required checks pass tren PR dich cuoi vao `develop`.
 
-### P1 - Missing implementation/test evidence
-- **Đã đóng toàn bộ nhóm Missing cũ**: Sprint 2 (`US-091..096`), Sprint 3 (`US-193..204`).
-- Trạng thái hiện tại: `Done` sau khi đã có implementation + test + docs + remote gate evidence.
+### P1 - Legal acceptance alignment
+- Cac nhom US Sprint 3 dang `Partial` vi thay doi acceptance:
+  - `US-157..160`,
+  - `US-187..192`,
+  - `US-193..198`.
+- Ly do: can dong bo evidence sau khi merge chain PR #16/#17/#18.
 
 ### P2 - Quality hardening
 - Không còn blocker đóng sprint.
@@ -31,17 +35,17 @@ Cập nhật: 2026-04-29 00:10:00
 
 ## 3) Kế hoạch xử lý theo thứ tự
 
-1. Đã mở và merge PR closeout [#4](https://github.com/eye-00/QLDA-UrbanchainVN/pull/4) vào `develop`.
-2. Đã pass regression local (`npm run lint`, `npm run build`, `npm test`) trước khi merge.
-3. Đã cập nhật `docs/12` để nâng US Sprint 2/3 lên `Done`.
+1. Merge PR #16 vao `develop` sau khi du review bat buoc.
+2. Rebase PR #17 len `develop` (hoac doi base sau khi #16 merge), chot checks frontend.
+3. Tao PR #18 (QA/docs closeout), chay full gate (`lint/build/test`) va cap nhat matrix US.
 
 ## 4) Action ownership để đóng gap
 
 | Công việc | Agent chính | Agent phối hợp | Output |
 |---|---|---|---|
-| Verify remote checks cho patch mới | AI_14 | AI_12, AI_13 | Done - checks pass trên PR #4 |
-| Regression Sprint 2/3 (integrity + notifications) | AI_12 | AI_07, AI_09 | Done - local test gate pass |
-| Đồng bộ closure docs | AI_15 | AI_03, AI_01 | Done - cập nhật docs/12, docs/13, docs/08 |
+| Verify remote checks cho patch mới | AI_14 | AI_12, AI_13 | In progress - theo doi chain PR #16/#17/#18 |
+| Regression Sprint 3 legal hardening | AI_12 | AI_07, AI_09 | In progress - se chot o PR #18 |
+| Đồng bộ closure docs | AI_15 | AI_03, AI_01 | In progress - cap nhat sau khi co merge chain |
 
 ## 5) Điều kiện chốt Done cuối cùng
 - Không còn US `Missing`.
