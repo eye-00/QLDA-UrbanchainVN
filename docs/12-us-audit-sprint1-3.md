@@ -26,6 +26,19 @@ Cập nhật: 2026-04-29 00:10:00
   - [frontend/test/wallet-helpers.test.ts](../frontend/test/wallet-helpers.test.ts)
   - [docs/07-api-contract.md](./07-api-contract.md)
 
+## Legal override update (2026-05-10)
+
+- Sprint 2 legal addendum `LEG-S2-001..005` đã được triển khai đầy đủ ở local với evidence code/test.
+- Trạng thái hiện tại:
+  - `Done (local evidence)` cho LEG-S2-001..005.
+  - `Partial (overall remote gate)` cho Sprint 2 legal-aligned cho tới khi pass required checks trên chuỗi PR (`backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`).
+- Evidence chính:
+  - [backend/test/sprint2-legal.test.ts](../backend/test/sprint2-legal.test.ts)
+  - [backend/src/modules/legal/legal.routes.ts](../backend/src/modules/legal/legal.routes.ts)
+  - [backend/src/modules/registrations/registration.routes.ts](../backend/src/modules/registrations/registration.routes.ts)
+  - [frontend/src/pages/RegistrationReviewPage.tsx](../frontend/src/pages/RegistrationReviewPage.tsx)
+  - [docs/08-definition-of-done.md](./08-definition-of-done.md)
+
 ## Ma trận chi tiết từng US
 
 | US_ID | Sprint | Feature | Acceptance | Evidence_Code | Evidence_Test | Evidence_Docs | Status | Risk | Remote_Dependency |
