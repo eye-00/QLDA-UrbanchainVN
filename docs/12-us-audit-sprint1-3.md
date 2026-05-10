@@ -1,6 +1,6 @@
 # US Audit Matrix - Sprint 1, Sprint 2, Sprint 3
 
-Cập nhật: 2026-05-10 15:40:00
+Cập nhật: 2026-05-10 16:15:00
 
 ## Quy ước đánh giá
 - `Done`: có implementation + test/evidence phù hợp + không mâu thuẫn docs/workflow.
@@ -13,7 +13,7 @@ Cập nhật: 2026-05-10 15:40:00
 |---|---:|---:|---:|---:|---:|
 | Sprint 1 | 90 | 0 | 0 | 90 | 100% |
 | Sprint 2 | 72 | 0 | 0 | 72 | 100% |
-| Sprint 3 | 58 | 14 | 0 | 72 | 100% |
+| Sprint 3 | 72 | 0 | 0 | 72 | 100% |
 
 ## Bổ sung backlog ví blockchain (Sprint 1 Epic 13)
 
@@ -39,17 +39,17 @@ Cập nhật: 2026-05-10 15:40:00
   - [frontend/src/pages/RegistrationReviewPage.tsx](../frontend/src/pages/RegistrationReviewPage.tsx)
   - [docs/08-definition-of-done.md](./08-definition-of-done.md)
 
-## Sprint 3 legal hardening override (2026-05-10)
+## Sprint 3 legal hardening override (2026-05-10, closeout)
 
 - Cac US lien quan nhom xu ly ho so can re-check do thay doi contract/action:
   - `US-157..160` (xem chi tiet + thao tac can bo),
   - `US-187..192` (yeu cau bo sung),
   - `US-193..198` (cap nhat trang thai ho so).
-- Trang thai tam thoi: `Partial` cho cac nhom tren den khi merge xong chuoi PR:
+- Trang thai cuoi: `Done` sau khi merge chuoi PR:
   - [PR #16](https://github.com/eye-00/QLDA-UrbanchainVN/pull/16) - backend legal hardening,
   - [PR #17](https://github.com/eye-00/QLDA-UrbanchainVN/pull/17) - frontend legal UX,
-  - PR #18 - QA/docs closeout.
-- Sau khi required checks pass tren PR dich vao `develop`, cap nhat lai cac dong US chi tiet tu `Partial` -> `Done`.
+  - [PR #18](https://github.com/eye-00/QLDA-UrbanchainVN/pull/18) - QA/docs closeout.
+- Required checks da pass tren cac PR dich vao `develop`, cap nhat matrix Sprint 3 ve `Done`.
 
 ## Ma trận chi tiết từng US
 

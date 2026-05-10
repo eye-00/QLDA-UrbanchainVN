@@ -557,27 +557,27 @@ Mỗi dòng backlog giữ đúng cấu trúc từ Excel:
 
 **Agent tham gia chính:** AI_08 (Frontend Admin) (30), AI_04 (Backend API) (24), AI_07 (Frontend Citizen) (12), AI_06 (Database & IPFS) (6)
 
-### Sprint 3 progress snapshot (2026-05-10)
+### Sprint 3 progress snapshot (2026-05-10, 16:15 ICT)
 
 | Nhóm US Sprint 3 (phase hiện tại) | Trạng thái | Verify local | Ghi chú |
 |---|---|---|---|
-| US-127..132 (Gửi hồ sơ đăng ký) | Done (local) | `POST /registrations`, `POST /registrations/:id/submit`, citizen UI, backend/frontend test pass local | Chờ merge PR chain Sprint 3 legal hardening để chốt remote |
-| US-145..156 (Danh sách + lọc hồ sơ chờ xử lý) | Partial | Officer UI đã có filter/status, bổ sung legal validation cho action đang ở PR #17 | Chờ review chéo + remote checks khi PR vào `develop` |
-| US-157..160 (Xem chi tiết hồ sơ đăng ký) | Partial | Có stepper, panel chi tiết, action groups; đã thêm timeline tài liệu (`/document-history`) | Chờ docs closeout + merge chain PR #16/#17/#18 |
-| US-187..192 (Yêu cầu bổ sung hồ sơ) | Partial | Backend đã bắt buộc `missingItems` + `deadlineAt`; frontend đã map checklist + deadline | Chờ verify remote gate và cập nhật audit matrix |
-| US-193..198 (Cập nhật trạng thái hồ sơ) | Partial | `commune-confirm` đã bắt buộc `notes` + `evidenceFileId` và có audit event | Chờ merge PR #16 vào `develop` |
+| US-127..132 (Gửi hồ sơ đăng ký) | Done | `POST /registrations`, `POST /registrations/:id/submit`, citizen UI, backend/frontend test pass | Đã merge chain Sprint 3 legal hardening |
+| US-145..156 (Danh sách + lọc hồ sơ chờ xử lý) | Done | Officer UI filter/status + legal validation actions đã pass checks | PR #17 đã merge vào `develop` |
+| US-157..160 (Xem chi tiết hồ sơ đăng ký) | Done | Stepper/panel chi tiết/action groups + timeline tài liệu (`/document-history`) | PR #16/#17/#18 đã merge |
+| US-187..192 (Yêu cầu bổ sung hồ sơ) | Done | Bắt buộc `missingItems` + `deadlineAt`, frontend checklist/deadline tương ứng | Backend + frontend checks pass |
+| US-193..198 (Cập nhật trạng thái hồ sơ) | Done | `commune-confirm` bắt buộc `notes` + `evidenceFileId` + audit event | PR #16 đã merge |
 
-### Sprint 1-2-3 US audit snapshot (2026-05-10, legal hardening wave)
+### Sprint 1-2-3 US audit snapshot (2026-05-10, sau merge chain legal hardening)
 
 | Sprint | Done | Partial | Missing | Tổng US | % Có đáp ứng (Done+Partial) |
 |---|---:|---:|---:|---:|---:|
 | Sprint 1 | 90 | 0 | 0 | 90 | 100% |
 | Sprint 2 | 72 | 0 | 0 | 72 | 100% |
-| Sprint 3 | 58 | 14 | 0 | 72 | 100% |
+| Sprint 3 | 72 | 0 | 0 | 72 | 100% |
 
 - Báo cáo chi tiết từng US: [docs/12-us-audit-sprint1-3.md](./12-us-audit-sprint1-3.md).
 - Kế hoạch bù thiếu/đóng gap: [docs/13-us-gap-remediation-plan.md](./13-us-gap-remediation-plan.md).
-- Lưu ý: Sprint 3 đang mở wave legal hardening; các nhóm US liên quan checklist bổ sung/xác nhận cấp xã/document timeline tạm giữ `Partial` đến khi pass chuỗi PR #16 -> #17 -> #18 trên `develop`.
+- Lưu ý: Wave legal hardening Sprint 3 đã đóng sau chuỗi PR #16 -> #17 -> #18 merge vào `develop` và checks pass.
 
 ### Epic 3: Đăng ký đất đai lần đầu
 

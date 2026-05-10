@@ -173,15 +173,15 @@ Mot backlog item duoc xem la Done khi:
   - `commune-confirm` bat buoc `notes` + `evidenceFileId` hop le theo ho so.
   - `request-supplement` bat buoc checklist `missingItems` + `deadlineAt` tuong lai.
   - bo sung endpoint timeline `GET /registrations/:id/document-history`.
-- Chuoi PR dang thuc hien:
+- Chuoi PR da hoan tat:
   - PR #16: backend core hardening ([link](https://github.com/eye-00/QLDA-UrbanchainVN/pull/16)).
   - PR #17: frontend legal UX alignment ([link](https://github.com/eye-00/QLDA-UrbanchainVN/pull/17)).
-  - PR #18: QA/docs closeout (se tao sau khi cap nhat tai lieu va verify).
+  - PR #18: QA/docs closeout ([link](https://github.com/eye-00/QLDA-UrbanchainVN/pull/18)).
 
 ### Trang thai gate hien tai
 - Local backend tests: `pass` (bao gom `sprint3-registration.test.ts` va full backend test).
 - Local frontend test/build: `pass`.
-- Remote gate: `Partial` cho den khi chuoi PR #16 -> #17 -> #18 duoc review/merge va required checks pass tren PR dich vao `develop`.
+- Remote gate: `Done` (chuoi PR #16 -> #17 -> #18 da merge vao `develop`, required checks pass tren tung PR).
 
 ## Sprint 1-2-3 US Audit Note (2026-04-29)
 - Bao cao chi tiet tung US: [docs/12-us-audit-sprint1-3.md](./12-us-audit-sprint1-3.md).
