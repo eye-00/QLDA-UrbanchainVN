@@ -33,6 +33,7 @@ type CreateRegistrationResponse = {
 };
 
 const initialForm = {
+  procedureCode: 'DKDD_LANDAU_3380',
   fullName: 'Nguyễn Văn A',
   identityNumber: '0482xxxxxxx',
   mapSheetNumber: '05',
@@ -103,6 +104,7 @@ export function CitizenRegistrationPage() {
     setLoading(true);
     try {
       const payload = {
+        procedureCode: form.procedureCode,
         landInfo: {
           provinceCode: form.provinceCode,
           communeName: form.communeName,
@@ -132,7 +134,9 @@ export function CitizenRegistrationPage() {
   async function submitRegistration(registrationId: string) {
     setLoading(true);
     try {
-      await apiPost(`/registrations/${registrationId}/submit`, {});
+      await apiPost(`/registrations/${registrationId}/submit`, {
+        legalBasisCode: `QĐ3380-SUBMIT-${new Date().getFullYear()}`
+      });
       showToast('success', 'Đã gửi hồ sơ vào luồng tiếp nhận.');
       await loadRegistrations();
     } catch (error) {
@@ -161,6 +165,12 @@ export function CitizenRegistrationPage() {
       </div>
       {locationNotice && <p className="notice">{locationNotice}</p>}
       <form onSubmit={onSubmit} className="card form-grid">
+        <label>Thủ tục pháp lý
+          <select value={form.procedureCode} onChange={(e) => setForm({ ...form, procedureCode: e.target.value })}>
+            <option value="DKDD_LANDAU_3380">Đăng ký lần đầu (QĐ 3380)</option>
+            <option value="DKDD_LANDAU_DON_GIAN">Đăng ký lần đầu (đơn giản)</option>
+          </select>
+        </label>
         <label>Họ tên người sử dụng đất
           <input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
         </label>

@@ -44,6 +44,8 @@ const roleOptions: UserRole[] = [
   'COMMUNE_OFFICER',
   'LAND_REGISTRY_OFFICER',
   'APPROVAL_AUTHORITY',
+  'TAX_OFFICER',
+  'AUDITOR',
   'ADMIN'
 ];
 
