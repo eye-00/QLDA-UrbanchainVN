@@ -35,6 +35,13 @@ type RegistrationItem = {
     address: string | null;
   };
   notes: string[];
+  files?: Array<{
+    id: string;
+    documentType: string;
+    originalName: string;
+    cid: string | null;
+    hash: string | null;
+  }>;
   updatedAt: string;
 };
 
@@ -55,6 +62,19 @@ type PaymentObligationItem = {
 
 type PaymentObligationListResponse = {
   items: PaymentObligationItem[];
+  total: number;
+};
+
+type DocumentHistoryEvent = {
+  id: string;
+  type: 'DOCUMENT_VERSION' | 'SUBMIT_SNAPSHOT' | 'STATUS_AUDIT';
+  at: string;
+  title: string;
+  detail: Record<string, unknown>;
+};
+
+type DocumentHistoryResponse = {
+  items: DocumentHistoryEvent[];
   total: number;
 };
 
@@ -96,6 +116,10 @@ export function RegistrationReviewPage() {
   const [chainHash, setChainHash] = useState('');
   const [legalBasisCode, setLegalBasisCode] = useState('');
   const [paymentObligations, setPaymentObligations] = useState<PaymentObligationItem[]>([]);
+  const [documentHistory, setDocumentHistory] = useState<DocumentHistoryEvent[]>([]);
+  const [missingItemsInput, setMissingItemsInput] = useState('');
+  const [supplementDeadline, setSupplementDeadline] = useState('');
+  const [communeEvidenceFileId, setCommuneEvidenceFileId] = useState('');
 
   const selected = useMemo(() => items.find((item) => item.id === selectedId) ?? null, [items, selectedId]);
   const queryString = useMemo(() => buildRegistrationReviewQuery(filters), [filters]);
@@ -129,10 +153,14 @@ export function RegistrationReviewPage() {
   useEffect(() => {
     if (!selected) {
       setPaymentObligations([]);
+      setDocumentHistory([]);
+      setCommuneEvidenceFileId('');
       return;
     }
     setLegalBasisCode(selected.legalBasisCode ?? selected.procedureCode ?? '');
+    setCommuneEvidenceFileId(selected.files?.[0]?.id ?? '');
     void loadPaymentObligations(selected.id);
+    void loadDocumentHistory(selected.id);
   }, [selected?.id]);
 
   async function loadPaymentObligations(registrationId: string) {
@@ -141,6 +169,15 @@ export function RegistrationReviewPage() {
       setPaymentObligations(data.items);
     } catch {
       setPaymentObligations([]);
+    }
+  }
+
+  async function loadDocumentHistory(registrationId: string) {
+    try {
+      const data = await apiGet<DocumentHistoryResponse>(`/registrations/${registrationId}/document-history`);
+      setDocumentHistory(data.items);
+    } catch {
+      setDocumentHistory([]);
     }
   }
 
@@ -166,8 +203,11 @@ export function RegistrationReviewPage() {
       setApprovalNumber('');
       setChainCid('');
       setChainHash('');
+      setMissingItemsInput('');
+      setSupplementDeadline('');
       await loadRegistrations();
       await loadPaymentObligations(selected.id);
+      await loadDocumentHistory(selected.id);
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Không thực hiện được thao tác.');
     } finally {
@@ -179,6 +219,20 @@ export function RegistrationReviewPage() {
     if (requiresActionNote('supplement', actionNote)) return true;
     showToast('error', `Vui lòng nhập ghi chú để ${actionLabel.toLowerCase()}.`);
     return false;
+  }
+
+  function parseMissingItems() {
+    return missingItemsInput
+      .split('\n')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+  }
+
+  function toIsoDeadline(value: string) {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toISOString();
   }
 
   return (
@@ -325,6 +379,21 @@ export function RegistrationReviewPage() {
           </div>
 
           <div className="row-gap">
+            <h3>Lịch sử phiên bản tài liệu</h3>
+            {documentHistory.length === 0 ? (
+              <div className="empty-state">Chưa có timeline tài liệu.</div>
+            ) : (
+              <ul className="note-list">
+                {documentHistory.map((event) => (
+                  <li key={event.id}>
+                    <strong>{event.title}</strong> - {new Date(event.at).toLocaleString('vi-VN')}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="row-gap">
             <h3>Thao tác xử lý</h3>
             <label>
               Căn cứ pháp lý
@@ -342,6 +411,17 @@ export function RegistrationReviewPage() {
                 placeholder="Nhập ghi chú hoặc lý do xử lý..."
               />
             </label>
+            <label>
+              Chứng cứ xác nhận cấp xã
+              <select value={communeEvidenceFileId} onChange={(event) => setCommuneEvidenceFileId(event.target.value)}>
+                <option value="">Chọn tệp chứng cứ</option>
+                {(selected.files ?? []).map((file) => (
+                  <option key={file.id} value={file.id}>
+                    {file.documentType} - {file.originalName}
+                  </option>
+                ))}
+              </select>
+            </label>
 
             <div className="action-row">
               {permissions.canAccept && (
@@ -355,7 +435,21 @@ export function RegistrationReviewPage() {
                   className="btn btn-outline"
                   onClick={() => {
                     if (!requireNoteFor('yêu cầu bổ sung')) return;
-                    void executeAction('/request-supplement', { note: actionNote }, 'Đã yêu cầu bổ sung hồ sơ.');
+                    const missingItems = parseMissingItems();
+                    if (missingItems.length === 0) {
+                      showToast('error', 'Vui lòng nhập danh mục thiếu (mỗi dòng một mục).');
+                      return;
+                    }
+                    const deadlineAt = toIsoDeadline(supplementDeadline);
+                    if (!deadlineAt) {
+                      showToast('error', 'Vui lòng nhập hạn bổ sung hợp lệ.');
+                      return;
+                    }
+                    void executeAction(
+                      '/request-supplement',
+                      { note: actionNote, missingItems, deadlineAt },
+                      'Đã yêu cầu bổ sung hồ sơ.'
+                    );
                   }}
                 >
                   Yêu cầu bổ sung
@@ -377,18 +471,63 @@ export function RegistrationReviewPage() {
 
             {permissions.canCommuneConfirm && (
               <div className="action-row">
-                <button type="button" onClick={() => void executeAction('/commune-confirm', { confirmed: true, notes: actionNote || undefined }, 'Đã xác nhận cấp xã.')}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!requireNoteFor('xác nhận cấp xã')) return;
+                    if (!communeEvidenceFileId) {
+                      showToast('error', 'Vui lòng chọn tệp chứng cứ cho xác nhận cấp xã.');
+                      return;
+                    }
+                    void executeAction(
+                      '/commune-confirm',
+                      { confirmed: true, notes: actionNote, evidenceFileId: communeEvidenceFileId },
+                      'Đã xác nhận cấp xã.'
+                    );
+                  }}
+                >
                   Xác nhận cấp xã
                 </button>
                 <button
                   type="button"
                   className="btn btn-outline"
-                  onClick={() => void executeAction('/commune-confirm', { confirmed: false, notes: actionNote || undefined }, 'Đã trả hồ sơ bổ sung từ cấp xã.')}
+                  onClick={() => {
+                    if (!requireNoteFor('trả hồ sơ bổ sung từ cấp xã')) return;
+                    if (!communeEvidenceFileId) {
+                      showToast('error', 'Vui lòng chọn tệp chứng cứ cho bước xác nhận cấp xã.');
+                      return;
+                    }
+                    void executeAction(
+                      '/commune-confirm',
+                      { confirmed: false, notes: actionNote, evidenceFileId: communeEvidenceFileId },
+                      'Đã trả hồ sơ bổ sung từ cấp xã.'
+                    );
+                  }}
                 >
                   Trả bổ sung
                 </button>
               </div>
             )}
+
+            <div className="form-grid">
+              <label>
+                Danh mục thiếu (mỗi dòng một mục)
+                <textarea
+                  value={missingItemsInput}
+                  onChange={(event) => setMissingItemsInput(event.target.value)}
+                  placeholder="Ví dụ:\nThiếu bản scan giấy tờ nguồn gốc đất\nThiếu minh chứng nghĩa vụ tài chính"
+                  rows={3}
+                />
+              </label>
+              <label>
+                Hạn bổ sung
+                <input
+                  type="datetime-local"
+                  value={supplementDeadline}
+                  onChange={(event) => setSupplementDeadline(event.target.value)}
+                />
+              </label>
+            </div>
 
             {permissions.canTaxTransfer && (
               <div className="form-grid">
