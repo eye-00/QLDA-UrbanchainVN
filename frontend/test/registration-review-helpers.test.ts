@@ -29,7 +29,9 @@ describe('registration review helpers', () => {
     expect(getReviewPermissions('RECEPTION_OFFICER').canAccept).toBe(true);
     expect(getReviewPermissions('RECEPTION_OFFICER').canApprove).toBe(false);
     expect(getReviewPermissions('LAND_REGISTRY_OFFICER').canTaxTransfer).toBe(true);
+    expect(getReviewPermissions('TAX_OFFICER').canConfirmPayment).toBe(true);
     expect(getReviewPermissions('APPROVAL_AUTHORITY').canBlockchainSync).toBe(true);
+    expect(getReviewPermissions('AUDITOR').canAccept).toBe(false);
     expect(getReviewPermissions('CITIZEN').canAccept).toBe(false);
     expect(getReviewPermissions('ADMIN').canApprove).toBe(true);
   });
@@ -41,5 +43,8 @@ describe('registration review helpers', () => {
     const approved = getReviewStepsByStatus('DA_CAP');
     expect(approved[6].state).toBe('current');
     expect(approved[0].state).toBe('done');
+
+    const blockchain = getReviewStepsByStatus('DA_GHI_BLOCKCHAIN');
+    expect(blockchain[6].state).toBe('current');
   });
 });
