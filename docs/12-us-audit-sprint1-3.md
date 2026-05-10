@@ -1,6 +1,6 @@
 # US Audit Matrix - Sprint 1, Sprint 2, Sprint 3
 
-Cập nhật: 2026-04-29 00:10:00
+Cập nhật: 2026-05-10 10:10:00
 
 ## Quy ước đánh giá
 - `Done`: có implementation + test/evidence phù hợp + không mâu thuẫn docs/workflow.
@@ -12,8 +12,45 @@ Cập nhật: 2026-04-29 00:10:00
 | Sprint | Done | Partial | Missing | Tổng US | % Có đáp ứng (Done+Partial) |
 |---|---:|---:|---:|---:|---:|
 | Sprint 1 | 90 | 0 | 0 | 90 | 100% |
-| Sprint 2 | 72 | 0 | 0 | 72 | 100% |
-| Sprint 3 | 72 | 0 | 0 | 72 | 100% |
+| Sprint 2 | 0 | 72 | 0 | 72 | 100% |
+| Sprint 3 | 0 | 72 | 0 | 72 | 100% |
+
+## Legal Rebaseline Override (2026-05-10)
+
+- Nguon chuan moi: `docs/docs-legal-aligned`.
+- Trang thai tong:
+  - Sprint 1 giu `Done` (bao gom wallet `US-547..558`).
+  - Sprint 2 ha ve `Partial` do chua dat legal gates moi.
+  - Sprint 3 ha ve `Partial` do chua dat legal gates moi.
+
+Legal blockers dang mo (owner phoi hop):
+
+| Legal gap | Anh huong sprint | Owner chinh | Ma backlog legal |
+|---|---|---|---|
+| Legal procedure registry + authority matrix | Sprint 2, Sprint 3 | AI_04 Backend API | `LEG-S2-001` |
+| Document versioning + submit snapshot | Sprint 2, Sprint 3 | AI_06 DB & IPFS + AI_04 Backend API | `LEG-S2-002`, `LEG-S2-004` |
+| Payment obligation model off-chain | Sprint 2, Sprint 3 | AI_04 Backend API | `LEG-S2-003`, `LEG-S5-001` |
+| Transition guard legalBasis/actor/status | Sprint 2, Sprint 3 | AI_15 Compliance + AI_04 Backend API | `LEG-S2-005` |
+| Blockchain precondition guard sau cap nhat ho so dia chinh | Sprint 3+ | AI_04 Backend API + AI_02 Blockchain Core Dev | `LEG-S4-001`, `LEG-S7-001` |
+
+Ghi chu:
+- Cac dong US chi tiet ben duoi duoc xem la "implementation evidence" hien co.
+- Ket luan chot trang thai sprint phai uu tien theo legal override nay cho den khi legal gaps duoc dong.
+
+## Bổ sung backlog ví blockchain (Sprint 1 Epic 13)
+
+- Backlog mới bổ sung nhóm `US-547..558` cho Sprint 1 (kết nối ví + xác minh chữ ký).
+- Trạng thái hiện tại: `Done` (implementation + local tests + remote gate đã xác nhận và merge).
+- Evidence local:
+  - [backend/src/modules/wallets/wallet.routes.ts](../backend/src/modules/wallets/wallet.routes.ts)
+  - [backend/test/sprint1-wallet.test.ts](../backend/test/sprint1-wallet.test.ts)
+  - [frontend/src/pages/WalletManagementPage.tsx](../frontend/src/pages/WalletManagementPage.tsx)
+  - [frontend/test/wallet-helpers.test.ts](../frontend/test/wallet-helpers.test.ts)
+  - [docs/07-api-contract.md](./07-api-contract.md)
+- Evidence remote:
+  - [PR #6](https://github.com/eye-00/QLDA-UrbanchainVN/pull/6) (merge commit `89c85ed`)
+  - [PR #7](https://github.com/eye-00/QLDA-UrbanchainVN/pull/7) (merge commit `e8605bf`)
+  - Required checks + branch protection + secret scanning/push protection: pass theo policy repo.
 
 ## Ma trận chi tiết từng US
 

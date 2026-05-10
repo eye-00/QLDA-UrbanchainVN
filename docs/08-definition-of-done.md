@@ -140,6 +140,26 @@ Mot backlog item duoc xem la Done khi:
 | APPROVAL_AUTHORITY | No | No | Yes | No | No | Yes | Yes |
 | ADMIN | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 
+## Legal Rebaseline Note (2026-05-10)
+
+Sau khi doi soat theo bo tai lieu `docs/docs-legal-aligned`, trang thai sprint duoc cap nhat theo legal baseline moi:
+
+- Sprint 1: `Done` (giu nguyen, bao gom wallet `US-547..558`).
+- Sprint 2: `Partial` (chua dat day du legal gates moi).
+- Sprint 3: `Partial` (chua dat day du legal gates moi).
+
+Legal gaps bat buoc phai dong truoc khi nang lai `Done` cho Sprint 2/3:
+
+1. Chua co legal procedure registry + authority matrix day du.
+2. Chua co document versioning + submit snapshot theo workflow phap ly.
+3. Chua tach day du payment model (`INTAKE_FEE` va `LAND_FINANCIAL_OBLIGATION`).
+4. Chua khoa transition gate bat buoc `legalBasisCode` + actor/status validation.
+5. Chua khoa precondition "chi ghi blockchain sau khi off-chain dat trang thai hop le".
+
+Luu y:
+- Ket luan rebaseline nay uu tien hon cac closure snapshot cu trong tai lieu.
+- Remote gate pass khong du de danh dau `Done` neu legal gates chua dat.
+
 ## Sprint 1-2-3 US Audit Note (2026-04-29)
 - Bao cao chi tiet tung US: [docs/12-us-audit-sprint1-3.md](./12-us-audit-sprint1-3.md).
 - Ke hoach bu thieu va dong gap: [docs/13-us-gap-remediation-plan.md](./13-us-gap-remediation-plan.md).
