@@ -306,3 +306,107 @@ Mọi AI agent trước khi code phải trả lời được:
 - Không bỏ qua VPĐKĐĐ/Chi nhánh trong bước thẩm định chuyên môn.
 - Không đánh dấu hồ sơ hoàn tất nếu chưa có cập nhật kết quả nghiệp vụ chuẩn.
 
+---
+
+# PHỤ LỤC PHÁP LÝ 2025 — Legal-aligned Workflow Patch
+
+> Phụ lục này bổ sung sau khi rà soát `3380_QD-BNNMT_670454.docx`, `2304_QD-BNNMT_662509.docx`, `151_2025_ND-CP_660608.docx`, `101_2024_ND-CP_613131.docx`. Nếu nội dung cũ trong file này mâu thuẫn với phụ lục, ưu tiên phụ lục và gắn `NEEDS_PM_DECISION`.
+
+## A. Nguồn pháp lý ưu tiên
+
+1. QĐ 3380/2025 cho thủ tục mới/sửa đổi/bổ sung.
+2. QĐ 2304/2025 cho danh mục nền nếu không bị QĐ 3380 thay thế.
+3. NĐ 151/2025 cho phân định thẩm quyền chính quyền địa phương 02 cấp, phí/lệ phí, actor xử lý.
+4. NĐ 101/2024 cho đăng ký, cấp GCN, hệ thống thông tin đất đai, bản đồ địa chính và CSDL đất đai.
+
+## B. Actor nghiệp vụ chuẩn từ Sprint 2+
+
+| Actor hệ thống | Ý nghĩa pháp lý/nghiệp vụ | Ghi chú triển khai |
+|---|---|---|
+| `CITIZEN` | Người dân/người sử dụng đất | Nộp hồ sơ, upload tài liệu, theo dõi, bổ sung |
+| `BUSINESS` | Tổ chức/doanh nghiệp | Chỉ dùng cho nhóm TTHC có tổ chức |
+| `RECEPTION_OFFICER` | Cơ quan tiếp nhận hồ sơ và trả kết quả/Bộ phận Một cửa | Kiểm tra thành phần, cấp tiếp nhận/hẹn trả, yêu cầu bổ sung |
+| `COMMUNE_OFFICER` | UBND cấp xã/cơ quan chuyên môn cấp xã | Xác nhận nội dung thuộc thẩm quyền xã, công khai/ghi nhận ý kiến khi cần |
+| `LAND_REGISTRY_OFFICER` | VPĐKĐĐ hoặc Chi nhánh VPĐKĐĐ | Thẩm định chuyên môn, cập nhật hồ sơ địa chính/CSDL đất đai |
+| `TAX_OFFICER` | Cơ quan thuế | Xác định/xác nhận nghĩa vụ tài chính nếu phát sinh |
+| `APPROVAL_AUTHORITY` | Chủ tịch UBND cấp xã/cấp tỉnh hoặc người/cơ quan có thẩm quyền ký cấp | Ký cấp/phê duyệt kết quả theo thủ tục |
+| `ADMIN` | Quản trị hệ thống | Không được thay actor nghiệp vụ |
+| `AUDITOR` | Kiểm tra/audit | Chỉ đọc/log/report |
+
+## C. State machine pháp lý chuẩn cho đăng ký lần đầu
+
+```text
+MOI_TAO
+  -> CHO_TIEP_NHAN
+  -> CAN_BO_SUNG
+  -> CHO_TIEP_NHAN
+  -> DA_TIEP_NHAN
+  -> CHO_XAC_NHAN_CAP_XA
+  -> DA_XAC_NHAN_CAP_XA
+  -> DANG_THAM_DINH_VPDKDD
+  -> CHO_THUE
+  -> CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH
+  -> DA_HOAN_THANH_NGHIA_VU_TAI_CHINH
+  -> CHO_KY_CAP
+  -> DA_KY_CAP
+  -> DA_CAP
+  -> DA_CAP_NHAT_HO_SO_DIA_CHINH
+  -> DA_GHI_BLOCKCHAIN
+  -> DA_TRA_KET_QUA
+
+TU_CHOI
+HUY_HO_SO
+```
+
+### Quy tắc chuyển trạng thái
+
+- `MOI_TAO -> CHO_TIEP_NHAN`: người dân submit hồ sơ nháp.
+- `CHO_TIEP_NHAN -> CAN_BO_SUNG`: chỉ `RECEPTION_OFFICER` hoặc actor được phân công, bắt buộc có lý do và danh mục cần bổ sung.
+- `DA_TIEP_NHAN -> CHO_XAC_NHAN_CAP_XA`: chỉ khi thành phần hồ sơ đủ.
+- `DA_XAC_NHAN_CAP_XA -> DANG_THAM_DINH_VPDKDD`: phải có record xác nhận/ý kiến cấp xã nếu workflow yêu cầu.
+- `DANG_THAM_DINH_VPDKDD -> CHO_THUE`: nếu có phát sinh nghĩa vụ tài chính.
+- `CHO_THUE -> CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH`: sau khi cơ quan thuế trả nghĩa vụ.
+- `DA_HOAN_THANH_NGHIA_VU_TAI_CHINH -> CHO_KY_CAP`: chỉ khi có bằng chứng hoàn thành nghĩa vụ tài chính.
+- `CHO_KY_CAP -> DA_KY_CAP`: chỉ actor `APPROVAL_AUTHORITY`.
+- `DA_KY_CAP -> DA_CAP_NHAT_HO_SO_DIA_CHINH`: VPĐKĐĐ/Chi nhánh cập nhật hồ sơ địa chính/CSDL đất đai.
+- `DA_CAP_NHAT_HO_SO_DIA_CHINH -> DA_GHI_BLOCKCHAIN`: backend/service wallet được cấp quyền ghi hash/CID/tx.
+- Không được chuyển tới `DA_TRA_KET_QUA` nếu chưa có kết quả nghiệp vụ chuẩn.
+
+## D. Tài liệu/hồ sơ và phiên bản tài liệu
+
+- Mỗi file upload tạo `document_version`, không ghi đè bản cũ.
+- Khi người dân submit hồ sơ, hệ thống khóa version hiện hành vào `application_document_snapshot`.
+- Khi cơ quan tiếp nhận yêu cầu bổ sung, người dân được tạo version mới cho tài liệu được yêu cầu; bản cũ chuyển `SUPERSEDED`, không xóa.
+- OCR/cảnh báo bám theo từng `document_version_id` và phải truy nguồn được file/CID gốc.
+- Ký số mô phỏng hoặc ký bằng ví chỉ ký `documentVersionHash`, không ký trực tiếp PII hoặc file nội dung công khai on-chain.
+
+## E. Nghĩa vụ tài chính và thanh toán QR test
+
+Tách hai nhóm:
+
+1. `INTAKE_FEE`: phí/lệ phí khi nộp hồ sơ nếu thủ tục yêu cầu.
+2. `LAND_FINANCIAL_OBLIGATION`: nghĩa vụ tài chính do cơ quan thuế xác định sau thẩm định.
+
+Quy tắc:
+
+- MoMo Test/QR test chỉ là gateway mô phỏng; không được mô tả là nộp thuế/phí thật bằng blockchain.
+- Blockchain chỉ ghi `paymentObligationId`, `receiptHash`, `paidAt`, `verifiedBy`, `txHash` sau khi off-chain đã xác nhận.
+
+## F. Bản đồ thửa đất
+
+- Trường `geometry_source_type` bắt buộc: `DEMO`, `IMPORTED`, `OFFICIAL_REFERENCE`.
+- Nếu dùng dữ liệu demo, UI phải hiển thị nhãn “Dữ liệu mô phỏng, không có giá trị pháp lý”.
+- Không ghi toàn bộ tọa độ/polygon lên blockchain; chỉ ghi `boundaryHash` hoặc `mapDatasetHash` sau khi được duyệt off-chain.
+- Nếu lưu tọa độ, cần ghi rõ hệ quy chiếu: `VN2000`, `WGS84_DEMO`, hoặc `UNKNOWN_NEEDS_REVIEW`.
+
+## G. Checklist trước khi code workflow đất đai
+
+- [ ] Đã xác định TTHC tương ứng trong QĐ 3380/QĐ 2304.
+- [ ] Đã xác định actor theo NĐ 151/2025.
+- [ ] Có bước cơ quan tiếp nhận kiểm tra thành phần hồ sơ.
+- [ ] Có bước UBND cấp xã nếu thủ tục yêu cầu xác nhận/công khai.
+- [ ] Có bước VPĐKĐĐ/Chi nhánh thẩm định/cập nhật hồ sơ địa chính.
+- [ ] Có bước cơ quan thuế nếu phát sinh nghĩa vụ tài chính.
+- [ ] Có actor ký cấp/phê duyệt đúng quyền.
+- [ ] Blockchain chỉ ghi sau khi off-chain hợp lệ.
+- [ ] AI OCR không tự quyết định trạng thái đạt/không đạt.

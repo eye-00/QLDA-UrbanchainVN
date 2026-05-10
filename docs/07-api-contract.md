@@ -239,6 +239,78 @@ Lấy hồ sơ người dùng hiện tại.
 - API trả mã `400` với error envelope chuẩn.
 - Hệ thống hỗ trợ auto-lock theo số lần đăng nhập sai vượt ngưỡng.
 
+## 4.10. Wallet APIs (Sprint 1 Epic 13)
+
+> Nhóm API chỉ cho `CITIZEN` và `BUSINESS`, dùng để liên kết và xác minh quyền sở hữu ví.
+
+### POST /wallets/connect
+Liên kết ví EVM với tài khoản hiện tại (chưa xác minh).
+
+#### Request
+```json
+{
+  "address": "0x1234567890123456789012345678901234567890",
+  "network": "SEPOLIA"
+}
+```
+
+#### Quy tắc
+- Validate địa chỉ EVM hợp lệ.
+- Unique `(network,address)` toàn hệ thống.
+- Không lưu private key/seed phrase.
+- Trạng thái khởi tạo: `PENDING_VERIFICATION`.
+
+### POST /wallets/:id/challenge
+Tạo challenge ký xác minh (nonce one-time, có hạn dùng).
+
+#### Response data
+```json
+{
+  "walletId": "wal_001",
+  "challengeId": "wch_001",
+  "message": "UrbanChain-VN Wallet Verification\n...",
+  "nonce": "f8a0...",
+  "expiresAt": "2026-05-06T03:35:00.000Z"
+}
+```
+
+### POST /wallets/:id/verify
+Xác minh chữ ký theo EIP-191 bằng `ethers.verifyMessage`.
+
+#### Request
+```json
+{
+  "signature": "0x..."
+}
+```
+
+#### Quy tắc
+- Chỉ xác minh trên challenge chưa dùng và chưa hết hạn.
+- Chữ ký sai hoặc challenge hết hạn trả lỗi `400`.
+- Xác minh thành công cập nhật trạng thái ví `VERIFIED`.
+
+### GET /wallets/me
+Lấy danh sách ví thuộc user hiện tại.
+
+### PATCH /wallets/:id/default
+Đặt ví mặc định (chỉ cho ví `VERIFIED`).
+
+#### Quy tắc
+- Mỗi user chỉ có 1 ví mặc định trên mỗi network tại một thời điểm.
+- Ví không thuộc user hiện tại trả `403`.
+
+### Wallet status
+- `PENDING_VERIFICATION`
+- `VERIFIED`
+- `INACTIVE`
+
+### Wallet audit actions
+- `WALLET_CONNECTED`
+- `WALLET_CHALLENGE_CREATED`
+- `WALLET_VERIFIED`
+- `WALLET_DEFAULT_CHANGED`
+- `WALLET_VERIFY_FAILED`
+
 ---
 
 ## 5. User & Organization APIs (Sprint 2)
@@ -362,13 +434,16 @@ Upload tài liệu hồ sơ.
 ### Response data
 ```json
 {
-  "fileId": "fil_001",
+  "id": "fil_001",
   "documentType": "PROOF_OF_LAND_USE",
   "storageStatus": "UPLOADED_IPFS",
   "cid": "bafy...",
-  "hash": "0xabc123"
+  "hash": "0xabc123",
+  "provider": "mock"
 }
 ```
+
+`provider` cho biết backend đang upload qua `mock`, `local` hoặc `pinata`.
 
 ## 7.2. GET /files/:fileId
 Lấy metadata file.
@@ -523,6 +598,10 @@ Phê duyệt/ký cấp kết quả.
 }
 ```
 
+### Sprint 4 behavior
+- Khi `BLOCKCHAIN_MODE=rpc`: backend gọi smart contract `UrbanLandRegistry.registerLand`, lưu `txHash`, `tokenId`, `landCode`.
+- Khi `BLOCKCHAIN_MODE=mock`: backend vẫn trả `txHash`/`tokenId` mock để giữ luồng demo.
+
 ## 8.9. POST /registrations/:registrationId/blockchain-sync
 Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
 
@@ -538,7 +617,9 @@ Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
 ```json
 {
   "txHash": "0x123456",
-  "tokenId": "1001"
+  "tokenId": 1001,
+  "metadataHash": "0xabc123",
+  "blockchainMode": "mock"
 }
 ```
 
@@ -896,3 +977,150 @@ Ví dụ:
 | `ocr` | OCR jobs, extraction, warnings |
 | `dashboard` | Dashboard, reports |
 | `audit` | Lịch sử thay đổi |
+
+---
+
+# PHỤ LỤC — Legal-aligned API Patch 2025
+
+## 1. Role codes bổ sung/chuẩn hóa
+
+```text
+CITIZEN
+BUSINESS
+RECEPTION_OFFICER
+COMMUNE_OFFICER
+LAND_REGISTRY_OFFICER
+TAX_OFFICER
+APPROVAL_AUTHORITY
+ADMIN
+AUDITOR
+```
+
+## 2. Enum RegistrationStatus chuẩn từ Sprint 2+
+
+```text
+MOI_TAO
+CHO_TIEP_NHAN
+CAN_BO_SUNG
+DA_TIEP_NHAN
+CHO_XAC_NHAN_CAP_XA
+DA_XAC_NHAN_CAP_XA
+DANG_THAM_DINH_VPDKDD
+CHO_THUE
+CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH
+DA_HOAN_THANH_NGHIA_VU_TAI_CHINH
+CHO_KY_CAP
+DA_KY_CAP
+DA_CAP
+DA_CAP_NHAT_HO_SO_DIA_CHINH
+DA_GHI_BLOCKCHAIN
+DA_TRA_KET_QUA
+TU_CHOI
+HUY_HO_SO
+```
+
+## 3. Legal procedure metadata endpoints
+
+```http
+GET /api/v1/legal/procedures
+GET /api/v1/legal/procedures/:procedureCode
+GET /api/v1/legal/authority-matrix
+```
+
+### `LegalProcedure` DTO
+
+```json
+{
+  "procedureCode": "1.013978",
+  "procedureName": "Đăng ký đất đai, tài sản gắn liền với đất, cấp Giấy chứng nhận lần đầu...",
+  "sourceDecision": "3380/QĐ-BNNMT/2025",
+  "fallbackSourceDecision": "2304/QĐ-BNNMT/2025",
+  "legalBasis": ["151/2025/NĐ-CP", "118/2025/NĐ-CP", "101/2024/NĐ-CP"],
+  "level": "CAP_XA|CAP_TINH|TRUNG_UONG",
+  "authorityActors": ["RECEPTION_OFFICER", "COMMUNE_OFFICER", "LAND_REGISTRY_OFFICER", "TAX_OFFICER", "APPROVAL_AUTHORITY"],
+  "requiresTaxStep": true,
+  "requiresCommuneConfirmation": true,
+  "isMockedForMvp": true
+}
+```
+
+## 4. Document version endpoints
+
+```http
+GET  /api/v1/documents/:documentId/versions
+POST /api/v1/documents/:documentId/versions
+POST /api/v1/document-versions/:versionId/lock
+POST /api/v1/document-versions/:versionId/supersede
+POST /api/v1/document-versions/:versionId/sign/mock
+POST /api/v1/document-versions/:versionId/sign/wallet
+POST /api/v1/document-versions/:versionId/verify
+POST /api/v1/document-versions/:versionId/record-on-chain
+```
+
+Rule: không trả PII dư thừa; signature payload chỉ chứa hash/id/timestamp/role, không chứa toàn văn giấy tờ.
+
+## 5. Payment obligation endpoints
+
+```http
+POST /api/v1/payment-obligations
+GET  /api/v1/payment-obligations/:id
+POST /api/v1/payment-obligations/:id/generate-qr-test
+POST /api/v1/payment-obligations/:id/mock-confirm
+POST /api/v1/payment-obligations/:id/verify-receipt
+POST /api/v1/payment-obligations/:id/record-on-chain
+```
+
+### `PaymentObligationType`
+
+```text
+INTAKE_FEE
+LAND_FINANCIAL_OBLIGATION
+REGISTRATION_FEE
+LATE_FEE
+OTHER_LEGAL_FEE
+```
+
+Rule: MoMo Test/QR test là mô phỏng. Không mô tả `paidByBlockchain=true` cho thuế/phí thật.
+
+## 6. Map parcel endpoints
+
+```http
+GET  /api/v1/map/parcels
+GET  /api/v1/map/parcels/:landRecordId
+POST /api/v1/map/parcels/:landRecordId/geometry
+POST /api/v1/map/parcels/:landRecordId/review
+POST /api/v1/map/parcels/:landRecordId/approve-offchain
+POST /api/v1/map/parcels/:landRecordId/record-boundary-hash
+GET  /api/v1/map/layers
+```
+
+### Geometry source enum
+
+```text
+DEMO
+IMPORTED
+OFFICIAL_REFERENCE
+UNKNOWN_NEEDS_REVIEW
+```
+
+## 7. Workflow transition endpoint rule
+
+```http
+POST /api/v1/registrations/:id/transition
+```
+
+Request phải có:
+
+```json
+{
+  "fromStatus": "DA_TIEP_NHAN",
+  "toStatus": "CHO_XAC_NHAN_CAP_XA",
+  "actorRole": "RECEPTION_OFFICER",
+  "reason": "Hồ sơ đủ thành phần",
+  "legalBasisCode": "151/2025-ND-CP|3380/QD-BNNMT",
+  "evidenceIds": ["docver_..."],
+  "requiresPmDecision": false
+}
+```
+
+Backend phải reject nếu actor/status transition không khớp legal workflow.

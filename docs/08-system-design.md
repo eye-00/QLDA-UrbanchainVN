@@ -485,3 +485,60 @@ Một feature chỉ được xem là hoàn thành khi:
 9. OCR warning.
 10. Dashboard/report.
 11. E2E + deployment.
+
+---
+
+# PHỤ LỤC — Legal-aligned System Design Patch 2025
+
+## 1. Module mới/bắt buộc từ Sprint 2+
+
+```text
+Legal Procedure Registry
+Document Versioning Service
+Intake & Workflow Engine
+Commune Confirmation Module
+Land Registry Review Module
+Tax/Payment Obligation Module
+Approval & Issuance Module
+Cadastral Update Module
+Map Parcel Service
+Blockchain Evidence Recorder
+```
+
+## 2. Ranh giới hệ thống
+
+| Lớp | Nguồn sự thật | Ghi chú |
+|---|---|---|
+| Nghiệp vụ đất đai | Off-chain DB + hồ sơ địa chính/CSDL đất đai mô phỏng | Blockchain không thay thế |
+| Tài liệu scan/PDF | IPFS/off-chain object storage | DB lưu metadata/CID/hash |
+| Blockchain | Hash/CID/tx/event | Chỉ ghi sau khi off-chain hợp lệ |
+| AI OCR | OCR result/warning | Không chuyển trạng thái tự động |
+| Bản đồ | GeoJSON/geometry off-chain | Ghi hash ranh giới nếu đã duyệt |
+| Thanh toán | Payment obligation/receipt off-chain | MoMo Test/QR chỉ mô phỏng |
+
+## 3. Service interaction cho đăng ký lần đầu
+
+```text
+Citizen Portal
+ -> Registration API
+ -> Document Versioning + IPFS
+ -> OCR Assistant
+ -> Intake Workflow
+ -> Commune Confirmation
+ -> Land Registry Review
+ -> Tax/Payment Obligation
+ -> Approval & Issuance
+ -> Cadastral Update
+ -> Blockchain Evidence Recorder
+ -> Result Notification
+```
+
+## 4. Sprint 1 wallet đã xong — tác động tới thiết kế
+
+Wallet module được giữ như lớp xác minh ví/ký kỹ thuật:
+
+- dùng để ký nonce/challenge;
+- ký hash tài liệu hoặc xác nhận thao tác demo;
+- không dùng để tự động phê duyệt hồ sơ;
+- không dùng để nộp thuế/phí thật bằng crypto/token;
+- mọi chữ ký ví phải gắn với tài khoản đã RBAC và audit log.

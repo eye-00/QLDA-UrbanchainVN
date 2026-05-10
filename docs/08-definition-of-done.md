@@ -16,6 +16,10 @@ Mot backlog item duoc xem la Done khi:
   - user LOCKED khong login duoc,
   - refresh/logout lifecycle hoat dong,
   - ownership scope cho du lieu ca nhan.
+- Sprint 1 Epic 13 (wallet):
+  - wallet connect + challenge + verify (EIP-191) hoat dong,
+  - nonce one-time co TTL va tu choi replay,
+  - khong luu private key/seed phrase/chu ky tho trong log.
 - Audit APIs hoat dong dung RBAC (`/audit/access-logs`, `/audit/user-actions`, `/audit/rbac-changes`).
 - Lint/build/test pass o root:
   - `npm run lint`
@@ -27,23 +31,27 @@ Mot backlog item duoc xem la Done khi:
   - `README.md`
 - Backlog closure co bang trang thai `Done/Partial/Missing` va evidence.
 
-## Sprint 1 Closure Note (2026-04-28)
+## Sprint 1 Closure Note (2026-05-10)
 
 ### Co the verify local
 - Auth/Test/Audit evidence co san trong repo:
   - [backend/test/auth-rbac.test.ts](../backend/test/auth-rbac.test.ts)
   - [backend/src/modules/auth/auth.routes.ts](../backend/src/modules/auth/auth.routes.ts)
   - [backend/src/modules/audit/audit.routes.ts](../backend/src/modules/audit/audit.routes.ts)
+  - [backend/test/sprint1-wallet.test.ts](../backend/test/sprint1-wallet.test.ts)
+  - [frontend/test/wallet-helpers.test.ts](../frontend/test/wallet-helpers.test.ts)
+  - [frontend/src/pages/WalletManagementPage.tsx](../frontend/src/pages/WalletManagementPage.tsx)
   - [README.md#sprint-1-verification-commands](../README.md#sprint-1-verification-commands)
   - [.github/workflows/ci.yml](../.github/workflows/ci.yml)
 
-### Phu thuoc GitHub remote (khong verify day du bang local)
-- Branch protection rules cua nhanh dich.
-- Required checks da duoc bat va pass tren PR (backend-ci, frontend-ci, contracts-ci, docs-check).
-- Secret scanning / push protection trang thai pass tren repository.
+### Verify GitHub remote (da xac nhan)
+- PR wallet backend/data: [#6](https://github.com/eye-00/QLDA-UrbanchainVN/pull/6) da merge vao `develop` (merge commit `89c85ed`), checks pass theo policy.
+- PR wallet frontend/docs: [#7](https://github.com/eye-00/QLDA-UrbanchainVN/pull/7) da merge vao `develop` (merge commit `e8605bf`), checks pass theo policy.
+- Branch protection `develop` bat required checks `backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`.
+- Secret scanning + push protection dang bat, open alerts = `0`.
 
 ### Trang thai closure ghi nhan
-- Nhom US Auth/Test/Audit: `Partial` (da co endpoint/test/evidence link trong repo, con phu thuoc gate remote de chot Done).
+- Nhom US Sprint 1 (bao gom wallet `US-547..558`): `Done`.
 
 ## Sprint 2 Full Gate (bat buoc)
 - CI lane checks pass: `backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`.
@@ -141,3 +149,53 @@ Mot backlog item duoc xem la Done khi:
 - Quy tac dong sprint giu nguyen:
   - Khong nang `Done` neu thieu evidence remote gate.
   - US `Missing` phai co implementation/test/docs bo sung truoc khi chot sprint.
+
+---
+
+# PHỤ LỤC — Legal Definition of Done cho Sprint 2+
+
+Một US từ Sprint 2 trở đi chỉ được `Done` khi đạt thêm các điều kiện pháp lý/nghiệp vụ sau:
+
+## 1. Legal source mapping
+
+- [ ] Có `legalBasis` hoặc `procedureCode` nếu liên quan thủ tục đất đai.
+- [ ] Đã kiểm tra QĐ 3380 trước QĐ 2304 khi thủ tục có sửa đổi/bổ sung.
+- [ ] Actor xử lý khớp NĐ 151/2025 về phân định thẩm quyền 02 cấp.
+- [ ] Nếu không chắc nguồn pháp lý, gắn `NEEDS_PM_DECISION`.
+
+## 2. Workflow/state gate
+
+- [ ] Không bỏ qua cơ quan tiếp nhận.
+- [ ] Không bỏ qua UBND cấp xã nếu workflow yêu cầu.
+- [ ] Không bỏ qua VPĐKĐĐ/Chi nhánh ở bước thẩm định/cập nhật hồ sơ địa chính.
+- [ ] Không bỏ qua cơ quan thuế nếu có nghĩa vụ tài chính.
+- [ ] Không ghi blockchain trước khi off-chain đạt trạng thái hợp lệ.
+
+## 3. Data privacy/on-chain gate
+
+- [ ] Không lưu PII/file scan/polygon đầy đủ on-chain.
+- [ ] Chỉ ghi hash/CID/tx/event/reference.
+- [ ] Signature payload không chứa dữ liệu cá nhân nhạy cảm.
+- [ ] QR/payment payload không lộ CCCD, địa chỉ chi tiết, hồ sơ nhạy cảm.
+
+## 4. Document version/signature gate
+
+- [ ] Upload/thay thế tài liệu tạo version mới.
+- [ ] Submit hồ sơ khóa snapshot tài liệu.
+- [ ] Yêu cầu bổ sung không xóa bản cũ.
+- [ ] Ký số/ví chỉ ký hash/metadata an toàn.
+- [ ] Xác minh chữ ký/hash có test positive/negative.
+
+## 5. Map parcel gate
+
+- [ ] Có `geometry_source_type`.
+- [ ] Dữ liệu demo phải có nhãn demo.
+- [ ] Nếu ghi blockchain chỉ ghi boundary/dataset hash.
+- [ ] Có test role-based access cho bản đồ.
+
+## 6. Payment gate
+
+- [ ] Tách `INTAKE_FEE` và `LAND_FINANCIAL_OBLIGATION`.
+- [ ] MoMo Test/QR được ghi rõ là mô phỏng.
+- [ ] Không gọi crypto/token là phương tiện nộp thuế/phí thật.
+- [ ] Có audit log khi xác nhận/ghi biên lai.
