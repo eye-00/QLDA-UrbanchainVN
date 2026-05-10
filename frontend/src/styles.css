@@ -192,6 +192,16 @@ p {
   gap: 12px;
 }
 
+.row-gap-xs {
+  display: grid;
+  gap: 4px;
+}
+
+.mono-text {
+  font-family: "JetBrains Mono", Consolas, "Courier New", monospace;
+  font-size: 12px;
+}
+
 .form-grid {
   width: 100%;
   display: grid;
@@ -316,6 +326,12 @@ button:disabled {
 }
 
 .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.onchain-status-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
@@ -578,6 +594,9 @@ button:disabled {
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .onchain-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .timeline-track {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -618,7 +637,8 @@ button:disabled {
   .form-grid,
   .form-grid-4,
   .login-shell,
-  .split-grid {
+  .split-grid,
+  .onchain-status-grid {
     grid-template-columns: 1fr;
   }
   .timeline-track {

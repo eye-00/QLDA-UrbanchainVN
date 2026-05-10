@@ -11,12 +11,16 @@ import {
   isTaxTransferReady,
   requiresActionNote
 } from './registrationReviewHelpers';
+import { canViewBlockchainStatus, formatShortTxHash, resolveBlockchainSyncBadge } from './registrationBlockchainHelpers';
 
 type RegistrationItem = {
   id: string;
   code: string;
   applicantId: string;
   status: string;
+  tokenId?: number | null;
+  txHash?: string | null;
+  landCode?: string | null;
   procedureCode?: string | null;
   legalBasisCode?: string | null;
   landInfo: {
@@ -78,6 +82,26 @@ type DocumentHistoryResponse = {
   total: number;
 };
 
+type BlockchainLookupPayload = {
+  mode: 'mock' | 'rpc';
+  contractAddress: string | null;
+  registrationTokenId: number | null;
+  landTokenId: number | null;
+};
+
+type BlockchainStatusPayload = {
+  registrationId: string;
+  registrationCode: string;
+  landCode: string;
+  offChain: {
+    status: string;
+    tokenId: number | null;
+    txHash: string | null;
+  };
+  onChain: BlockchainLookupPayload;
+  inSync: boolean;
+};
+
 const STATUS_FILTER_OPTIONS = [
   'CHO_TIEP_NHAN',
   'CAN_BO_SUNG',
@@ -117,6 +141,8 @@ export function RegistrationReviewPage() {
   const [legalBasisCode, setLegalBasisCode] = useState('');
   const [paymentObligations, setPaymentObligations] = useState<PaymentObligationItem[]>([]);
   const [documentHistory, setDocumentHistory] = useState<DocumentHistoryEvent[]>([]);
+  const [blockchainStatus, setBlockchainStatus] = useState<BlockchainStatusPayload | null>(null);
+  const [loadingBlockchainStatus, setLoadingBlockchainStatus] = useState(false);
   const [missingItemsInput, setMissingItemsInput] = useState('');
   const [supplementDeadline, setSupplementDeadline] = useState('');
   const [communeEvidenceFileId, setCommuneEvidenceFileId] = useState('');
@@ -124,6 +150,7 @@ export function RegistrationReviewPage() {
   const selected = useMemo(() => items.find((item) => item.id === selectedId) ?? null, [items, selectedId]);
   const queryString = useMemo(() => buildRegistrationReviewQuery(filters), [filters]);
   const permissions = useMemo(() => getReviewPermissions(user?.role), [user?.role]);
+  const blockchainStatusEnabled = useMemo(() => canViewBlockchainStatus(user?.role), [user?.role]);
   const reviewSteps = useMemo(
     () => (selected ? getReviewStepsByStatus(selected.status) : []),
     [selected]
@@ -154,6 +181,7 @@ export function RegistrationReviewPage() {
     if (!selected) {
       setPaymentObligations([]);
       setDocumentHistory([]);
+      setBlockchainStatus(null);
       setCommuneEvidenceFileId('');
       return;
     }
@@ -161,7 +189,12 @@ export function RegistrationReviewPage() {
     setCommuneEvidenceFileId(selected.files?.[0]?.id ?? '');
     void loadPaymentObligations(selected.id);
     void loadDocumentHistory(selected.id);
-  }, [selected?.id]);
+    if (blockchainStatusEnabled) {
+      void loadBlockchainStatus(selected.id);
+    } else {
+      setBlockchainStatus(null);
+    }
+  }, [selected?.id, blockchainStatusEnabled]);
 
   async function loadPaymentObligations(registrationId: string) {
     try {
@@ -178,6 +211,20 @@ export function RegistrationReviewPage() {
       setDocumentHistory(data.items);
     } catch {
       setDocumentHistory([]);
+    }
+  }
+
+  async function loadBlockchainStatus(registrationId: string) {
+    if (!blockchainStatusEnabled) return;
+    setLoadingBlockchainStatus(true);
+    try {
+      const data = await apiGet<BlockchainStatusPayload>(`/registrations/${registrationId}/blockchain-status`);
+      setBlockchainStatus(data);
+    } catch (error) {
+      setBlockchainStatus(null);
+      showToast('error', error instanceof Error ? error.message : 'Không đối soát được trạng thái on-chain/off-chain.');
+    } finally {
+      setLoadingBlockchainStatus(false);
     }
   }
 
@@ -291,6 +338,7 @@ export function RegistrationReviewPage() {
                   <th>Chủ sử dụng</th>
                   <th>Vị trí thửa đất</th>
                   <th>Trạng thái</th>
+                  <th>Blockchain</th>
                   <th>Cập nhật</th>
                   <th>Chi tiết</th>
                 </tr>
@@ -305,6 +353,16 @@ export function RegistrationReviewPage() {
                       <span className={`badge ${getRegistrationStatusBadgeClass(item.status)}`}>
                         {getRegistrationStatusLabel(item.status)}
                       </span>
+                    </td>
+                    <td>
+                      {item.txHash ? (
+                        <div className="row-gap-xs">
+                          <div className="mono-text">{formatShortTxHash(item.txHash)}</div>
+                          <div className="muted">Token #{item.tokenId ?? 'N/A'}</div>
+                        </div>
+                      ) : (
+                        <span className="muted">Chưa ghi chain</span>
+                      )}
                     </td>
                     <td>{new Date(item.updatedAt).toLocaleString('vi-VN')}</td>
                     <td>
@@ -392,6 +450,78 @@ export function RegistrationReviewPage() {
               </ul>
             )}
           </div>
+
+          {blockchainStatusEnabled && (
+            <div className="row-gap">
+              <div className="card-title-row">
+                <h3>Đối soát on-chain/off-chain</h3>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => selected && void loadBlockchainStatus(selected.id)}
+                  disabled={loadingBlockchainStatus}
+                >
+                  {loadingBlockchainStatus ? 'Đang đối soát...' : 'Đối soát lại'}
+                </button>
+              </div>
+              {!blockchainStatus ? (
+                <div className="empty-state">Chưa có dữ liệu đối soát blockchain.</div>
+              ) : (
+                <div className="onchain-status-grid">
+                  <div className="metric-item">
+                    <span>Độ đồng bộ</span>
+                    <strong>
+                      <span
+                        className={`badge ${resolveBlockchainSyncBadge(
+                          blockchainStatus.inSync,
+                          Boolean(blockchainStatus.offChain.txHash || blockchainStatus.offChain.tokenId),
+                          Boolean(
+                            blockchainStatus.onChain.registrationTokenId || blockchainStatus.onChain.landTokenId
+                          )
+                        ).className}`}
+                      >
+                        {
+                          resolveBlockchainSyncBadge(
+                            blockchainStatus.inSync,
+                            Boolean(blockchainStatus.offChain.txHash || blockchainStatus.offChain.tokenId),
+                            Boolean(blockchainStatus.onChain.registrationTokenId || blockchainStatus.onChain.landTokenId)
+                          ).label
+                        }
+                      </span>
+                    </strong>
+                  </div>
+                  <div className="metric-item">
+                    <span>Mã thửa dùng để ghi chain</span>
+                    <strong className="mono-text">{blockchainStatus.landCode}</strong>
+                  </div>
+                  <div className="metric-item">
+                    <span>Token hồ sơ (off-chain)</span>
+                    <strong>{blockchainStatus.offChain.tokenId ?? 'Chưa có'}</strong>
+                  </div>
+                  <div className="metric-item">
+                    <span>Token hồ sơ (on-chain)</span>
+                    <strong>{blockchainStatus.onChain.registrationTokenId ?? 'Chưa có'}</strong>
+                  </div>
+                  <div className="metric-item">
+                    <span>Token thửa đất (on-chain)</span>
+                    <strong>{blockchainStatus.onChain.landTokenId ?? 'Chưa có'}</strong>
+                  </div>
+                  <div className="metric-item">
+                    <span>Tx hash (off-chain)</span>
+                    <strong className="mono-text">{formatShortTxHash(blockchainStatus.offChain.txHash) ?? 'Chưa có'}</strong>
+                  </div>
+                  <div className="metric-item">
+                    <span>Địa chỉ contract</span>
+                    <strong className="mono-text">{blockchainStatus.onChain.contractAddress ?? 'Mock mode'}</strong>
+                  </div>
+                  <div className="metric-item">
+                    <span>Nguồn kiểm tra</span>
+                    <strong>{blockchainStatus.onChain.mode === 'rpc' ? 'RPC node' : 'Mock blockchain'}</strong>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="row-gap">
             <h3>Thao tác xử lý</h3>

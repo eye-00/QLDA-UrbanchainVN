@@ -8,6 +8,8 @@ import { loadCommuneOptionsByProvince, loadProvinceOptions, type CommuneOption, 
 type RegistrationItem = {
   id: string;
   code: string;
+  tokenId?: number | null;
+  txHash?: string | null;
   landInfo: {
     parcelNumber: string;
     mapSheetNumber: string;
@@ -251,6 +253,7 @@ export function CitizenRegistrationPage() {
                   <th>Chủ sử dụng</th>
                   <th>Thửa đất</th>
                   <th>Trạng thái</th>
+                  <th>Blockchain</th>
                   <th>Cập nhật gần nhất</th>
                   <th>Ghi chú gần nhất</th>
                   <th>Hành động</th>
@@ -271,6 +274,16 @@ export function CitizenRegistrationPage() {
                         <span className={`badge ${getRegistrationStatusBadgeClass(item.status)}`}>
                           {getRegistrationStatusLabel(item.status)}
                         </span>
+                      </td>
+                      <td>
+                        {item.txHash ? (
+                          <div className="row-gap-xs">
+                            <div className="mono-text">{item.txHash.slice(0, 14)}...{item.txHash.slice(-6)}</div>
+                            <div className="muted">Token #{item.tokenId ?? "N/A"}</div>
+                          </div>
+                        ) : (
+                          <span className="muted">Chưa ghi chain</span>
+                        )}
                       </td>
                       <td>{new Date(item.updatedAt).toLocaleString('vi-VN')}</td>
                       <td>
