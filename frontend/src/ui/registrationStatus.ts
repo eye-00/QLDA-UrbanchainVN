@@ -14,9 +14,6 @@ export const REGISTRATION_STATUS_LABELS: Record<string, string> = {
   DA_CAP_NHAT_HO_SO_DIA_CHINH: 'Đã cập nhật hồ sơ địa chính',
   DA_GHI_BLOCKCHAIN: 'Đã ghi blockchain',
   DA_CAP: 'Đã cấp',
-  DA_HOAN_THANH_NGHIA_VU_TAI_CHINH: 'Đã hoàn thành nghĩa vụ tài chính',
-  DA_CAP_NHAT_HO_SO_DIA_CHINH: 'Đã cập nhật hồ sơ địa chính',
-  DA_GHI_BLOCKCHAIN: 'Đã ghi blockchain',
   DA_TRA_KET_QUA: 'Đã trả kết quả',
   HUY_HO_SO: 'Hủy hồ sơ',
   TU_CHOI: 'Từ chối'

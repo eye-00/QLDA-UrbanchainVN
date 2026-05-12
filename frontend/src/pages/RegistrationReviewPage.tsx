@@ -6,6 +6,7 @@ import { getRegistrationStatusBadgeClass, getRegistrationStatusLabel } from '../
 import {
   buildRegistrationReviewQuery
 } from './registrationReviewHelpers';
+import { formatShortTxHash } from './registrationBlockchainHelpers';
 
 type RegistrationItem = {
   id: string;

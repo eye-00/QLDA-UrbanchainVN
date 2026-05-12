@@ -216,20 +216,6 @@ async function seedUsers(orgByCode: Map<string, { id: string }>) {
       passwordHash: sharedPasswordHash
     },
     {
-      email: "tax@urbanchain.vn",
-      fullName: "Cán bộ thuế",
-      role: "TAX_OFFICER" as const,
-      identityNumber: null,
-      organizationId: approvalOrg.id
-    },
-    {
-      email: "auditor@urbanchain.vn",
-      fullName: "Cán bộ kiểm soát",
-      role: "AUDITOR" as const,
-      identityNumber: null,
-      organizationId: approvalOrg.id
-    },
-    {
       email: "admin@urbanchain.vn",
       fullName: "Quản trị hệ thống (legacy)",
       role: "ADMIN" as UserRole,
