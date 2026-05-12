@@ -261,6 +261,12 @@ async function seedWallets() {
   const citizen = await prisma.user.findUniqueOrThrow({
     where: { email: "citizen@urbanchain.vn" }
   });
+  const registryOfficer = await prisma.user.findUniqueOrThrow({
+    where: { email: "registry@urbanchain.vn" }
+  });
+  const approvalOfficer = await prisma.user.findUniqueOrThrow({
+    where: { email: "approval@urbanchain.vn" }
+  });
 
   const verifiedWallet = await prisma.walletAccount.upsert({
     where: {
@@ -334,6 +340,92 @@ async function seedWallets() {
   await prisma.walletAccount.update({
     where: { id: verifiedWallet.id },
     data: { isDefault: true }
+  });
+
+  const registryWallet = await prisma.walletAccount.upsert({
+    where: {
+      wallet_network_address_unique: {
+        network: BlockchainNetwork.SEPOLIA,
+        address: "0x2442c655A20adcE8fEd8e431B3a3d05CC98c5984"
+      }
+    },
+    update: {
+      userId: registryOfficer.id,
+      status: WalletStatus.VERIFIED,
+      isDefault: true,
+      verifiedAt: new Date(),
+      lastVerifiedAt: new Date()
+    },
+    create: {
+      userId: registryOfficer.id,
+      network: BlockchainNetwork.SEPOLIA,
+      address: "0x2442c655A20adcE8fEd8e431B3a3d05CC98c5984",
+      status: WalletStatus.VERIFIED,
+      isDefault: true,
+      verifiedAt: new Date(),
+      lastVerifiedAt: new Date()
+    }
+  });
+
+  const approvalWallet = await prisma.walletAccount.upsert({
+    where: {
+      wallet_network_address_unique: {
+        network: BlockchainNetwork.SEPOLIA,
+        address: "0x88FB99245BE032C3c1135a286442D09931037B76"
+      }
+    },
+    update: {
+      userId: approvalOfficer.id,
+      status: WalletStatus.VERIFIED,
+      isDefault: true,
+      verifiedAt: new Date(),
+      lastVerifiedAt: new Date()
+    },
+    create: {
+      userId: approvalOfficer.id,
+      network: BlockchainNetwork.SEPOLIA,
+      address: "0x88FB99245BE032C3c1135a286442D09931037B76",
+      status: WalletStatus.VERIFIED,
+      isDefault: true,
+      verifiedAt: new Date(),
+      lastVerifiedAt: new Date()
+    }
+  });
+
+  const defaultChainId = Number(process.env.BLOCKCHAIN_CHAIN_ID ?? "11155111");
+  const now = new Date();
+
+  await prisma.serviceWalletAuthorization.deleteMany({
+    where: {
+      userId: { in: [registryOfficer.id, approvalOfficer.id] }
+    }
+  });
+
+  await prisma.serviceWalletAuthorization.createMany({
+    data: [
+      {
+        walletId: registryWallet.id,
+        userId: registryOfficer.id,
+        organizationId: registryOfficer.organizationId ?? null,
+        roleScope: "LAND_REGISTRY_OFFICER",
+        network: BlockchainNetwork.SEPOLIA,
+        chainId: Number.isFinite(defaultChainId) && defaultChainId > 0 ? defaultChainId : 11155111,
+        status: "ACTIVE",
+        effectiveFrom: now,
+        reason: "Seed service wallet authorization"
+      },
+      {
+        walletId: approvalWallet.id,
+        userId: approvalOfficer.id,
+        organizationId: approvalOfficer.organizationId ?? null,
+        roleScope: "APPROVAL_AUTHORITY",
+        network: BlockchainNetwork.SEPOLIA,
+        chainId: Number.isFinite(defaultChainId) && defaultChainId > 0 ? defaultChainId : 11155111,
+        status: "ACTIVE",
+        effectiveFrom: now,
+        reason: "Seed service wallet authorization"
+      }
+    ]
   });
 }
 

@@ -36,6 +36,19 @@ enum BlockchainNetwork {
   GANACHE
 }
 
+enum ServiceWalletAuthorizationStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum BlockchainTxLifecycleStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  REJECTED
+}
+
 enum RegistrationStatus {
   MOI_TAO
   CHO_TIEP_NHAN
@@ -114,6 +127,9 @@ model User {
   ownedParcels   LandParcel[]   @relation("ParcelOwner")
   sessions       AuthSession[]
   wallets        WalletAccount[]
+  serviceWalletAuthorizations ServiceWalletAuthorization[] @relation("ServiceWalletOwner")
+  serviceWalletAuthorizationsRevoked ServiceWalletAuthorization[] @relation("ServiceWalletRevokedBy")
+  blockchainTxEvents BlockchainTxLifecycle[] @relation("BlockchainTxActor")
   documentVersionsCreated RegistrationDocumentVersion[] @relation("DocVersionCreatedBy")
   submittedSnapshots RegistrationSubmitSnapshot[] @relation("SnapshotSubmittedBy")
   paymentObligationsCreated RegistrationPaymentObligation[] @relation("PaymentCreatedBy")
@@ -217,6 +233,7 @@ model Registration {
   documentVersions RegistrationDocumentVersion[]
   submitSnapshots RegistrationSubmitSnapshot[]
   paymentObligations RegistrationPaymentObligation[]
+  blockchainTxEvents BlockchainTxLifecycle[]
 
   @@index([procedureCode])
 }
@@ -263,9 +280,57 @@ model WalletAccount {
   updatedAt        DateTime                    @updatedAt
   user             User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
   challenges       WalletVerificationChallenge[]
+  serviceAuthorizations ServiceWalletAuthorization[]
 
   @@unique([network, address], name: "wallet_network_address_unique")
   @@index([userId, network, isDefault])
+}
+
+model ServiceWalletAuthorization {
+  id             String                           @id @default(cuid())
+  walletId       String
+  userId         String
+  organizationId String?
+  roleScope      UserRole
+  network        BlockchainNetwork
+  chainId        Int
+  status         ServiceWalletAuthorizationStatus @default(ACTIVE)
+  effectiveFrom  DateTime                         @default(now())
+  effectiveTo    DateTime?
+  reason         String?
+  revokedAt      DateTime?
+  revokedById    String?
+  createdAt      DateTime                         @default(now())
+  updatedAt      DateTime                         @updatedAt
+  wallet         WalletAccount                    @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  user           User                             @relation("ServiceWalletOwner", fields: [userId], references: [id], onDelete: Cascade)
+  revokedBy      User?                            @relation("ServiceWalletRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@index([network, chainId, status])
+  @@index([userId, roleScope, status])
+}
+
+model BlockchainTxLifecycle {
+  id             String                     @id @default(cuid())
+  registrationId String
+  actorId        String?
+  action         String
+  network        BlockchainNetwork
+  chainId        Int
+  walletAddress  String
+  txHash         String?
+  explorerUrl    String?
+  status         BlockchainTxLifecycleStatus @default(PENDING)
+  errorCode      String?
+  errorMessage   String?
+  payload        Json?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  registration   Registration               @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  actor          User?                      @relation("BlockchainTxActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([registrationId, createdAt])
+  @@index([status, network, chainId])
 }
 
 model WalletVerificationChallenge {

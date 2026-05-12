@@ -1,9 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Server } from "node:http";
+import { ethers } from "ethers";
 import { createApp } from "../src/app.js";
 
 let server: Server;
 let baseUrl: string;
+
+const TEST_WALLET_KEYS = {
+  LAND_REGISTRY_OFFICER: "0x59c6995e998f97a5a0044966f094538f5d9d315f0f74d45d4f4b63e5f9f9b6b1",
+  APPROVAL_AUTHORITY: "0x5de4111afa1a4b94908c05a2db3fca5e9cb0ce3f4bfefd4dc2621c99ceb8590f"
+} as const;
 
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(`${baseUrl}${path}`, init);
@@ -38,6 +44,41 @@ async function uploadRegistrationEvidence(token: string, registrationId: string,
   });
   expect(uploaded.response.status).toBe(201);
   return uploaded.body.data.id as string;
+}
+
+async function getServiceWalletAuthorizationId(adminToken: string, roleScope: "LAND_REGISTRY_OFFICER" | "APPROVAL_AUTHORITY") {
+  const listed = await api(`/api/v1/service-wallets?status=ACTIVE&roleScope=${roleScope}`, {
+    headers: {
+      Authorization: `Bearer ${adminToken}`
+    }
+  });
+  expect(listed.response.status).toBe(200);
+  const first = listed.body.data.items[0];
+  expect(Boolean(first)).toBe(true);
+  return first.id as string;
+}
+
+async function buildBlockchainSyncSignaturePayload(
+  roleScope: "LAND_REGISTRY_OFFICER" | "APPROVAL_AUTHORITY",
+  registrationCode: string
+) {
+  const signer = new ethers.Wallet(TEST_WALLET_KEYS[roleScope]);
+  const signerChainId = Number(process.env.BLOCKCHAIN_CHAIN_ID ?? "11155111");
+  const signingMessage = [
+    "UrbanChain-VN Blockchain Sync Confirmation",
+    `RegistrationCode: ${registrationCode}`,
+    `RoleScope: ${roleScope}`,
+    `Signer: ${signer.address}`,
+    `ChainId: ${signerChainId}`,
+    `IssuedAt: ${new Date().toISOString()}`
+  ].join("\n");
+  const signature = await signer.signMessage(signingMessage);
+  return {
+    signerWalletAddress: signer.address,
+    signerChainId,
+    signingMessage,
+    signature
+  };
 }
 
 beforeAll(async () => {
@@ -110,6 +151,7 @@ describe("Sprint 3 registration core workflow", () => {
     const registryToken = await login("registry@urbanchain.vn");
     const taxToken = await login("tax@urbanchain.vn");
     const approvalToken = await login("approval@urbanchain.vn");
+    const approvalWalletAuthorizationId = await getServiceWalletAuthorizationId(adminToken, "APPROVAL_AUTHORITY");
     const suffix = Date.now().toString();
 
     const created = await api("/api/v1/registrations", {
@@ -278,7 +320,9 @@ describe("Sprint 3 registration core workflow", () => {
       body: JSON.stringify({
         legalBasisCode: "QĐ3380-BLOCKCHAIN-SYNC",
         cid: `bafy-s3-${suffix}`,
-        metadataHash: `0x${suffix}`
+        metadataHash: `0x${suffix}`,
+        walletAuthorizationId: approvalWalletAuthorizationId,
+        ...(await buildBlockchainSyncSignaturePayload("APPROVAL_AUTHORITY", created.body.data.registrationCode as string))
       })
     });
     expect(sync.response.status).toBe(200);
@@ -475,6 +519,7 @@ describe("Sprint 3 registration core workflow", () => {
     const registryToken = await login("registry@urbanchain.vn");
     const taxToken = await login("tax@urbanchain.vn");
     const approvalToken = await login("approval@urbanchain.vn");
+    const approvalWalletAuthorizationId = await getServiceWalletAuthorizationId(adminToken, "APPROVAL_AUTHORITY");
     const suffix = Date.now().toString();
 
     const created = await api("/api/v1/registrations", {
@@ -639,7 +684,9 @@ describe("Sprint 3 registration core workflow", () => {
       body: JSON.stringify({
         legalBasisCode: "QĐ3380-S4-BLOCKCHAIN",
         cid: `bafy-s4-${suffix}`,
-        metadataHash: `0x${suffix}`
+        metadataHash: `0x${suffix}`,
+        walletAuthorizationId: approvalWalletAuthorizationId,
+        ...(await buildBlockchainSyncSignaturePayload("APPROVAL_AUTHORITY", created.body.data.registrationCode as string))
       })
     });
     expect(sync.response.status).toBe(200);
@@ -664,7 +711,9 @@ describe("Sprint 3 registration core workflow", () => {
       body: JSON.stringify({
         legalBasisCode: "QĐ3380-S4-BLOCKCHAIN-RETRY",
         cid: `bafy-s4-dup-${suffix}`,
-        metadataHash: `0xdup${suffix}`
+        metadataHash: `0xdup${suffix}`,
+        walletAuthorizationId: approvalWalletAuthorizationId,
+        ...(await buildBlockchainSyncSignaturePayload("APPROVAL_AUTHORITY", created.body.data.registrationCode as string))
       })
     });
     expect(duplicateSync.response.status).toBe(409);
