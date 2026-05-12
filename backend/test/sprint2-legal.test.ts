@@ -1,9 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Server } from "node:http";
+import { ethers } from "ethers";
 import { createApp } from "../src/app.js";
 
 let server: Server;
 let baseUrl: string;
+
+const TEST_WALLET_KEYS = {
+  LAND_REGISTRY_OFFICER: "0x59c6995e998f97a5a0044966f094538f5d9d315f0f74d45d4f4b63e5f9f9b6b1",
+  APPROVAL_AUTHORITY: "0x5de4111afa1a4b94908c05a2db3fca5e9cb0ce3f4bfefd4dc2621c99ceb8590f"
+} as const;
 
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(`${baseUrl}${path}`, init);
@@ -19,6 +25,39 @@ async function login(email: string, password = "StrongPassword@123") {
   });
   expect(response.status).toBe(200);
   return body.data.accessToken as string;
+}
+
+async function getServiceWalletAuthorizationId(adminToken: string, roleScope: "LAND_REGISTRY_OFFICER" | "APPROVAL_AUTHORITY") {
+  const listed = await api(`/api/v1/service-wallets?status=ACTIVE&roleScope=${roleScope}`, {
+    headers: {
+      Authorization: `Bearer ${adminToken}`
+    }
+  });
+  expect(listed.response.status).toBe(200);
+  return listed.body.data.items[0].id as string;
+}
+
+async function buildBlockchainSyncSignaturePayload(
+  roleScope: "LAND_REGISTRY_OFFICER" | "APPROVAL_AUTHORITY",
+  registrationCode: string
+) {
+  const signer = new ethers.Wallet(TEST_WALLET_KEYS[roleScope]);
+  const signerChainId = Number(process.env.BLOCKCHAIN_CHAIN_ID ?? "11155111");
+  const signingMessage = [
+    "UrbanChain-VN Blockchain Sync Confirmation",
+    `RegistrationCode: ${registrationCode}`,
+    `RoleScope: ${roleScope}`,
+    `Signer: ${signer.address}`,
+    `ChainId: ${signerChainId}`,
+    `IssuedAt: ${new Date().toISOString()}`
+  ].join("\n");
+  const signature = await signer.signMessage(signingMessage);
+  return {
+    signerWalletAddress: signer.address,
+    signerChainId,
+    signingMessage,
+    signature
+  };
 }
 
 beforeAll(async () => {
@@ -153,6 +192,7 @@ describe("Sprint 2 legal-aligned core", () => {
     const registryToken = await login("registry@urbanchain.vn");
     const taxToken = await login("tax@urbanchain.vn");
     const approvalToken = await login("approval@urbanchain.vn");
+    const approvalWalletAuthorizationId = await getServiceWalletAuthorizationId(adminToken, "APPROVAL_AUTHORITY");
     const suffix = Date.now().toString();
 
     const created = await api("/api/v1/registrations", {
@@ -360,7 +400,9 @@ describe("Sprint 2 legal-aligned core", () => {
       body: JSON.stringify({
         legalBasisCode: "QĐ3380-BLOCKCHAIN-EARLY",
         cid: `bafy-early-${suffix}`,
-        metadataHash: `0x${suffix}`
+        metadataHash: `0x${suffix}`,
+        walletAuthorizationId: approvalWalletAuthorizationId,
+        ...(await buildBlockchainSyncSignaturePayload("APPROVAL_AUTHORITY", created.body.data.registrationCode as string))
       })
     });
     expect(blockchainBeforeCadastral.response.status).toBe(409);
@@ -388,7 +430,9 @@ describe("Sprint 2 legal-aligned core", () => {
       body: JSON.stringify({
         legalBasisCode: "QĐ3380-BLOCKCHAIN-DONE",
         cid: `bafy-done-${suffix}`,
-        metadataHash: `0x${suffix}done`
+        metadataHash: `0x${suffix}done`,
+        walletAuthorizationId: approvalWalletAuthorizationId,
+        ...(await buildBlockchainSyncSignaturePayload("APPROVAL_AUTHORITY", created.body.data.registrationCode as string))
       })
     });
     expect(blockchainOk.response.status).toBe(200);

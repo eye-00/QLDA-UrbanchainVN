@@ -1,5 +1,6 @@
 import {
   BlockchainNetwork,
+  BlockchainTxLifecycleStatus,
   DocumentVersionStatus,
   PaymentObligationStatus,
   PaymentObligationType,
@@ -8,6 +9,7 @@ import {
   UserRole
 } from "@prisma/client";
 import { Router } from "express";
+import { ethers } from "ethers";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
 import { asyncHandler, badRequestError, conflictError, forbiddenError, notFoundError } from "../../lib/errors.js";
@@ -120,7 +122,12 @@ const cadastralUpdateSchema = z.object({
 const blockchainSyncSchema = z.object({
   legalBasisCode: legalBasisCodeSchema,
   cid: z.string().min(3),
-  metadataHash: z.string().min(3)
+  metadataHash: z.string().min(3),
+  walletAuthorizationId: z.string().min(1),
+  signerWalletAddress: z.string().min(1),
+  signerChainId: z.coerce.number().int().positive(),
+  signingMessage: z.string().min(3),
+  signature: z.string().min(20)
 });
 
 const requiredNoteSchema = z.object({
@@ -237,6 +244,118 @@ const STATUS_TRANSITION_GRAPH: Partial<Record<RegistrationStatus, RegistrationSt
 
 function isCitizenRole(role: string) {
   return AUTH_ROLES.citizen.includes(role as (typeof AUTH_ROLES.citizen)[number]);
+}
+
+function resolveExpectedBlockchainNetwork() {
+  const networkRaw = (process.env.BLOCKCHAIN_NETWORK ?? "SEPOLIA").trim().toUpperCase();
+  return (Object.values(BlockchainNetwork) as string[]).includes(networkRaw)
+    ? (networkRaw as BlockchainNetwork)
+    : BlockchainNetwork.SEPOLIA;
+}
+
+function resolveExpectedBlockchainChainId() {
+  const parsed = Number(process.env.BLOCKCHAIN_CHAIN_ID ?? "11155111");
+  if (!Number.isFinite(parsed) || parsed <= 0) return 11155111;
+  return parsed;
+}
+
+function resolveExplorerBaseUrl(network: BlockchainNetwork) {
+  const byEnv = process.env.BLOCKCHAIN_EXPLORER_BASE_URL?.trim();
+  if (byEnv) return byEnv;
+  if (network === "SEPOLIA") return "https://sepolia.etherscan.io/tx/";
+  return "";
+}
+
+function classifyBlockchainErrorStatus(errorMessage: string): BlockchainTxLifecycleStatus {
+  const normalized = errorMessage.toLowerCase();
+  if (
+    normalized.includes("user denied") ||
+    normalized.includes("rejected") ||
+    normalized.includes("cancelled")
+  ) {
+    return "REJECTED";
+  }
+  return "FAILED";
+}
+
+function hashSignature(signature: string) {
+  return ethers.keccak256(ethers.toUtf8Bytes(signature));
+}
+
+async function ensureServiceWalletAuthorizationForSync(
+  actor: AuthenticatedRequest["user"],
+  input: {
+    walletAuthorizationId: string;
+    signerWalletAddress: string;
+    signerChainId: number;
+  }
+) {
+  const expectedNetwork = resolveExpectedBlockchainNetwork();
+  const expectedChainId = resolveExpectedBlockchainChainId();
+  const now = new Date();
+
+  const authorization = await prisma.serviceWalletAuthorization.findUnique({
+    where: { id: input.walletAuthorizationId },
+    include: {
+      wallet: {
+        select: {
+          id: true,
+          address: true,
+          network: true,
+          status: true
+        }
+      }
+    }
+  });
+
+  if (!authorization) {
+    throw forbiddenError("walletAuthMissing: Không tìm thấy quyền ví công vụ");
+  }
+
+  if (authorization.status !== "ACTIVE") {
+    throw forbiddenError("walletAuthMissing: Quyền ví công vụ không còn hiệu lực");
+  }
+
+  if (authorization.effectiveTo && authorization.effectiveTo <= now) {
+    throw forbiddenError("walletAuthMissing: Quyền ví công vụ đã hết hạn");
+  }
+
+  if (authorization.network !== expectedNetwork || authorization.chainId !== expectedChainId) {
+    throw forbiddenError("walletAuthMissing: Quyền ví công vụ không khớp network/chainId hệ thống");
+  }
+
+  if (input.signerChainId !== expectedChainId) {
+    throw forbiddenError(
+      `walletAuthMissing: signerChainId không hợp lệ. current=${input.signerChainId} expected=${expectedChainId}`
+    );
+  }
+
+  const normalizedSignerAddress = ethers.getAddress(input.signerWalletAddress.trim());
+  if (normalizedSignerAddress !== ethers.getAddress(authorization.wallet.address)) {
+    throw forbiddenError("walletAuthMissing: Ví ký không trùng với ví công vụ được cấp quyền");
+  }
+
+  if (authorization.wallet.network !== expectedNetwork || authorization.wallet.status !== "VERIFIED") {
+    throw forbiddenError("walletAuthMissing: Ví công vụ chưa xác minh hoặc không đúng network");
+  }
+
+  const actorIsAdmin = actor.role === "ADMIN";
+  if (!actorIsAdmin && authorization.userId !== actor.userId) {
+    throw forbiddenError("walletAuthMissing: Bạn không sở hữu quyền ví công vụ này");
+  }
+
+  if (!actorIsAdmin && authorization.roleScope !== actor.role) {
+    throw forbiddenError(
+      `walletAuthMissing: Vai trò ${actor.role} không khớp roleScope ${authorization.roleScope} của ví công vụ`
+    );
+  }
+
+  return {
+    authorization,
+    expectedNetwork,
+    expectedChainId,
+    normalizedSignerAddress
+  };
 }
 
 function parseNoteHistory(value: Prisma.JsonValue | null) {
@@ -1232,16 +1351,37 @@ registrationRouter.post(
 
     await ensureProcedureAndAuthority(existing, user.role);
 
-    const networkRaw = (process.env.BLOCKCHAIN_NETWORK ?? "SEPOLIA").trim().toUpperCase();
-    const walletNetwork = (Object.values(BlockchainNetwork) as string[]).includes(networkRaw)
-      ? (networkRaw as BlockchainNetwork)
-      : BlockchainNetwork.SEPOLIA;
+    let parsedSignerAddress = "";
+    try {
+      parsedSignerAddress = ethers.getAddress(parsed.data.signerWalletAddress.trim());
+    } catch {
+      throw badRequestError("signerWalletAddress không hợp lệ");
+    }
+
+    let recoveredAddress = "";
+    try {
+      recoveredAddress = ethers.getAddress(ethers.verifyMessage(parsed.data.signingMessage, parsed.data.signature));
+    } catch {
+      throw badRequestError("signature không hợp lệ");
+    }
+
+    if (recoveredAddress !== parsedSignerAddress) {
+      throw forbiddenError("walletAuthMissing: Chữ ký không khớp signerWalletAddress");
+    }
+
+    const { authorization, expectedNetwork, expectedChainId, normalizedSignerAddress } =
+      await ensureServiceWalletAuthorizationForSync(user, {
+        walletAuthorizationId: parsed.data.walletAuthorizationId,
+        signerWalletAddress: parsed.data.signerWalletAddress,
+        signerChainId: parsed.data.signerChainId
+      });
+
     const ownerWallet = await prisma.walletAccount.findFirst({
       where: {
         userId: existing.applicantId,
         status: "VERIFIED",
         isDefault: true,
-        network: walletNetwork
+        network: expectedNetwork
       }
     });
     const effectiveLandCode = existing.landCode ?? `LAND-${existing.code}`;
@@ -1249,6 +1389,28 @@ registrationRouter.post(
     if (onChainLookup.registrationTokenId || onChainLookup.landTokenId) {
       throw conflictError("Bản ghi blockchain đã tồn tại cho hồ sơ hoặc mã thửa đất");
     }
+
+    const txLifecycle = await prisma.blockchainTxLifecycle.create({
+      data: {
+        registrationId: existing.id,
+        actorId: user.userId,
+        action: "BLOCKCHAIN_SYNC",
+        network: expectedNetwork,
+        chainId: expectedChainId,
+        walletAddress: normalizedSignerAddress,
+        status: "PENDING",
+        payload: {
+          walletAuthorizationId: authorization.id,
+          legalBasisCode: parsed.data.legalBasisCode,
+          signerWalletAddress: normalizedSignerAddress,
+          signerChainId: parsed.data.signerChainId,
+          signingMessage: parsed.data.signingMessage,
+          signatureHash: hashSignature(parsed.data.signature),
+          cid: parsed.data.cid,
+          metadataHash: parsed.data.metadataHash
+        }
+      }
+    });
 
     let chainResult;
     try {
@@ -1267,6 +1429,31 @@ registrationRouter.post(
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Blockchain sync failed";
+      const failureStatus = classifyBlockchainErrorStatus(message);
+      await prisma.blockchainTxLifecycle.update({
+        where: { id: txLifecycle.id },
+        data: {
+          status: failureStatus,
+          errorCode: failureStatus === "REJECTED" ? "USER_REJECTED" : "CHAIN_TX_FAILED",
+          errorMessage: message
+        }
+      });
+
+      await writeAuditLog({
+        actorId: user.userId,
+        action: `BLOCKCHAIN_TX_${failureStatus}`,
+        entityType: "REGISTRATION",
+        entityId: existing.id,
+        payload: {
+          txLifecycleId: txLifecycle.id,
+          walletAuthorizationId: authorization.id,
+          signerWalletAddress: normalizedSignerAddress,
+          network: expectedNetwork,
+          chainId: expectedChainId,
+          errorMessage: message
+        }
+      });
+
       if (message.includes("verified default wallet")) {
         throw badRequestError("Người nộp hồ sơ chưa có ví mặc định đã xác minh cho mạng blockchain hiện tại");
       }
@@ -1280,6 +1467,46 @@ registrationRouter.post(
       }
       throw conflictError(`Không đồng bộ được blockchain: ${message}`);
     }
+
+    const explorerBaseUrl = resolveExplorerBaseUrl(expectedNetwork);
+    const explorerUrl = explorerBaseUrl && chainResult.txHash ? `${explorerBaseUrl}${chainResult.txHash}` : null;
+
+    await prisma.blockchainTxLifecycle.update({
+      where: { id: txLifecycle.id },
+      data: {
+        status: "CONFIRMED",
+        txHash: chainResult.txHash,
+        explorerUrl,
+        errorCode: null,
+        errorMessage: null
+      }
+    });
+
+    await writeAuditLog({
+      actorId: user.userId,
+      action: "BLOCKCHAIN_TX_PENDING",
+      entityType: "REGISTRATION",
+      entityId: existing.id,
+      payload: {
+        txLifecycleId: txLifecycle.id,
+        walletAuthorizationId: authorization.id,
+        signerWalletAddress: normalizedSignerAddress,
+        network: expectedNetwork,
+        chainId: expectedChainId
+      }
+    });
+
+    await writeAuditLog({
+      actorId: user.userId,
+      action: "BLOCKCHAIN_TX_CONFIRMED",
+      entityType: "REGISTRATION",
+      entityId: existing.id,
+      payload: {
+        txLifecycleId: txLifecycle.id,
+        txHash: chainResult.txHash,
+        explorerUrl
+      }
+    });
 
     const updated = await prisma.registration.update({
       where: { id: existing.id },
@@ -1307,8 +1534,12 @@ registrationRouter.post(
         legalBasisCode: parsed.data.legalBasisCode,
         tokenId: updated.tokenId,
         blockchainMode: chainResult.mode,
-        walletNetwork,
+        walletNetwork: expectedNetwork,
         ownerWalletAddress: ownerWallet?.address ?? null,
+        signerWalletAddress: normalizedSignerAddress,
+        signerChainId: expectedChainId,
+        serviceWalletAuthorizationId: authorization.id,
+        txLifecycleId: txLifecycle.id,
         onChainPrecheck: {
           mode: onChainLookup.mode,
           contractAddress: onChainLookup.contractAddress,
@@ -1325,6 +1556,8 @@ registrationRouter.post(
         registrationId: updated.id,
         tokenId: updated.tokenId,
         txHash: updated.txHash,
+        chainId: expectedChainId,
+        contractAddress: onChainLookup.contractAddress,
         cid: updated.ipfsCid,
         metadataHash: updated.documentHash
       },
@@ -1412,6 +1645,51 @@ registrationRouter.get(
         inSync
       },
       "Đã đối soát trạng thái on-chain/off-chain"
+    );
+  })
+);
+
+registrationRouter.get(
+  "/:id/tx-lifecycle",
+  requireRoles(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "ADMIN", "AUDITOR"]),
+  asyncHandler(async (req, res) => {
+    const user = (req as AuthenticatedRequest).user;
+    const existing = await findRegistrationByParam(String(req.params.id));
+    if (!existing) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
+
+    const items = await prisma.blockchainTxLifecycle.findMany({
+      where: { registrationId: existing.id },
+      orderBy: { createdAt: "desc" }
+    });
+
+    await writeAuditLog({
+      actorId: user.userId,
+      action: "REGISTRATION_BLOCKCHAIN_TX_LIFECYCLE_VIEWED",
+      entityType: "REGISTRATION",
+      entityId: existing.id,
+      payload: { total: items.length }
+    });
+
+    return ok(
+      res,
+      {
+        items: items.map((item) => ({
+          id: item.id,
+          action: item.action,
+          network: item.network,
+          chainId: item.chainId,
+          walletAddress: item.walletAddress,
+          txHash: item.txHash,
+          explorerUrl: item.explorerUrl,
+          status: item.status,
+          errorCode: item.errorCode,
+          errorMessage: item.errorMessage,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt
+        })),
+        total: items.length
+      },
+      "Đã tải vòng đời giao dịch blockchain"
     );
   })
 );
