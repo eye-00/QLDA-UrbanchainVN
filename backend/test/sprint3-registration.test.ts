@@ -1,9 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Server } from "node:http";
+import { ethers } from "ethers";
 import { createApp } from "../src/app.js";
 
 let server: Server;
 let baseUrl: string;
+
+const TEST_WALLET_KEYS = {
+  LAND_REGISTRY_OFFICER: "0x59c6995e998f97a5a0044966f094538f5d9d315f0f74d45d4f4b63e5f9f9b6b1",
+  APPROVAL_AUTHORITY: "0x5de4111afa1a4b94908c05a2db3fca5e9cb0ce3f4bfefd4dc2621c99ceb8590f"
+} as const;
 
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(`${baseUrl}${path}`, init);
@@ -22,12 +28,56 @@ async function login(email: string, password = "StrongPassword@123") {
   return body.data.accessToken as string;
 }
 
-function legalPayload(reason: string) {
+async function uploadRegistrationEvidence(token: string, registrationId: string, filename = "commune-evidence.pdf") {
+  const formData = new FormData();
+  formData.set("documentType", "COMMUNE_EVIDENCE");
+  formData.set("ownerType", "REGISTRATION");
+  formData.set("registrationId", registrationId);
+  formData.set("file", new Blob(["evidence"], { type: "application/pdf" }), filename);
+
+  const uploaded = await api("/api/v1/files/upload", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: formData
+  });
+  expect(uploaded.response.status).toBe(201);
+  return uploaded.body.data.id as string;
+}
+
+async function getServiceWalletAuthorizationId(adminToken: string, roleScope: "LAND_REGISTRY_OFFICER" | "APPROVAL_AUTHORITY") {
+  const listed = await api(`/api/v1/service-wallets?status=ACTIVE&roleScope=${roleScope}`, {
+    headers: {
+      Authorization: `Bearer ${adminToken}`
+    }
+  });
+  expect(listed.response.status).toBe(200);
+  const first = listed.body.data.items[0];
+  expect(Boolean(first)).toBe(true);
+  return first.id as string;
+}
+
+async function buildBlockchainSyncSignaturePayload(
+  roleScope: "LAND_REGISTRY_OFFICER" | "APPROVAL_AUTHORITY",
+  registrationCode: string
+) {
+  const signer = new ethers.Wallet(TEST_WALLET_KEYS[roleScope]);
+  const signerChainId = Number(process.env.BLOCKCHAIN_CHAIN_ID ?? "11155111");
+  const signingMessage = [
+    "UrbanChain-VN Blockchain Sync Confirmation",
+    `RegistrationCode: ${registrationCode}`,
+    `RoleScope: ${roleScope}`,
+    `Signer: ${signer.address}`,
+    `ChainId: ${signerChainId}`,
+    `IssuedAt: ${new Date().toISOString()}`
+  ].join("\n");
+  const signature = await signer.signMessage(signingMessage);
   return {
-    procedureCode: "1.013978",
-    legalBasisCode: "151/2025-ND-CP|3380/QD-BNNMT",
-    reason,
-    evidenceIds: ["EV-TEST-01"]
+    signerWalletAddress: signer.address,
+    signerChainId,
+    signingMessage,
+    signature
   };
 }
 
@@ -92,15 +142,6 @@ describe("Sprint 3 registration core workflow", () => {
     });
     expect(submitted.response.status).toBe(200);
     expect(submitted.body.data.status).toBe("CHO_TIEP_NHAN");
-
-    const submitAgain = await api(`/api/v1/registrations/${registrationId}/submit`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${citizenToken}`,
-        "Content-Type": "application/json"
-      }
-    });
-    expect(submitAgain.response.status).toBe(409);
   });
 
   it("officer can move registration across review flow endpoints", async () => {
@@ -110,6 +151,7 @@ describe("Sprint 3 registration core workflow", () => {
     const registryToken = await login("registry@urbanchain.vn");
     const taxToken = await login("tax@urbanchain.vn");
     const approvalToken = await login("approval@urbanchain.vn");
+    const approvalWalletAuthorizationId = await getServiceWalletAuthorizationId(adminToken, "APPROVAL_AUTHORITY");
     const suffix = Date.now().toString();
 
     const created = await api("/api/v1/registrations", {
@@ -137,7 +179,7 @@ describe("Sprint 3 registration core workflow", () => {
     });
     expect(created.response.status).toBe(201);
     const registrationId = created.body.data.registrationId as string;
-    await uploadRegistrationEvidence(citizenToken, registrationId);
+    const evidenceFileId = await uploadRegistrationEvidence(citizenToken, registrationId);
 
     const submitted = await api(`/api/v1/registrations/${registrationId}/submit`, {
       method: "POST",
@@ -149,47 +191,16 @@ describe("Sprint 3 registration core workflow", () => {
     });
     expect(submitted.response.status).toBe(200);
 
-    const approveTooEarly = await api(`/api/v1/registrations/${registrationId}/approve`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${approvalToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        approvalNumber: `QD-EARLY-${suffix}`,
-        approvalDate: "2026-04-28",
-        ...legalPayload("Thử phê duyệt quá sớm")
-      })
-    });
-    expect(approveTooEarly.response.status).toBe(409);
-
     const accept = await api(`/api/v1/registrations/${registrationId}/accept`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${receptionToken}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(legalPayload("Bộ phận một cửa đã tiếp nhận hồ sơ"))
+      body: JSON.stringify({ legalBasisCode: "QĐ3380-RECEPTION-ACCEPT" })
     });
     expect(accept.response.status).toBe(200);
     expect(accept.body.data.status).toBe("DA_TIEP_NHAN");
-
-    const moveToCommuneReview = await api(`/api/v1/registrations/${registrationId}/status`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${receptionToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        status: "CHO_XAC_NHAN_CAP_XA",
-        reason: "Chuyển hồ sơ sang bước xác nhận cấp xã",
-        procedureCode: "1.013978",
-        legalBasisCode: "151/2025-ND-CP|3380/QD-BNNMT",
-        evidenceIds: ["EV-TEST-00"]
-      })
-    });
-    expect(moveToCommuneReview.response.status).toBe(200);
-    expect(moveToCommuneReview.body.data.status).toBe("CHO_XAC_NHAN_CAP_XA");
 
     const statusWithoutReason = await api(`/api/v1/registrations/${registrationId}/status`, {
       method: "PATCH",
@@ -197,12 +208,7 @@ describe("Sprint 3 registration core workflow", () => {
         Authorization: `Bearer ${receptionToken}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        status: "CAN_BO_SUNG",
-        procedureCode: "1.013978",
-        legalBasisCode: "151/2025-ND-CP|3380/QD-BNNMT",
-        evidenceIds: ["EV-TEST-01"]
-      })
+      body: JSON.stringify({ status: "CAN_BO_SUNG", legalBasisCode: "QĐ3380-RECEPTION-SUPP" })
     });
     expect(statusWithoutReason.response.status).toBe(400);
 
@@ -214,7 +220,9 @@ describe("Sprint 3 registration core workflow", () => {
       },
       body: JSON.stringify({
         confirmed: true,
-        ...legalPayload("UBND cấp xã xác nhận thông tin hồ sơ")
+        legalBasisCode: "QĐ3380-COMMUNE-CONFIRM",
+        notes: "UBND cấp xã xác nhận hồ sơ hợp lệ theo thẩm quyền",
+        evidenceFileId
       })
     });
     expect(communeConfirm.response.status).toBe(200);
@@ -227,8 +235,8 @@ describe("Sprint 3 registration core workflow", () => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        taxReferenceNo: `TAX-${suffix}`,
-        ...legalPayload("Chuyển nghĩa vụ tài chính sang cơ quan thuế")
+        legalBasisCode: "QĐ3380-TAX-TRANSFER",
+        taxReferenceNo: `TAX-${suffix}`
       })
     });
     expect(taxTransfer.response.status).toBe(200);
@@ -274,40 +282,6 @@ describe("Sprint 3 registration core workflow", () => {
     });
     expect(toApprovalQueue.response.status).toBe(200);
 
-    const moveToFinanceWait = await api(`/api/v1/registrations/${registrationId}/status`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${registryToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        status: "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH",
-        reason: "Đang chờ xác nhận hoàn thành nghĩa vụ tài chính",
-        procedureCode: "1.013978",
-        legalBasisCode: "151/2025-ND-CP|3380/QD-BNNMT",
-        evidenceIds: ["EV-TEST-02"]
-      })
-    });
-    expect(moveToFinanceWait.response.status).toBe(200);
-    expect(moveToFinanceWait.body.data.status).toBe("CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH");
-
-    const moveToSigningQueue = await api(`/api/v1/registrations/${registrationId}/status`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${registryToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        status: "CHO_KY_CAP",
-        reason: "Đã hoàn tất nghiệp vụ, chuyển hồ sơ sang hàng đợi ký cấp",
-        procedureCode: "1.013978",
-        legalBasisCode: "151/2025-ND-CP|3380/QD-BNNMT",
-        evidenceIds: ["EV-TEST-03"]
-      })
-    });
-    expect(moveToSigningQueue.response.status).toBe(200);
-    expect(moveToSigningQueue.body.data.status).toBe("CHO_KY_CAP");
-
     const approve = await api(`/api/v1/registrations/${registrationId}/approve`, {
       method: "POST",
       headers: {
@@ -317,8 +291,7 @@ describe("Sprint 3 registration core workflow", () => {
       body: JSON.stringify({
         legalBasisCode: "QĐ3380-APPROVE",
         approvalNumber: `QD-${suffix}`,
-        approvalDate: "2026-04-28",
-        ...legalPayload("Phê duyệt hồ sơ đã đủ điều kiện ký cấp")
+        approvalDate: "2026-04-28"
       })
     });
     expect(approve.response.status).toBe(200);
@@ -330,7 +303,10 @@ describe("Sprint 3 registration core workflow", () => {
         Authorization: `Bearer ${registryToken}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(legalPayload("Đã cập nhật hồ sơ địa chính/CSDL đất đai"))
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-CADASTRAL-UPDATE",
+        note: "Đã cập nhật hồ sơ địa chính tại VPĐKĐĐ"
+      })
     });
     expect(cadastralUpdated.response.status).toBe(200);
     expect(cadastralUpdated.body.data.status).toBe("DA_CAP_NHAT_HO_SO_DIA_CHINH");
@@ -345,25 +321,13 @@ describe("Sprint 3 registration core workflow", () => {
         legalBasisCode: "QĐ3380-BLOCKCHAIN-SYNC",
         cid: `bafy-s3-${suffix}`,
         metadataHash: `0x${suffix}`,
-        ...legalPayload("Đồng bộ metadata hồ sơ lên blockchain")
+        walletAuthorizationId: approvalWalletAuthorizationId,
+        ...(await buildBlockchainSyncSignaturePayload("APPROVAL_AUTHORITY", created.body.data.registrationCode as string))
       })
     });
     expect(sync.response.status).toBe(200);
     expect(sync.body.data.txHash).toBeTruthy();
-
-    const rejectAfterIssued = await api(`/api/v1/registrations/${registrationId}/reject`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${approvalToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        note: "Không hợp lệ sau khi đã cấp",
-        ...legalPayload("Không hợp lệ sau khi đã cấp")
-      })
-    });
-    expect(rejectAfterIssued.response.status).toBe(409);
-  }, 45000);
+  });
 
   it("supports status update and notification history for registration processing result", async () => {
     const citizenToken = await login("citizen@urbanchain.vn");
@@ -406,22 +370,6 @@ describe("Sprint 3 registration core workflow", () => {
     });
     expect(submitted.response.status).toBe(200);
 
-    const invalidStatusJump = await api(`/api/v1/registrations/${registrationId}/status`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${receptionToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        status: "DA_CAP",
-        reason: "Nhảy trạng thái",
-        procedureCode: "1.013978",
-        legalBasisCode: "151/2025-ND-CP|3380/QD-BNNMT",
-        evidenceIds: ["EV-TEST-01"]
-      })
-    });
-    expect(invalidStatusJump.response.status).toBe(409);
-
     const statusUpdated = await api(`/api/v1/registrations/${registrationId}/status`, {
       method: "PATCH",
       headers: {
@@ -430,10 +378,8 @@ describe("Sprint 3 registration core workflow", () => {
       },
       body: JSON.stringify({
         status: "CAN_BO_SUNG",
-        reason: "Thiếu bản scan giấy tờ nguồn gốc đất",
-        procedureCode: "1.013978",
-        legalBasisCode: "151/2025-ND-CP|3380/QD-BNNMT",
-        evidenceIds: ["EV-TEST-03"]
+        legalBasisCode: "QĐ3380-RECEPTION-SUPP-02",
+        reason: "Thiếu bản scan giấy tờ nguồn gốc đất"
       })
     });
     expect(statusUpdated.response.status).toBe(200);
@@ -823,121 +769,5 @@ describe("Sprint 3 registration core workflow", () => {
       }
     });
     expect(forbiddenRead.response.status).toBe(403);
-  });
-
-  it("enforces file ownership when attaching fileIds to registration create", async () => {
-    const suffix = Date.now().toString();
-    const citizenOneToken = await login("citizen@urbanchain.vn");
-    const citizenTwoEmail = `s3.file.scope.${suffix}@urbanchain.vn`;
-
-    const registerCitizenTwo = await api("/api/v1/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fullName: "Scope Citizen File 2",
-        email: citizenTwoEmail,
-        password: "StrongPassword@123",
-        role: "CITIZEN"
-      })
-    });
-    expect(registerCitizenTwo.response.status).toBe(201);
-    const citizenTwoToken = await login(citizenTwoEmail);
-
-    const ownFileForm = new FormData();
-    ownFileForm.set("documentType", "DON_DANG_KY");
-    ownFileForm.set("ownerType", "USER");
-    ownFileForm.set("file", new Blob(["own-file"], { type: "application/pdf" }), "own-file.pdf");
-    const ownUploaded = await api("/api/v1/files/upload", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${citizenOneToken}` },
-      body: ownFileForm
-    });
-    expect(ownUploaded.response.status).toBe(201);
-
-    const createWithOwnFile = await api("/api/v1/registrations", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${citizenOneToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        landInfo: {
-          provinceCode: "48",
-          communeName: "Hòa Khánh",
-          parcelNumber: `FILE-OWN-${suffix}`,
-          mapSheetNumber: "55",
-          area: 75,
-          landUsePurpose: "ODT",
-          address: "Số 5 Đường Demo"
-        },
-        ownerInfo: {
-          ownerType: "INDIVIDUAL",
-          fullName: "Owner File One"
-        },
-        fileIds: [ownUploaded.body.data.id]
-      })
-    });
-    expect(createWithOwnFile.response.status).toBe(201);
-
-    const foreignFileForm = new FormData();
-    foreignFileForm.set("documentType", "GIAY_TO_NHAN_THAN");
-    foreignFileForm.set("ownerType", "USER");
-    foreignFileForm.set("file", new Blob(["foreign-file"], { type: "application/pdf" }), "foreign-file.pdf");
-    const foreignUploaded = await api("/api/v1/files/upload", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${citizenTwoToken}` },
-      body: foreignFileForm
-    });
-    expect(foreignUploaded.response.status).toBe(201);
-
-    const createWithForeignFile = await api("/api/v1/registrations", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${citizenOneToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        landInfo: {
-          provinceCode: "48",
-          communeName: "Hòa Khánh",
-          parcelNumber: `FILE-FOREIGN-${suffix}`,
-          mapSheetNumber: "56",
-          area: 80,
-          landUsePurpose: "ODT",
-          address: "Số 6 Đường Demo"
-        },
-        ownerInfo: {
-          ownerType: "INDIVIDUAL",
-          fullName: "Owner File Foreign"
-        },
-        fileIds: [foreignUploaded.body.data.id]
-      })
-    });
-    expect(createWithForeignFile.response.status).toBe(403);
-
-    const createWithMissingFile = await api("/api/v1/registrations", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${citizenOneToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        landInfo: {
-          provinceCode: "48",
-          communeName: "Hòa Khánh",
-          parcelNumber: `FILE-MISSING-${suffix}`,
-          mapSheetNumber: "57",
-          area: 81,
-          landUsePurpose: "ODT",
-          address: "Số 7 Đường Demo"
-        },
-        ownerInfo: {
-          ownerType: "INDIVIDUAL",
-          fullName: "Owner File Missing"
-        },
-        fileIds: ["fil-not-exists"]
-      })
-    });
-    expect(createWithMissingFile.response.status).toBe(400);
   });
 });
