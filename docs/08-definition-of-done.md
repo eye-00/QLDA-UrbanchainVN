@@ -195,22 +195,27 @@ Mot backlog item duoc xem la Done khi:
 
 ## Sprint 4 Gate (Blockchain registration sync)
 
-### Local verification (2026-05-10)
+### Local verification (2026-05-12)
 - Backend:
+  - `npm run db:migrate` ✅
+  - `npm run db:seed` ✅
   - `npm --workspace backend run build` ✅
   - `npm run lint:backend` ✅
-  - `npm --workspace backend run test -- test/sprint4-blockchain.client.test.ts` ✅
-  - `npm --workspace backend run test -- test/sprint3-registration.test.ts` ✅
+  - `npm --workspace backend run test` ✅
 - Frontend:
   - `npm --workspace frontend run test` ✅
   - `npm --workspace frontend run build` ✅
   - `npm run lint:frontend` ✅ (warning hooks khong fail gate)
 
 ### Scope implementation chain
-- PR #20 (core): blockchain client + sync mode.
-- PR #21 (hardening): on-chain duplicate precheck + `GET /registrations/:id/blockchain-status`.
-- PR #22 (frontend): hiển thị tx/token cho công dân + panel đối soát on/off-chain cho cán bộ.
-- PR #23 (qa/docs): test đối soát + cập nhật docs closeout.
+- PR #20, #21, #22, #23 (nen Sprint 4 da merge).
+- PR #26 (S4-LGL-01): service-wallet governance + guard/legal check tại service-layer + tx lifecycle backend.
+- PR #27 (S4-LGL-02): UI ví công vụ + luồng ký xác nhận blockchain cho can bo.
+- PR #28 (S4-LGL-03): QA/docs closeout (in progress).
 
 ### Sprint 4 closure status
-- `In Progress` cho đến khi chuỗi PR #21 -> #22 -> #23 merge vào `develop` và required checks pass trên từng PR.
+- `Partial`: da dat legal core + frontend signing flow, cho docs closeout PR #28.
+- Dieu kien nang `Done`:
+  - PR #28 merge vao `develop`,
+  - required checks pass theo policy (`backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`),
+  - cap nhat dong bo `docs/04`, `docs/07`, `docs/08`.

@@ -630,21 +630,34 @@ Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
 {
   "legalBasisCode": "QĐ3380-BLOCKCHAIN-01",
   "cid": "bafy...",
-  "metadataHash": "0xabc123"
+  "metadataHash": "0xabc123",
+  "walletAuthorizationId": "swa_001",
+  "signerWalletAddress": "0xabc...def",
+  "signerChainId": 11155111,
+  "signingMessage": "UrbanChain-VN Blockchain Sync Confirmation\\n...",
+  "signature": "0x..."
 }
 ```
 
 ### Response data
 ```json
 {
+  "registrationId": "reg_001",
+  "tokenId": 1001,
   "txHash": "0x123456",
-  "tokenId": "1001"
+  "chainId": 11155111,
+  "contractAddress": "0xabc...",
+  "cid": "bafy...",
+  "metadataHash": "0xabc123"
 }
 ```
 
 ### Validation rules
 - Từ chối `409 Conflict` nếu hồ sơ đã có `txHash`/`tokenId` off-chain.
 - Từ chối `409 Conflict` nếu precheck phát hiện `registrationCode` hoặc `landCode` đã tồn tại on-chain.
+- Từ chối `409 Conflict` nếu hồ sơ chưa đạt `DA_CAP_NHAT_HO_SO_DIA_CHINH` (legal precondition).
+- Từ chối `403 Forbidden` nếu actor không có `service-wallet authorization` hợp lệ theo role/network/chainId.
+- Từ chối `400 Bad Request` nếu chữ ký `personal_sign` không hợp lệ hoặc không khớp `signerWalletAddress`.
 
 ## 8.10. GET /registrations/:registrationId/notifications
 Lấy lịch sử thông báo kết quả xử lý hồ sơ theo RBAC/ownership.
@@ -773,6 +786,61 @@ Ghi nhận đã cập nhật hồ sơ địa chính off-chain trước bước b
 
 ### RBAC
 - `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`, `ADMIN`, `AUDITOR`.
+
+## 8.21. GET /registrations/:registrationId/tx-lifecycle
+Lấy vòng đời giao dịch blockchain của hồ sơ (`PENDING|CONFIRMED|FAILED|REJECTED`).
+
+### Response data
+```json
+{
+  "items": [
+    {
+      "id": "txl_001",
+      "action": "BLOCKCHAIN_SYNC",
+      "network": "SEPOLIA",
+      "chainId": 11155111,
+      "walletAddress": "0xabc...def",
+      "txHash": "0x123456",
+      "explorerUrl": "https://sepolia.etherscan.io/tx/0x123456",
+      "status": "CONFIRMED",
+      "errorCode": null,
+      "errorMessage": null,
+      "createdAt": "2026-05-12T04:00:00.000Z",
+      "updatedAt": "2026-05-12T04:00:15.000Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### RBAC
+- `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`, `ADMIN`, `AUDITOR`.
+
+## 8.22. Service Wallet Governance APIs (Sprint 4)
+> Nhóm API quản trị ví công vụ, chỉ cho `ADMIN`.
+
+### GET /service-wallets
+Lấy danh sách quyền ví công vụ, hỗ trợ filter theo `status/network/roleScope/chainId`.
+
+### POST /service-wallets
+Cấp quyền ví công vụ từ ví đã `VERIFIED`.
+
+#### Request
+```json
+{
+  "walletId": "wal_001",
+  "roleScope": "APPROVAL_AUTHORITY",
+  "chainId": 11155111,
+  "effectiveTo": "2026-12-31T16:59:59.000Z",
+  "reason": "Phân công ký giao dịch hồ sơ đăng ký"
+}
+```
+
+### PATCH /service-wallets/:id/status
+Cập nhật trạng thái quyền ví công vụ: `ACTIVE|REVOKED|EXPIRED`.
+
+### GET /service-wallets/:id/audit
+Lấy audit trail của quyền ví công vụ.
 
 ---
 
