@@ -421,6 +421,35 @@ describe("Sprint 2 legal-aligned core", () => {
     expect(cadastralUpdate.response.status).toBe(200);
     expect(cadastralUpdate.body.data.status).toBe("DA_CAP_NHAT_HO_SO_DIA_CHINH");
 
+    const bypassStatusToBlockchain = await api(`/api/v1/registrations/${registrationId}/status`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        status: "DA_GHI_BLOCKCHAIN",
+        legalBasisCode: "QĐ3380-BYPASS-BLOCKCHAIN"
+      })
+    });
+    expect(bypassStatusToBlockchain.response.status).toBe(409);
+
+    const adminBlockchainSync = await api(`/api/v1/registrations/${registrationId}/blockchain-sync`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-BLOCKCHAIN-ADMIN-FORBIDDEN",
+        cid: `bafy-admin-${suffix}`,
+        metadataHash: `0x${suffix}admin`,
+        walletAuthorizationId: approvalWalletAuthorizationId,
+        ...(await buildBlockchainSyncSignaturePayload("APPROVAL_AUTHORITY", created.body.data.registrationCode as string))
+      })
+    });
+    expect(adminBlockchainSync.response.status).toBe(403);
+
     const blockchainOk = await api(`/api/v1/registrations/${registrationId}/blockchain-sync`, {
       method: "POST",
       headers: {

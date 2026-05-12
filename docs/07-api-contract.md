@@ -683,8 +683,13 @@ Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
 ```
 
 ### Business rules
-- Chỉ cho phép đồng bộ blockchain khi hồ sơ đang ở trạng thái `DA_CAP`.
+- Chỉ cho phép đồng bộ blockchain khi hồ sơ đã cập nhật địa chính off-chain (`DA_CAP_NHAT_HO_SO_DIA_CHINH`).
 - Nếu gọi sai trạng thái hiện tại, API trả `409` với error envelope chuẩn.
+- Không cho phép bypass bằng `PATCH /registrations/:id/status -> DA_GHI_BLOCKCHAIN`; phải đi qua endpoint này để ghi nhận tx lifecycle/audit.
+
+### RBAC
+- `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`.
+- `ADMIN` chỉ quản trị ví công vụ, không thực thi thao tác blockchain-sync.
 
 ## 8.10. GET /registrations/:registrationId/notifications
 Lấy lịch sử thông báo kết quả xử lý hồ sơ theo RBAC/ownership.
@@ -847,7 +852,7 @@ Lấy vòng đời giao dịch blockchain của hồ sơ (`PENDING|CONFIRMED|FAI
 > Nhóm API quản trị ví công vụ, chỉ cho `ADMIN`.
 
 ### GET /service-wallets
-Lấy danh sách quyền ví công vụ, hỗ trợ filter theo `status/network/roleScope/chainId`.
+Lấy danh sách quyền ví công vụ, hỗ trợ filter theo `status/network/roleScope/organizationId/chainId`.
 
 ### POST /service-wallets
 Cấp quyền ví công vụ từ ví đã `VERIFIED`.
@@ -862,6 +867,10 @@ Cấp quyền ví công vụ từ ví đã `VERIFIED`.
   "reason": "Phân công ký giao dịch hồ sơ đăng ký"
 }
 ```
+
+#### Rule bắt buộc
+- `roleScope` chỉ cho phép: `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`.
+- Không cho phép cấp quyền ví công vụ với `roleScope=ADMIN`.
 
 ### PATCH /service-wallets/:id/status
 Cập nhật trạng thái quyền ví công vụ: `ACTIVE|REVOKED|EXPIRED`.
