@@ -9,7 +9,6 @@ import {
   getReviewPermissions,
   getReviewStepsByStatus,
   isActionAllowedForStatus,
-  isBlockchainSyncReady,
   isTaxTransferReady,
   requiresActionNote,
   toBlockchainDisplayValue,
@@ -69,8 +68,6 @@ export function RegistrationReviewDetailPage() {
   const [evidenceText, setEvidenceText] = useState('');
   const [taxReferenceNo, setTaxReferenceNo] = useState('');
   const [approvalNumber, setApprovalNumber] = useState('');
-  const [chainCid, setChainCid] = useState('');
-  const [chainHash, setChainHash] = useState('');
   const [selectedFileMetadata, setSelectedFileMetadata] = useState<UploadedFileItem | null>(null);
   const [fileActionLoadingId, setFileActionLoadingId] = useState<string | null>(null);
 
@@ -140,8 +137,6 @@ export function RegistrationReviewDetailPage() {
       setEvidenceText('');
       setTaxReferenceNo('');
       setApprovalNumber('');
-      setChainCid('');
-      setChainHash('');
       await loadRegistrationDetail();
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Không thực hiện được thao tác.');
@@ -637,39 +632,17 @@ export function RegistrationReviewDetailPage() {
           )}
 
           {canBlockchainSync && (
-            <div className="form-grid">
-              <label>
-                CID IPFS
-                <input value={chainCid} onChange={(event) => setChainCid(event.target.value)} placeholder="bafy..." />
-              </label>
-              <label>
-                Metadata hash
-                <input value={chainHash} onChange={(event) => setChainHash(event.target.value)} placeholder="0x..." />
-              </label>
+            <div className="row-gap">
+              <div className="notice">
+                Luồng ký blockchain được tách màn riêng để thao tác liền mạch và giảm lỗi khi xử lý hồ sơ.
+              </div>
               <div className="action-row">
                 <button
                   type="button"
                   disabled={submitting}
-                  onClick={() => {
-                    if (!isBlockchainSyncReady(chainCid, chainHash)) {
-                      showToast('error', 'Vui lòng nhập đầy đủ CID và metadata hash.');
-                      return;
-                    }
-                    void executeAction(
-                      'blockchainSync',
-                      '/blockchain-sync',
-                      withLegalPayload(
-                        {
-                          cid: chainCid,
-                          metadataHash: chainHash
-                        },
-                        actionNote || 'Đã ghi hash/CID metadata hồ sơ lên blockchain'
-                      ),
-                      'Đã đồng bộ bản ghi số.'
-                    );
-                  }}
+                  onClick={() => navigate(`/registrations/review/${item.id}/blockchain-sign`)}
                 >
-                  Đồng bộ blockchain
+                  Mở màn ký blockchain
                 </button>
               </div>
             </div>

@@ -148,6 +148,6 @@ export function getReviewPermissions(role: UserRole | undefined) {
       role === 'TAX_OFFICER' ||
       isAdmin,
     canCadastralUpdate: role === 'LAND_REGISTRY_OFFICER' || isAdmin,
-    canBlockchainSync: role === 'LAND_REGISTRY_OFFICER' || role === 'APPROVAL_AUTHORITY' || isAdmin
+    canBlockchainSync: role === 'LAND_REGISTRY_OFFICER' || role === 'APPROVAL_AUTHORITY'
   };
 }

@@ -660,6 +660,7 @@ Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
 ```json
 {
   "legalBasisCode": "QĐ3380-BLOCKCHAIN-01",
+  "syncMode": "OFFICER_SERVICE_WALLET",
   "cid": "bafy...",
   "metadataHash": "0xabc123",
   "walletAuthorizationId": "swa_001",
@@ -676,7 +677,12 @@ Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
   "registrationId": "reg_001",
   "tokenId": 1001,
   "txHash": "0x123456",
-  "tokenId": 1001,
+  "status": "CONFIRMED",
+  "syncMode": "OFFICER_SERVICE_WALLET",
+  "chainId": 11155111,
+  "contractAddress": "0xabc...",
+  "explorerUrl": "https://sepolia.etherscan.io/tx/0x123456",
+  "cid": "bafy...",
   "metadataHash": "0xabc123",
   "blockchainMode": "mock"
 }
@@ -686,10 +692,44 @@ Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
 - Chỉ cho phép đồng bộ blockchain khi hồ sơ đã cập nhật địa chính off-chain (`DA_CAP_NHAT_HO_SO_DIA_CHINH`).
 - Nếu gọi sai trạng thái hiện tại, API trả `409` với error envelope chuẩn.
 - Không cho phép bypass bằng `PATCH /registrations/:id/status -> DA_GHI_BLOCKCHAIN`; phải đi qua endpoint này để ghi nhận tx lifecycle/audit.
+- `syncMode`:
+  - `OFFICER_SERVICE_WALLET` (mặc định cho officer): bắt buộc `walletAuthorizationId`.
+  - `CITIZEN_DIRECT_SIGN` (mặc định cho `CITIZEN|BUSINESS`): không dùng `walletAuthorizationId`, bắt buộc ví ký trùng ví mặc định đã xác minh của chủ hồ sơ.
+- Error marker để FE map:
+  - `walletAuthMissing`
+  - `WALLET_MISMATCH`
+  - `WRONG_NETWORK`
+  - `STATUS_NOT_READY`
+  - `OWNERSHIP_DENIED`
+
+### RBAC
+- `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`, `CITIZEN`, `BUSINESS`.
+- `ADMIN` chỉ quản trị ví công vụ, không thực thi thao tác blockchain-sync.
+
+## 8.9.1. GET /registrations/:registrationId/blockchain-sync/candidates
+Lấy danh sách ví công vụ sẵn sàng ký blockchain cho actor hiện tại.
 
 ### RBAC
 - `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`.
-- `ADMIN` chỉ quản trị ví công vụ, không thực thi thao tác blockchain-sync.
+
+### Response data
+```json
+{
+  "items": [
+    {
+      "authorizationId": "swa_001",
+      "walletAddress": "0xabc...def",
+      "walletStatus": "VERIFIED",
+      "network": "SEPOLIA",
+      "chainId": 11155111,
+      "roleScope": "APPROVAL_AUTHORITY",
+      "effectiveTo": null,
+      "status": "ACTIVE"
+    }
+  ],
+  "total": 1
+}
+```
 
 ## 8.10. GET /registrations/:registrationId/notifications
 Lấy lịch sử thông báo kết quả xử lý hồ sơ theo RBAC/ownership.
@@ -877,6 +917,10 @@ Cập nhật trạng thái quyền ví công vụ: `ACTIVE|REVOKED|EXPIRED`.
 
 ### GET /service-wallets/:id/audit
 Lấy audit trail của quyền ví công vụ.
+
+### Sprint 4 legal override note (tạm thời)
+- PR-S4-02 cho phép `CITIZEN_DIRECT_SIGN`: công dân/doanh nghiệp ký thông điệp ủy quyền, backend vẫn là bên gửi giao dịch on-chain.
+- Không đổi ABI smart contract, không ghi PII lên chain.
 
 ---
 

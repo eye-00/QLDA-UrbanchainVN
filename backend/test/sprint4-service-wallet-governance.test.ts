@@ -91,6 +91,21 @@ describe("Sprint 4 service wallet governance", () => {
     expect(listed.response.status).toBe(403);
   });
 
+  it("returns blockchain-sync candidates for officer by role/network/status", async () => {
+    const approvalToken = await login("approval@urbanchain.vn");
+    const candidates = await api("/api/v1/registrations/reg_demo_001/blockchain-sync/candidates", {
+      headers: {
+        Authorization: `Bearer ${approvalToken}`
+      }
+    });
+    expect(candidates.response.status).toBe(200);
+    expect(Array.isArray(candidates.body.data.items)).toBe(true);
+    for (const item of candidates.body.data.items as Array<{ roleScope: string; status: string }>) {
+      expect(item.roleScope).toBe("APPROVAL_AUTHORITY");
+      expect(item.status).toBe("ACTIVE");
+    }
+  });
+
   it("rejects roleScope ADMIN when granting service wallet authorization", async () => {
     const adminToken = await login("admin@urbanchain.vn");
     const listed = await api("/api/v1/service-wallets?status=ACTIVE", {

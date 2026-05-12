@@ -38,6 +38,7 @@ describe('registration review helpers', () => {
     expect(getReviewPermissions('AUDITOR').canAccept).toBe(false);
     expect(getReviewPermissions('CITIZEN').canAccept).toBe(false);
     expect(getReviewPermissions('ADMIN').canApprove).toBe(true);
+    expect(getReviewPermissions('ADMIN').canBlockchainSync).toBe(false);
   });
 
   it('maps status to workflow steps', () => {

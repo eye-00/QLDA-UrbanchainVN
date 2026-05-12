@@ -9,7 +9,7 @@ type ServiceWalletItem = {
   network: 'SEPOLIA' | 'HARDHAT' | 'GANACHE';
   chainId: number;
   status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
-  roleScope: 'LAND_REGISTRY_OFFICER' | 'APPROVAL_AUTHORITY' | 'ADMIN';
+  roleScope: 'LAND_REGISTRY_OFFICER' | 'APPROVAL_AUTHORITY';
   user: {
     id: string;
     fullName: string;
@@ -44,9 +44,18 @@ type StatusFilter = 'ALL' | 'ACTIVE' | 'REVOKED' | 'EXPIRED';
 
 const ROLE_SCOPE_OPTIONS: Array<{ value: ServiceWalletItem['roleScope']; label: string }> = [
   { value: 'LAND_REGISTRY_OFFICER', label: 'Cán bộ VPĐKĐĐ' },
-  { value: 'APPROVAL_AUTHORITY', label: 'Cơ quan phê duyệt' },
-  { value: 'ADMIN', label: 'Quản trị hệ thống' }
+  { value: 'APPROVAL_AUTHORITY', label: 'Cơ quan phê duyệt' }
 ];
+
+function getRoleScopeLabel(roleScope: ServiceWalletItem['roleScope']) {
+  return ROLE_SCOPE_OPTIONS.find((item) => item.value === roleScope)?.label ?? roleScope;
+}
+
+function getAuthorizationStatusLabel(status: ServiceWalletItem['status']) {
+  if (status === 'ACTIVE') return 'Đang hiệu lực';
+  if (status === 'REVOKED') return 'Đã thu hồi';
+  return 'Hết hiệu lực';
+}
 
 export function ServiceWalletManagementPage() {
   const { showToast } = useToast();
@@ -228,7 +237,7 @@ export function ServiceWalletManagementPage() {
                 {items.map((item) => (
                   <tr key={item.id}>
                     <td className="mono-text">{item.walletAddress}</td>
-                    <td>{item.roleScope}</td>
+                    <td>{getRoleScopeLabel(item.roleScope)}</td>
                     <td>{item.network} / {item.chainId}</td>
                     <td>
                       <div>{item.user.fullName}</div>
@@ -236,7 +245,7 @@ export function ServiceWalletManagementPage() {
                     </td>
                     <td>
                       <span className={`badge ${item.status === 'ACTIVE' ? 'badge-success' : item.status === 'REVOKED' ? 'badge-danger' : 'badge-warning'}`}>
-                        {item.status}
+                        {getAuthorizationStatusLabel(item.status)}
                       </span>
                     </td>
                     <td>

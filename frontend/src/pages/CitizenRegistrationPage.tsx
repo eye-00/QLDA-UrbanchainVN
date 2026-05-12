@@ -10,6 +10,7 @@ import {
 import { useToast } from '../ui/ToastContext';
 import { getRegistrationStatusBadgeClass, getRegistrationStatusLabel } from '../ui/registrationStatus';
 import { loadCommuneOptionsByProvince, loadProvinceOptions, type CommuneOption, type ProvinceOption } from '../lib/vnAddress';
+import { canOpenBlockchainSign } from './registrationBlockchainHelpers';
 
 type RegistrationItem = {
   id: string;
@@ -25,6 +26,7 @@ type RegistrationItem = {
     fullName: string;
   };
   status: string;
+  cadastralUpdatedAt?: string | null;
   notes: string[];
   updatedAt: string;
 };
@@ -431,6 +433,7 @@ export function CitizenRegistrationPage() {
               <tbody>
                 {items.map((item) => {
                   const canSubmit = item.status === 'MOI_TAO' || item.status === 'CAN_BO_SUNG';
+                  const canSignBlockchain = canOpenBlockchainSign(item.status, item.cadastralUpdatedAt ?? null);
                   return (
                     <tr key={item.id}>
                       <td>{item.code}</td>
@@ -475,6 +478,11 @@ export function CitizenRegistrationPage() {
                           ) : (
                             <span className="muted">Đã gửi</span>
                           )}
+                          {canSignBlockchain ? (
+                            <Link to={`/registrations/${item.id}/blockchain-sign`} className="btn-link btn-link-outline">
+                              Ký & gửi blockchain
+                            </Link>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
