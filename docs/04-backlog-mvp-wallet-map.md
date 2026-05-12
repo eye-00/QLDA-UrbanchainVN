@@ -70,6 +70,21 @@ Theo bo tai lieu `docs/docs-legal-aligned`, trang thai closure sprint duoc cap n
 
 > Ghi chu: Cac closure snapshot cu ben duoi giu lai de truy vet lich su; khi xung dot, uu tien ket luan theo section legal rebaseline nay.
 
+## 2.2. Technical closure update (2026-05-12)
+
+Cap nhat bang chung gate ky thuat moi nhat tren `develop`:
+
+- PR on dinh test/compile: [#24](https://github.com/eye-00/QLDA-UrbanchainVN/pull/24) da merge (head commit `b3ca4dd`, merge commit tren `develop` `5531a98`).
+- Required checks tren PR #24 da pass: `backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`, `changes`.
+- Smoke local gate pass (2026-05-12):
+  - `npm run db:migrate`
+  - `npm run db:seed`
+  - `npm test` (contracts `7/7`, backend `36/36`, frontend `37/37`).
+
+Luu y:
+- Cap nhat nay xac nhan da go blocker ky thuat compile/test.
+- Khong override ket luan legal baseline tai section `2.1` (Sprint 2/3/4 van `Partial` cho den khi dong legal gates va legal evidence closeout).
+
 ### Legal backlog injection (canonical)
 
 | Backlog legal item | Sprint | Mô tả ngắn |

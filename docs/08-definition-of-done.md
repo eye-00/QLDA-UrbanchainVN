@@ -180,6 +180,26 @@ Luu y:
   - Khong nang `Done` neu thieu evidence remote gate.
   - US `Missing` phai co implementation/test/docs bo sung truoc khi chot sprint.
 
+## Technical Gate Update (2026-05-12)
+
+Cap nhat xac nhan da go blocker ky thuat compile/test tren nhanh `develop`:
+
+- PR technical closeout: [#24](https://github.com/eye-00/QLDA-UrbanchainVN/pull/24) da merge.
+- Required checks pass day du tren PR #24:
+  - `backend-ci`
+  - `frontend-ci`
+  - `contracts-ci`
+  - `docs-check`
+  - `changes`
+- Xac nhan local full test gate pass:
+  - `npm run db:migrate`
+  - `npm run db:seed`
+  - `npm test` (contracts `7/7`, backend `36/36`, frontend `37/37`).
+
+Gioi han:
+- Muc nay chi xac nhan on dinh ky thuat build/test.
+- Trang thai legal closure Sprint 2/3/4 van theo `Legal Rebaseline Note (2026-05-10)` cho den khi dong du legal blockers.
+
 ---
 
 # PHỤ LỤC — Legal Definition of Done cho Sprint 2+
