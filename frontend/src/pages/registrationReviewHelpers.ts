@@ -138,9 +138,6 @@ export function getReviewStepsByStatus(status: string) {
 
 export function getReviewPermissions(role: UserRole | undefined) {
   const isAdmin = role === 'ADMIN';
-  const isTaxOfficer = role === 'TAX_OFFICER';
-  const isRegistryOfficer = role === 'LAND_REGISTRY_OFFICER';
-  const isApproval = role === 'APPROVAL_AUTHORITY';
   return {
     canAccept: role === 'RECEPTION_OFFICER' || isAdmin,
     canCommuneConfirm: role === 'COMMUNE_OFFICER' || isAdmin,

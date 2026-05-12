@@ -6,7 +6,6 @@ import { getRegistrationStatusBadgeClass, getRegistrationStatusLabel } from '../
 import {
   buildRegistrationReviewQuery
 } from './registrationReviewHelpers';
-import { canViewBlockchainStatus, formatShortTxHash, resolveBlockchainSyncBadge } from './registrationBlockchainHelpers';
 
 type RegistrationItem = {
   id: string;
@@ -46,89 +45,6 @@ type RegistrationItem = {
 
 type RegistrationListResponse = {
   items: RegistrationItem[];
-  total: number;
-};
-
-type PaymentObligationItem = {
-  id: string;
-  type: 'INTAKE_FEE' | 'LAND_FINANCIAL_OBLIGATION';
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
-  legalBasisCode: string;
-  referenceNo: string | null;
-  amount: number | null;
-  note: string | null;
-};
-
-type PaymentObligationListResponse = {
-  items: PaymentObligationItem[];
-  total: number;
-};
-
-type DocumentHistoryEvent = {
-  id: string;
-  type: 'DOCUMENT_VERSION' | 'SUBMIT_SNAPSHOT' | 'STATUS_AUDIT';
-  at: string;
-  title: string;
-  detail: Record<string, unknown>;
-};
-
-type DocumentHistoryResponse = {
-  items: DocumentHistoryEvent[];
-  total: number;
-};
-
-type BlockchainLookupPayload = {
-  mode: 'mock' | 'rpc';
-  contractAddress: string | null;
-  registrationTokenId: number | null;
-  landTokenId: number | null;
-};
-
-type BlockchainStatusPayload = {
-  registrationId: string;
-  registrationCode: string;
-  landCode: string;
-  offChain: {
-    status: string;
-    tokenId: number | null;
-    txHash: string | null;
-  };
-  onChain: BlockchainLookupPayload;
-  inSync: boolean;
-};
-
-type ServiceWalletAuthorizationItem = {
-  id: string;
-  walletId: string;
-  walletAddress: string;
-  network: 'SEPOLIA' | 'HARDHAT' | 'GANACHE';
-  chainId: number;
-  status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
-  roleScope: UserRole;
-};
-
-type ServiceWalletAuthorizationListResponse = {
-  items: ServiceWalletAuthorizationItem[];
-  total: number;
-};
-
-type BlockchainTxLifecycleItem = {
-  id: string;
-  action: string;
-  network: 'SEPOLIA' | 'HARDHAT' | 'GANACHE';
-  chainId: number;
-  walletAddress: string;
-  txHash: string | null;
-  explorerUrl: string | null;
-  status: 'PENDING' | 'CONFIRMED' | 'FAILED' | 'REJECTED';
-  errorCode: string | null;
-  errorMessage: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type BlockchainTxLifecycleResponse = {
-  items: BlockchainTxLifecycleItem[];
   total: number;
 };
 
