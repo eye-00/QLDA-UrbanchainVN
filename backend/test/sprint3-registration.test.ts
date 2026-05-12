@@ -1,15 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Server } from "node:http";
-import { ethers } from "ethers";
 import { createApp } from "../src/app.js";
 
 let server: Server;
 let baseUrl: string;
-
-const TEST_WALLET_KEYS = {
-  LAND_REGISTRY_OFFICER: "0x59c6995e998f97a5a0044966f094538f5d9d315f0f74d45d4f4b63e5f9f9b6b1",
-  APPROVAL_AUTHORITY: "0x5de4111afa1a4b94908c05a2db3fca5e9cb0ce3f4bfefd4dc2621c99ceb8590f"
-} as const;
 
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(`${baseUrl}${path}`, init);
@@ -116,7 +110,6 @@ describe("Sprint 3 registration core workflow", () => {
     const registryToken = await login("registry@urbanchain.vn");
     const taxToken = await login("tax@urbanchain.vn");
     const approvalToken = await login("approval@urbanchain.vn");
-    const approvalWalletAuthorizationId = await getServiceWalletAuthorizationId(adminToken, "APPROVAL_AUTHORITY");
     const suffix = Date.now().toString();
 
     const created = await api("/api/v1/registrations", {
@@ -144,7 +137,7 @@ describe("Sprint 3 registration core workflow", () => {
     });
     expect(created.response.status).toBe(201);
     const registrationId = created.body.data.registrationId as string;
-    const evidenceFileId = await uploadRegistrationEvidence(citizenToken, registrationId);
+    await uploadRegistrationEvidence(citizenToken, registrationId);
 
     const submitted = await api(`/api/v1/registrations/${registrationId}/submit`, {
       method: "POST",

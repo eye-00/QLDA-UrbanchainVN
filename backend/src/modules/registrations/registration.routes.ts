@@ -5,7 +5,6 @@ import {
   UserRole
 } from "@prisma/client";
 import { Router } from "express";
-import { ethers } from "ethers";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
 import { registerLandOnChain, syncLandMetadataOnChain, toChainSafeHash } from "../../lib/blockchain.js";
