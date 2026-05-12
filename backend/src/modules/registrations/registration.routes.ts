@@ -339,12 +339,11 @@ async function ensureServiceWalletAuthorizationForSync(
     throw forbiddenError("walletAuthMissing: Ví công vụ chưa xác minh hoặc không đúng network");
   }
 
-  const actorIsAdmin = actor.role === "ADMIN";
-  if (!actorIsAdmin && authorization.userId !== actor.userId) {
+  if (authorization.userId !== actor.userId) {
     throw forbiddenError("walletAuthMissing: Bạn không sở hữu quyền ví công vụ này");
   }
 
-  if (!actorIsAdmin && authorization.roleScope !== actor.role) {
+  if (authorization.roleScope !== actor.role) {
     throw forbiddenError(
       `walletAuthMissing: Vai trò ${actor.role} không khớp roleScope ${authorization.roleScope} của ví công vụ`
     );
@@ -382,6 +381,10 @@ function toNotificationMessage(status: RegistrationStatus, note: string) {
 }
 
 function assertTransitionAllowed(currentStatus: RegistrationStatus, nextStatus: RegistrationStatus, actorRole: UserRole) {
+  if (nextStatus === "DA_GHI_BLOCKCHAIN") {
+    throw conflictError("Không được chuyển trực tiếp sang DA_GHI_BLOCKCHAIN. Hãy dùng endpoint blockchain-sync.");
+  }
+
   const allowedNext = STATUS_TRANSITION_GRAPH[currentStatus] ?? [];
   if (!allowedNext.includes(nextStatus)) {
     throw badRequestError(`Không thể chuyển trạng thái từ ${currentStatus} sang ${nextStatus}`);
@@ -1330,7 +1333,7 @@ registrationRouter.post(
 
 registrationRouter.post(
   "/:id/blockchain-sync",
-  requireRoles(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "ADMIN"]),
+  requireRoles(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY"]),
   asyncHandler(async (req, res) => {
     const parsed = blockchainSyncSchema.safeParse(req.body ?? {});
     if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);

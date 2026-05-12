@@ -9,7 +9,7 @@ import { requireAuth, requireRoles, type AuthenticatedRequest } from "../auth/au
 
 const serviceWalletRouter = Router();
 
-const managedRoleSchema = z.enum(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "ADMIN"]);
+const managedRoleSchema = z.enum(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY"]);
 
 const createAuthorizationSchema = z.object({
   walletId: z.string().min(1),
@@ -28,6 +28,7 @@ const listQuerySchema = z.object({
   status: z.enum(["ACTIVE", "REVOKED", "EXPIRED"]).optional(),
   network: z.nativeEnum(BlockchainNetwork).optional(),
   roleScope: managedRoleSchema.optional(),
+  organizationId: z.string().min(1).optional(),
   chainId: z.coerce.number().int().positive().optional(),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20)
@@ -83,11 +84,12 @@ serviceWalletRouter.get(
     const parsed = listQuerySchema.safeParse(req.query);
     if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
 
-    const { page, pageSize, status, network, roleScope, chainId } = parsed.data;
+    const { page, pageSize, status, network, roleScope, organizationId, chainId } = parsed.data;
     const where = {
       ...(status ? { status } : {}),
       ...(network ? { network } : {}),
       ...(roleScope ? { roleScope } : {}),
+      ...(organizationId ? { organizationId } : {}),
       ...(chainId ? { chainId } : {})
     };
 

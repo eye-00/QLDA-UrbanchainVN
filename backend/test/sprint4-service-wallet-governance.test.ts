@@ -90,4 +90,29 @@ describe("Sprint 4 service wallet governance", () => {
     });
     expect(listed.response.status).toBe(403);
   });
+
+  it("rejects roleScope ADMIN when granting service wallet authorization", async () => {
+    const adminToken = await login("admin@urbanchain.vn");
+    const listed = await api("/api/v1/service-wallets?status=ACTIVE", {
+      headers: {
+        Authorization: `Bearer ${adminToken}`
+      }
+    });
+    expect(listed.response.status).toBe(200);
+    const target = listed.body.data.items[0];
+    expect(Boolean(target)).toBe(true);
+
+    const createWithAdminRole = await api("/api/v1/service-wallets", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        walletId: target.walletId,
+        roleScope: "ADMIN"
+      })
+    });
+    expect(createWithAdminRole.response.status).toBe(400);
+  });
 });
