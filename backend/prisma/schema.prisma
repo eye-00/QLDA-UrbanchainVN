@@ -13,8 +13,8 @@ enum UserRole {
   RECEPTION_OFFICER
   COMMUNE_OFFICER
   LAND_REGISTRY_OFFICER
-  TAX_OFFICER
   APPROVAL_AUTHORITY
+  TAX_OFFICER
   AUDITOR
   ADMIN
 }
@@ -34,6 +34,19 @@ enum BlockchainNetwork {
   SEPOLIA
   HARDHAT
   GANACHE
+}
+
+enum ServiceWalletAuthorizationStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum BlockchainTxLifecycleStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  REJECTED
 }
 
 enum RegistrationStatus {
@@ -57,6 +70,19 @@ enum RegistrationStatus {
   TU_CHOI
 }
 
+enum ProcedureLevel {
+  XA
+  TINH
+  LIEN_THONG
+}
+
+enum DocumentVersionStatus {
+  ACTIVE
+  REPLACED
+  LOCKED
+  INVALIDATED
+}
+
 enum PaymentObligationType {
   INTAKE_FEE
   LAND_FINANCIAL_OBLIGATION
@@ -64,9 +90,8 @@ enum PaymentObligationType {
 
 enum PaymentObligationStatus {
   PENDING
-  FULFILLED
-  WAIVED
-  CANCELED
+  CONFIRMED
+  CANCELLED
 }
 
 enum TransferStatus {
@@ -102,8 +127,29 @@ model User {
   ownedParcels   LandParcel[]   @relation("ParcelOwner")
   sessions       AuthSession[]
   wallets        WalletAccount[]
+  serviceWalletAuthorizations ServiceWalletAuthorization[] @relation("ServiceWalletOwner")
+  serviceWalletAuthorizationsRevoked ServiceWalletAuthorization[] @relation("ServiceWalletRevokedBy")
+  blockchainTxEvents BlockchainTxLifecycle[] @relation("BlockchainTxActor")
+  documentVersionsCreated RegistrationDocumentVersion[] @relation("DocVersionCreatedBy")
+  submittedSnapshots RegistrationSubmitSnapshot[] @relation("SnapshotSubmittedBy")
+  paymentObligationsCreated RegistrationPaymentObligation[] @relation("PaymentCreatedBy")
+  paymentObligationsConfirmed RegistrationPaymentObligation[] @relation("PaymentConfirmedBy")
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+}
+
+model LegalProcedure {
+  id              String         @id @default(cuid())
+  procedureCode   String         @unique
+  sourceDecision  String
+  legalBasis      String
+  level           ProcedureLevel
+  authorityActors Json
+  requiresTaxStep Boolean        @default(false)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  registrations   Registration[]
 }
 
 model AuthSession {
@@ -171,7 +217,6 @@ model Registration {
   ownerAddress   String?
   procedureCode  String?
   legalBasisCode String?
-  submitSnapshotAt DateTime?
   noteHistory    Json?
   submittedSnapshotLocked Boolean          @default(false)
   cadastralUpdatedAt DateTime?
@@ -187,7 +232,10 @@ model Registration {
   files          FileAsset[]
   documentVersions RegistrationDocumentVersion[]
   submitSnapshots RegistrationSubmitSnapshot[]
-  paymentObligations PaymentObligation[]
+  paymentObligations RegistrationPaymentObligation[]
+  blockchainTxEvents BlockchainTxLifecycle[]
+
+  @@index([procedureCode])
 }
 
 model TransferRequest {
@@ -219,71 +267,6 @@ model FileAsset {
   createdAt      DateTime @default(now())
 }
 
-model LegalProcedure {
-  id                String   @id @default(cuid())
-  procedureCode     String   @unique
-  name              String
-  sourceDecision    String?
-  legalBasis        String
-  level             String
-  authorityActors   Json
-  requiresTaxStep   Boolean  @default(false)
-  isActive          Boolean  @default(true)
-  registrations     Registration[]
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-}
-
-model RegistrationDocumentVersion {
-  id             String   @id @default(cuid())
-  registrationId String
-  fileAssetId    String
-  documentType   String
-  versionNo      Int      @map("versionNumber")
-  cid            String?
-  hash           String?
-  createdBy      String?  @map("createdById")
-  createdAt      DateTime @default(now())
-  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  fileAsset      FileAsset     @relation(fields: [fileAssetId], references: [id], onDelete: Cascade)
-
-  @@unique([registrationId, fileAssetId, versionNo], name: "reg_doc_version_unique")
-  @@index([registrationId, documentType, createdAt], name: "reg_doc_reg_docType_createdAt_idx")
-}
-
-model RegistrationSubmitSnapshot {
-  id                String   @id @default(cuid())
-  registrationId    String
-  snapshotNo        Int      @default(1)
-  submittedBy       String?  @map("submittedById")
-  procedureCode     String?
-  legalBasisCode    String
-  authorityActor    String   @default("RECEPTION_OFFICER")
-  fileVersionIds    Json     @map("documentVersionIds")
-  fileIds           Json
-  createdAt         DateTime @default(now())
-  registration      Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-
-  @@index([registrationId, createdAt])
-}
-
-model PaymentObligation {
-  id             String                  @id @default(cuid())
-  registrationId String
-  type           PaymentObligationType
-  status         PaymentObligationStatus @default(PENDING)
-  amount         Decimal?                @db.Decimal(12,2)
-  referenceNo    String?
-  note           String?
-  createdBy      String?
-  fulfilledAt    DateTime?
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  registration   Registration            @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-
-  @@index([registrationId, type, status])
-}
-
 model WalletAccount {
   id               String                      @id @default(cuid())
   userId           String
@@ -297,9 +280,57 @@ model WalletAccount {
   updatedAt        DateTime                    @updatedAt
   user             User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
   challenges       WalletVerificationChallenge[]
+  serviceAuthorizations ServiceWalletAuthorization[]
 
   @@unique([network, address], name: "wallet_network_address_unique")
   @@index([userId, network, isDefault])
+}
+
+model ServiceWalletAuthorization {
+  id             String                           @id @default(cuid())
+  walletId       String
+  userId         String
+  organizationId String?
+  roleScope      UserRole
+  network        BlockchainNetwork
+  chainId        Int
+  status         ServiceWalletAuthorizationStatus @default(ACTIVE)
+  effectiveFrom  DateTime                         @default(now())
+  effectiveTo    DateTime?
+  reason         String?
+  revokedAt      DateTime?
+  revokedById    String?
+  createdAt      DateTime                         @default(now())
+  updatedAt      DateTime                         @updatedAt
+  wallet         WalletAccount                    @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  user           User                             @relation("ServiceWalletOwner", fields: [userId], references: [id], onDelete: Cascade)
+  revokedBy      User?                            @relation("ServiceWalletRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@index([network, chainId, status])
+  @@index([userId, roleScope, status])
+}
+
+model BlockchainTxLifecycle {
+  id             String                     @id @default(cuid())
+  registrationId String
+  actorId        String?
+  action         String
+  network        BlockchainNetwork
+  chainId        Int
+  walletAddress  String
+  txHash         String?
+  explorerUrl    String?
+  status         BlockchainTxLifecycleStatus @default(PENDING)
+  errorCode      String?
+  errorMessage   String?
+  payload        Json?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  registration   Registration               @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  actor          User?                      @relation("BlockchainTxActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([registrationId, createdAt])
+  @@index([status, network, chainId])
 }
 
 model WalletVerificationChallenge {
@@ -313,6 +344,66 @@ model WalletVerificationChallenge {
   wallet     WalletAccount @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
   @@index([walletId, usedAt, expiresAt])
+}
+
+model RegistrationDocumentVersion {
+  id             String                @id @default(cuid())
+  registrationId String
+  versionNumber  Int
+  documentType   String
+  storageStatus  String
+  cid            String?
+  hash           String?
+  status         DocumentVersionStatus @default(ACTIVE)
+  note           String?
+  fileAssetId    String?
+  createdById    String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  registration   Registration          @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  fileAsset      FileAsset?            @relation(fields: [fileAssetId], references: [id], onDelete: SetNull)
+  createdBy      User?                 @relation("DocVersionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([registrationId, versionNumber], name: "registration_document_version_unique")
+  @@index([registrationId, status])
+}
+
+model RegistrationSubmitSnapshot {
+  id                 String       @id @default(cuid())
+  registrationId     String
+  snapshotNo         Int
+  procedureCode      String?
+  legalBasisCode     String
+  authorityActor     String
+  documentVersionIds Json
+  submittedById      String
+  createdAt          DateTime     @default(now())
+  registration       Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  submittedBy        User         @relation("SnapshotSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+
+  @@unique([registrationId, snapshotNo], name: "registration_snapshot_unique")
+  @@index([registrationId])
+}
+
+model RegistrationPaymentObligation {
+  id             String                  @id @default(cuid())
+  registrationId String
+  type           PaymentObligationType
+  status         PaymentObligationStatus @default(PENDING)
+  legalBasisCode String
+  referenceNo    String?
+  amount         Decimal?                @db.Decimal(12,2)
+  note           String?
+  createdById    String
+  confirmedById  String?
+  confirmedAt    DateTime?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  registration   Registration            @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  createdBy      User                    @relation("PaymentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  confirmedBy    User?                   @relation("PaymentConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
+
+  @@index([registrationId, type, status])
 }
 
 model AuditLog {

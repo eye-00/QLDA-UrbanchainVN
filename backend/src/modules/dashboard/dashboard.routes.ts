@@ -90,7 +90,7 @@ dashboardRouter.get(
     if (user.role === "APPROVAL_AUTHORITY") {
       const [waitingApproval, approved, rejected] = await Promise.all([
         prisma.registration.count({ where: { status: "CHO_KY_CAP" } }),
-        prisma.registration.count({ where: { status: { in: ["DA_CAP", "DA_GHI_BLOCKCHAIN", "DA_TRA_KET_QUA"] } } }),
+        prisma.registration.count({ where: { status: "DA_CAP" } }),
         prisma.registration.count({ where: { status: "TU_CHOI" } })
       ]);
       return ok(res, {
@@ -102,39 +102,36 @@ dashboardRouter.get(
     }
 
     if (user.role === "TAX_OFFICER") {
-      const [pendingFinance, waitingTaxQueue, fulfilledFinance] = await Promise.all([
-        prisma.paymentObligation.count({ where: { type: "LAND_FINANCIAL_OBLIGATION", status: "PENDING" } }),
-        prisma.registration.count({ where: { status: { in: ["CHO_THUE", "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH"] } } }),
-        prisma.paymentObligation.count({ where: { type: "LAND_FINANCIAL_OBLIGATION", status: "FULFILLED" } })
+      const [waitingTax, completedTax, cancelledTax] = await Promise.all([
+        prisma.registrationPaymentObligation.count({ where: { type: "LAND_FINANCIAL_OBLIGATION", status: "PENDING" } }),
+        prisma.registrationPaymentObligation.count({ where: { type: "LAND_FINANCIAL_OBLIGATION", status: "CONFIRMED" } }),
+        prisma.registrationPaymentObligation.count({ where: { type: "LAND_FINANCIAL_OBLIGATION", status: "CANCELLED" } })
       ]);
       return ok(res, {
         role: user.role,
         summary: {
-          queue: { waitingTaxQueue },
-          payment: { pending: pendingFinance, fulfilled: fulfilledFinance }
+          obligations: { waitingTax, completedTax, cancelledTax }
         }
       });
     }
 
     if (user.role === "AUDITOR") {
-      const [auditLogs, legalTransitions, blockchainSynced] = await Promise.all([
+      const [totalAuditLogs, legalTransitionLogs, blockchainSyncLogs] = await Promise.all([
         prisma.auditLog.count(),
         prisma.auditLog.count({ where: { action: "REGISTRATION_STATUS_UPDATED" } }),
-        prisma.registration.count({ where: { status: "DA_GHI_BLOCKCHAIN" } })
+        prisma.auditLog.count({ where: { action: "REGISTRATION_BLOCKCHAIN_SYNCED" } })
       ]);
       return ok(res, {
         role: user.role,
         summary: {
-          audit: { totalLogs: auditLogs, legalTransitions, blockchainSynced }
+          audits: { totalAuditLogs, legalTransitionLogs, blockchainSyncLogs }
         }
       });
     }
 
     const [myRegistrations, myApprovedRegistrations, myTransfers, myCompletedTransfers] = await Promise.all([
       prisma.registration.count({ where: { applicantId: user.userId } }),
-      prisma.registration.count({
-        where: { applicantId: user.userId, status: { in: ["DA_CAP", "DA_GHI_BLOCKCHAIN", "DA_TRA_KET_QUA"] } }
-      }),
+      prisma.registration.count({ where: { applicantId: user.userId, status: "DA_CAP" } }),
       prisma.transferRequest.count({ where: { fromUserId: user.userId } }),
       prisma.transferRequest.count({
         where: { fromUserId: user.userId, status: "DA_DANG_KY_BIEN_DONG" }

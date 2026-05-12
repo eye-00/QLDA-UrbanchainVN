@@ -17,6 +17,7 @@ import { organizationRouter } from "./modules/organizations/organization.routes.
 import { auditRouter } from "./modules/audit/audit.routes.js";
 import { walletRouter } from "./modules/wallets/wallet.routes.js";
 import { legalRouter } from "./modules/legal/legal.routes.js";
+import { serviceWalletRouter } from "./modules/service-wallets/service-wallet.routes.js";
 
 const backendEnvPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".env");
 dotenv.config({ path: backendEnvPath });
@@ -40,6 +41,7 @@ export function createApp() {
   app.use("/api/v1/audit", auditRouter);
   app.use("/api/v1/wallets", walletRouter);
   app.use("/api/v1/legal", legalRouter);
+  app.use("/api/v1/service-wallets", serviceWalletRouter);
   app.use(notFoundHandler);
   app.use(errorHandler);
 
