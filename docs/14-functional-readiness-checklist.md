@@ -35,6 +35,15 @@ Quy ước:
 | Chuẩn hóa tiếng Việt UI | Text có dấu, nhất quán thuật ngữ | ✅ Đạt phần lớn | `frontend/src/App.tsx`, `frontend/src/styles.css`, `frontend/src/pages/*` |
 | Error envelope FE-BE | FE đọc đúng lỗi từ envelope backend | ✅ Đạt | `frontend/src/lib/api.ts`, `backend/src/lib/errors.ts` |
 
+### Technical gate update (2026-05-12)
+
+- PR technical closeout [#24](https://github.com/eye-00/QLDA-UrbanchainVN/pull/24) da merge.
+- Required checks pass: `backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`, `changes`.
+- Local smoke pass:
+  - `npm run db:migrate`
+  - `npm run db:seed`
+  - `npm test` (contracts `7/7`, backend `36/36`, frontend `37/37`).
+
 Rule chấm readiness:
 - Nếu một chức năng có trạng thái kỹ thuật `✅ Đạt` nhưng chưa có legal evidence trong ma trận traceability thì không nâng quá `⚠️ Một phần`.
 
@@ -44,17 +53,17 @@ Nguồn chuẩn: `docs/docs-legal-aligned/04-backlog-mvp.current-wallet-map-doc-
 
 | Legal item | Tiêu chí kiểm tra | Trạng thái hiện tại |
 |---|---|---|
-| `LEG-S2-001` Procedure registry + authority matrix | Có `procedureCode/legalBasis/authorityActors/requiresTaxStep` và áp vào transition | ❌ Chưa đạt |
-| `LEG-S2-002` Document versioning | Upload/thay thế tạo version mới, không ghi đè | ⚠️ Một phần |
-| `LEG-S2-003` Intake fee/payment model | Tách rõ `INTAKE_FEE` và `LAND_FINANCIAL_OBLIGATION` | ❌ Chưa đạt |
-| `LEG-S2-004` Submit snapshot | Submit khóa snapshot version tài liệu | ❌ Chưa đạt |
-| `LEG-S2-005` Transition legal guard | Transition nhạy cảm bắt buộc legal basis/reason + actor/status hợp lệ | ⚠️ Một phần |
-| `LEG-S3-001..003` Commune/Supplement/Version history | Đủ luồng legal-aligned ở UI + BE + audit | ⚠️ Một phần |
-| `LEG-S4-001` Blockchain precondition | Chỉ ghi blockchain sau `DA_CAP_NHAT_HO_SO_DIA_CHINH` | ❌ Chưa đạt |
+| `LEG-S2-001` Procedure registry + authority matrix | Có `procedureCode/legalBasis/authorityActors/requiresTaxStep` và áp vào transition | ✅ Đạt (local technical) |
+| `LEG-S2-002` Document versioning | Upload/thay thế tạo version mới, không ghi đè | ✅ Đạt (local technical) |
+| `LEG-S2-003` Intake fee/payment model | Tách rõ `INTAKE_FEE` và `LAND_FINANCIAL_OBLIGATION` | ✅ Đạt (local technical) |
+| `LEG-S2-004` Submit snapshot | Submit khóa snapshot version tài liệu | ✅ Đạt (local technical) |
+| `LEG-S2-005` Transition legal guard | Transition nhạy cảm bắt buộc legal basis/reason + actor/status hợp lệ | ✅ Đạt (local technical) |
+| `LEG-S3-001..003` Commune/Supplement/Version history | Đủ luồng legal-aligned ở UI + BE + audit | ⚠️ Một phần (cần legal closeout checklist cuối) |
+| `LEG-S4-001` Blockchain precondition | Chỉ ghi blockchain sau `DA_CAP_NHAT_HO_SO_DIA_CHINH` | ✅ Đạt (local technical) |
 
 ## Kết luận readiness theo legal baseline
 
 - Sprint 1: ✅ `Done`
-- Sprint 2: ⚠️ `Partial` (block bởi `LEG-S2-001..005`)
-- Sprint 3: ⚠️ `Partial` (phụ thuộc LEG-S2 + `LEG-S3-*`)
-- Sprint 4: ⚠️ `Partial` (block bởi `LEG-S4-001`)
+- Sprint 2: ⚠️ `Partial` (da dat local technical, chua dong legal closeout/final sign-off)
+- Sprint 3: ⚠️ `Partial` (phu thuoc legal closeout `LEG-S3-*`)
+- Sprint 4: ⚠️ `Partial` (can chot legal governance cho nhom US-565..576)

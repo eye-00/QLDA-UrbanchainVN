@@ -1,6 +1,6 @@
 # US Audit Matrix - Sprint 1, Sprint 2, Sprint 3
 
-Cập nhật: 2026-05-10 10:10:00
+Cập nhật: 2026-05-12 17:45:00
 
 ## Nguồn chuẩn dùng để audit
 
@@ -37,6 +37,19 @@ Cập nhật: 2026-05-10 10:10:00
 
 Ghi chu:
 - File nay audit Sprint 1-3; trang thai Sprint 4 duoc theo doi o backlog canonical va docs closure sprint tuong ung.
+
+## Technical gate evidence update (2026-05-12)
+
+- PR technical closeout: [#24](https://github.com/eye-00/QLDA-UrbanchainVN/pull/24) da merge vao `develop`.
+- Required checks tren PR #24 da pass: `backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`, `changes`.
+- Local smoke gate da pass:
+  - `npm run db:migrate`
+  - `npm run db:seed`
+  - `npm test` (contracts `7/7`, backend `36/36`, frontend `37/37`).
+
+Tac dong len ma tran:
+- Cac muc `Partial` do blocker compile/test va remote checks cho dot fix ky thuat da duoc go.
+- Trang thai tong Sprint 2/3 trong bang tong hop van `Partial` do legal blockers chua dong theo legal override.
 
 Legal blockers dang mo (owner phoi hop):
 
