@@ -211,11 +211,8 @@ Mot backlog item duoc xem la Done khi:
 - PR #20, #21, #22, #23 (nen Sprint 4 da merge).
 - PR #26 (S4-LGL-01): service-wallet governance + guard/legal check tại service-layer + tx lifecycle backend.
 - PR #27 (S4-LGL-02): UI ví công vụ + luồng ký xác nhận blockchain cho can bo.
-- PR #28 (S4-LGL-03): QA/docs closeout (in progress).
+- PR #28 (S4-LGL-03): QA/docs closeout (merged).
 
 ### Sprint 4 closure status
-- `Partial`: da dat legal core + frontend signing flow, cho docs closeout PR #28.
-- Dieu kien nang `Done`:
-  - PR #28 merge vao `develop`,
-  - required checks pass theo policy (`backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`),
-  - cap nhat dong bo `docs/04`, `docs/07`, `docs/08`.
+- `Done`: legal core + frontend signing flow + QA/docs closeout da merge day du.
+- Required checks tren PR #28: `backend-ci` pass, `frontend-ci` pass, `docs-check` pass (contracts-ci skip theo scope docs-only).
