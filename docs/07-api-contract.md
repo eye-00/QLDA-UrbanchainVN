@@ -13,6 +13,19 @@ Nguyên tắc:
 - blockchain chỉ trả metadata/hash/transaction cần thiết;
 - trạng thái hồ sơ phải dùng enum thống nhất.
 
+## 1.1. Legal Source Reference
+
+- Nguồn pháp lý chuẩn: [00-legal-basis-register.md](./00-legal-basis-register.md)
+- Ma trận traceability: [docs-legal-aligned/16-legal-requirement-traceability.md](./docs-legal-aligned/16-legal-requirement-traceability.md)
+
+Rule bắt buộc cho endpoint transition nhạy cảm:
+- Có `procedureCode`.
+- Có `legalBasisCode`.
+- Có `actorRole`.
+- Có `reason`.
+- Có `evidence` hoặc `evidenceIds`.
+- nếu có khác biệt giữa mô tả cũ và legal patch, ưu tiên baseline `docs/docs-legal-aligned`.
+
 ---
 
 ## 2. Quy ước kỹ thuật
@@ -69,7 +82,9 @@ Authorization: Bearer <token>
 - `RECEPTION_OFFICER`
 - `COMMUNE_OFFICER`
 - `LAND_REGISTRY_OFFICER`
+- `TAX_OFFICER`
 - `APPROVAL_AUTHORITY`
+- `AUDITOR`
 - `ADMIN`
 
 ---
@@ -430,6 +445,7 @@ Upload tài liệu hồ sơ.
 - `documentType`
 - `ownerType`
 - `ownerId`
+- `registrationId` (optional)
 
 ### Response data
 ```json
@@ -444,6 +460,10 @@ Upload tài liệu hồ sơ.
 ```
 
 `provider` cho biết backend đang upload qua `mock`, `local` hoặc `pinata`.
+
+### Khuyến nghị luồng FE
+- Luồng chuẩn cho màn công dân: **upload trước** qua `/files/upload`, nhận `fileId`, sau đó gọi `POST /registrations` với `fileIds`.
+- `documentType` do UI chọn từ catalog nghiệp vụ; backend hiện chưa ép enum cứng theo loại giấy tờ.
 
 ## 7.2. GET /files/:fileId
 Lấy metadata file.
@@ -501,6 +521,11 @@ Tạo hồ sơ đăng ký lần đầu.
 ```
 
 > Compatibility note: backend hien cho phep ca `attachedFileIds` va `fileIds` de tuong thich nguoc UI.
+
+### Business rules (attach file)
+- Với `CITIZEN`/`BUSINESS`, chỉ được đính kèm file thuộc quyền sở hữu của chính user hoặc file đã gắn registration của chính user.
+- Nếu `fileIds` chứa file không tồn tại -> trả `400`.
+- Nếu `fileIds` chứa file không thuộc quyền -> trả `403`.
 
 ### Response data
 ```json
@@ -564,6 +589,7 @@ Danh sách hồ sơ, hỗ trợ filter theo vai trò.
 - Chỉ role phù hợp mới được đổi sang trạng thái tương ứng.
 - Mọi thay đổi trạng thái phải lưu audit trail.
 - `reason` là bắt buộc với các trạng thái từ chối hoặc yêu cầu bổ sung.
+- Khi chuyển trạng thái sai workflow (`currentStatus` -> `nextStatus` không hợp lệ), API trả `409` với error envelope chuẩn.
 
 ## 8.6. POST /registrations/:registrationId/commune-confirm
 UBND cấp xã xác nhận xử lý.
@@ -622,6 +648,10 @@ Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
   "blockchainMode": "mock"
 }
 ```
+
+### Business rules
+- Chỉ cho phép đồng bộ blockchain khi hồ sơ đang ở trạng thái `DA_CAP`.
+- Nếu gọi sai trạng thái hiện tại, API trả `409` với error envelope chuẩn.
 
 ## 8.10. GET /registrations/:registrationId/notifications
 Lấy lịch sử thông báo kết quả xử lý hồ sơ theo RBAC/ownership.

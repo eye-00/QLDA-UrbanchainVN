@@ -2,10 +2,22 @@
 
 Cập nhật: 2026-05-10 10:10:00
 
+## Nguồn chuẩn dùng để audit
+
+- Canonical backlog: `docs/docs-legal-aligned/04-backlog-mvp.current-wallet-map-doc-version-signature.md`
+- Legal addendum: `docs/docs-legal-aligned/04-backlog-mvp.legal-aligned-addendum.md`
+- Khi mâu thuẫn với `docs/04-backlog-mvp.md` (546 US), ưu tiên canonical backlog ở trên.
+
 ## Quy ước đánh giá
 - `Done`: có implementation + test/evidence phù hợp + không mâu thuẫn docs/workflow.
 - `Partial`: đã có một phần hoặc pass local nhưng còn thiếu gate/evidence remote hoặc coverage acceptance chưa đủ.
 - `Missing`: chưa có dấu vết triển khai đáng tin cậy theo acceptance.
+
+## Legal evidence policy
+
+- Nguồn pháp lý chuẩn: [docs-legal-aligned/16-legal-requirement-traceability.md](./docs-legal-aligned/16-legal-requirement-traceability.md).
+- Một US/nhóm US chỉ được chấm `Done` khi có legal evidence map được tới ít nhất một hàng trong ma trận traceability.
+- Nếu chỉ pass remote checks nhưng thiếu legal proof hoặc còn `NEEDS_PM_DECISION`, trạng thái tối đa là `Partial`.
 
 ## Tổng hợp theo sprint
 
@@ -22,6 +34,9 @@ Cập nhật: 2026-05-10 10:10:00
   - Sprint 1 giu `Done` (bao gom wallet `US-547..558`).
   - Sprint 2 ha ve `Partial` do chua dat legal gates moi.
   - Sprint 3 ha ve `Partial` do chua dat legal gates moi.
+
+Ghi chu:
+- File nay audit Sprint 1-3; trang thai Sprint 4 duoc theo doi o backlog canonical va docs closure sprint tuong ung.
 
 Legal blockers dang mo (owner phoi hop):
 

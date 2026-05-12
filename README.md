@@ -33,6 +33,7 @@ prompts/     Prompts for 15 AI agents
    npm run db:push
    npm run db:seed
    ```
+   Lưu ý: `npm run db:seed` hiện reset dữ liệu test trong các bảng chính (users/org/lands/registrations/files/audit) trước khi nạp bộ dữ liệu mẫu.
    Nếu dùng migration thay vì push schema:
    ```bash
    npm run db:migrate
@@ -43,6 +44,22 @@ prompts/     Prompts for 15 AI agents
    - `npm run dev:frontend`
 
 If Docker Desktop is not running, start it before `npm run infra:up`.
+
+## Sprint 4 runtime modes (IPFS + Blockchain)
+Backend hỗ trợ 2 chế độ cho luồng ghi nhận blockchain:
+
+- `mock` (mặc định): không cần node blockchain/IPFS thật, vẫn sinh `cid/hash/txHash` để demo luồng.
+- `local`/`pinata` + `rpc`: dùng hạ tầng thật để upload IPFS và ghi nhận on-chain.
+
+Biến môi trường chính (backend):
+- `IPFS_UPLOAD_MODE`: `mock` | `local` | `pinata`
+- `IPFS_API_URL`: endpoint IPFS API (ví dụ `http://localhost:5001`)
+- `PINATA_JWT`: token Pinata khi dùng `pinata`
+- `BLOCKCHAIN_MODE`: `mock` | `rpc`
+- `RPC_URL`: RPC endpoint (localhost/sepolia)
+- `CONTRACT_ADDRESS`: địa chỉ `UrbanLandRegistry`
+- `BACKEND_WALLET_PRIVATE_KEY`: private key ví backend để gọi contract
+- `BLOCKCHAIN_DEFAULT_TOKEN_OWNER`: ví owner token mặc định (optional)
 
 ## Quality commands
 - `npm run lint`
@@ -70,10 +87,32 @@ If Docker Desktop is not running, start it before `npm run infra:up`.
   - xem danh sách hồ sơ chờ xử lý,
   - lọc theo trạng thái/từ khóa,
   - mở chi tiết hồ sơ với timeline trạng thái và thực hiện thao tác theo vai trò.
+  - xem danh sách tệp đính kèm của hồ sơ, lấy link tải và kiểm tra toàn vẹn tệp.
 - Công dân vào màn `Đăng ký lần đầu` có thể:
   - tạo hồ sơ mới,
+  - tải tài liệu hồ sơ qua `/files/upload` trước khi tạo và đính kèm `fileIds` vào payload đăng ký,
   - gửi hồ sơ từ trạng thái `MOI_TAO` hoặc `CAN_BO_SUNG`.
   - xem ghi chú cập nhật gần nhất của hồ sơ.
+
+## Tài khoản test sau khi seed
+- Mật khẩu chung cho toàn bộ tài khoản seed: `StrongPassword@123`
+- Công dân:
+  - `citizen.nguyenvana@urbanchain.vn`
+  - `citizen.tranthib@urbanchain.vn`
+- Doanh nghiệp:
+  - `business.minhphat@urbanchain.vn`
+- Cán bộ tiếp nhận:
+  - `reception.haichau@urbanchain.vn`
+- Cán bộ cấp xã:
+  - `commune.hoakhanh@urbanchain.vn`
+- Cán bộ VPĐKĐĐ:
+  - `registry.danang@urbanchain.vn`
+- Cơ quan phê duyệt:
+  - `approval.danang@urbanchain.vn`
+- Quản trị:
+  - `admin.system@urbanchain.vn`
+- Tài khoản khóa để test login guard:
+  - `citizen.locked@urbanchain.vn` (status `LOCKED`)
 
 ### Sprint 2 smoke checks (địa giới 2 cấp + Việt hóa UI)
 - Kiểm tra các màn hình `Bảng điều khiển`, `Quản lý người dùng`, `Quản lý đơn vị`, `Quản lý thửa đất`, `Tra cứu thửa đất`, `Đăng ký lần đầu` hiển thị tiếng Việt có dấu.
@@ -105,6 +144,7 @@ If Docker Desktop is not running, start it before `npm run infra:up`.
 ### Sprint 1 verification commands
 - `npm run db:generate`
 - `npm --workspace backend run test`
+- `npm --workspace backend run test -- sprint1-wallet.test.ts`
 - `npm --workspace frontend run test`
 - `npm --workspace contracts run test`
 
@@ -115,9 +155,18 @@ If Docker Desktop is not running, start it before `npm run infra:up`.
 - `POST /api/v1/auth/password/reset-confirm`
 - `POST /api/v1/auth/change-password`
 
+### Sprint 1 wallet endpoints (Epic 13)
+- `POST /api/v1/wallets/connect`
+- `POST /api/v1/wallets/:id/challenge`
+- `POST /api/v1/wallets/:id/verify`
+- `GET /api/v1/wallets/me`
+- `PATCH /api/v1/wallets/:id/default`
+
 ### Sprint 1 closure evidence (local vs remote)
 - Local evidence for US auth/test/audit:
   - `backend/test/auth-rbac.test.ts`
+  - `backend/test/sprint1-wallet.test.ts`
+  - `backend/src/modules/wallets/wallet.routes.ts`
   - `backend/src/modules/auth/auth.routes.ts`
   - `backend/src/modules/audit/audit.routes.ts`
   - `.github/workflows/ci.yml`

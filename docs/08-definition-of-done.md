@@ -1,5 +1,13 @@
 # Definition of Done
 
+## Legal Source Reference
+
+- Nguồn pháp lý chuẩn: [00-legal-basis-register.md](./00-legal-basis-register.md)
+- Ma trận traceability: [docs-legal-aligned/16-legal-requirement-traceability.md](./docs-legal-aligned/16-legal-requirement-traceability.md)
+
+Rule chấm tiến độ:
+- Không nâng `Done` cho US/LEG item nếu thiếu legal evidence tương ứng trong ma trận traceability.
+
 Mot backlog item duoc xem la Done khi:
 - Da map voi backlog ID
 - Code compile/build pass
@@ -71,7 +79,7 @@ Mot backlog item duoc xem la Done khi:
   - `README.md`
 - Backlog closure Sprint 2 co bang `Done/Partial/Missing` + evidence.
 
-## Sprint 2 Closure Note (2026-04-28, cập nhật remote gate 19:20 ICT)
+## Sprint 2 Closure Note (2026-04-28, cập nhật remote gate 19:20 ICT) — Historical Snapshot
 
 ### Co the verify local
 - Backend sprint 2 implementation va regression:
@@ -98,10 +106,10 @@ Mot backlog item duoc xem la Done khi:
 - Required checks tren PR #1 da pass: `changes`, `backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`.
 - Merge commit tren `develop`: `f211a90`.
 
-### Trang thai closure ghi nhan
-- Nhom US Sprint 2 Must+Should: `Done`.
+### Trang thai closure ghi nhan (truoc legal rebaseline)
+- Nhom US Sprint 2 Must+Should: `Done` theo snapshot cu.
 
-## Sprint 3 Phase 1 Gate (Registration core)
+## Sprint 3 Phase 1 Gate (Registration core) — Historical Snapshot
 - Data + API core da duoc mo:
   - `POST /registrations`
   - `POST /registrations/:id/submit`
@@ -120,7 +128,7 @@ Mot backlog item duoc xem la Done khi:
   - `npm --workspace backend run test -- auth-rbac.test.ts`
 - Trang thai phase: `Done` (da co implementation + test + remote gate evidence tren PR #4).
 
-## Sprint 3 Phase 2 Gate (Registration review UI)
+## Sprint 3 Phase 2 Gate (Registration review UI) — Historical Snapshot
 - Frontend officer review scope da co:
   - [frontend/src/pages/RegistrationReviewPage.tsx](../frontend/src/pages/RegistrationReviewPage.tsx)
   - [frontend/src/pages/CitizenRegistrationPage.tsx](../frontend/src/pages/CitizenRegistrationPage.tsx)
@@ -147,6 +155,7 @@ Sau khi doi soat theo bo tai lieu `docs/docs-legal-aligned`, trang thai sprint d
 - Sprint 1: `Done` (giu nguyen, bao gom wallet `US-547..558`).
 - Sprint 2: `Partial` (chua dat day du legal gates moi).
 - Sprint 3: `Partial` (chua dat day du legal gates moi).
+- Sprint 4: `Partial` (chua dat legal gate `LEG-S4-001`).
 
 Legal gaps bat buoc phai dong truoc khi nang lai `Done` cho Sprint 2/3:
 
@@ -159,6 +168,7 @@ Legal gaps bat buoc phai dong truoc khi nang lai `Done` cho Sprint 2/3:
 Luu y:
 - Ket luan rebaseline nay uu tien hon cac closure snapshot cu trong tai lieu.
 - Remote gate pass khong du de danh dau `Done` neu legal gates chua dat.
+- Cac section "closure snapshot" cu (neu co) chi de truy vet lich su, khong dung de chot trang thai hien tai.
 
 ## Sprint 1-2-3 US Audit Note (2026-04-29)
 - Bao cao chi tiet tung US: [docs/12-us-audit-sprint1-3.md](./12-us-audit-sprint1-3.md).

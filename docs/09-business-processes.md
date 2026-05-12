@@ -30,6 +30,26 @@ Các nguyên tắc bắt buộc:
 
 5. **Mọi thao tác quan trọng phải có audit log.**
 
+### Legal Source Reference
+
+- Nguồn pháp lý chuẩn: [00-legal-basis-register.md](./00-legal-basis-register.md)
+- Ma trận traceability: [docs-legal-aligned/16-legal-requirement-traceability.md](./docs-legal-aligned/16-legal-requirement-traceability.md)
+
+Rule triển khai nghiệp vụ:
+- Actor phải đúng theo phân định thẩm quyền 2 cấp.
+- Phí/lệ phí tiếp nhận và nghĩa vụ tài chính phải tách ở off-chain.
+- Chỉ ghi blockchain sau khi bước cập nhật hồ sơ địa chính/CSDL đất đai đã hợp lệ.
+
+### Legal override rule (2026-05-10)
+
+- Nguồn pháp lý chuẩn: `docs/docs-legal-aligned/*`.
+- Nếu nội dung mô tả workflow cũ (English states) mâu thuẫn với state machine legal-aligned, ưu tiên state machine legal-aligned trong phụ lục của tài liệu này và trong `docs/05-workflow-land-law.md`.
+- Trạng thái triển khai hiện tại theo legal baseline:
+  - Sprint 1: `Done`
+  - Sprint 2: `Partial` (còn `LEG-S2-001..005`)
+  - Sprint 3: `Partial` (phụ thuộc LEG-S2 + `LEG-S3-*`)
+  - Sprint 4: `Partial` (còn `LEG-S4-001`)
+
 ---
 
 ## 2. Tác nhân nghiệp vụ
@@ -91,21 +111,26 @@ Người dân nộp hồ sơ đăng ký đất đai lần đầu. Hệ thống h
 ### 3.4. State machine
 
 ```text
-DRAFT
-  -> SUBMITTED
-  -> INTAKE_REVIEW
-  -> SUPPLEMENT_REQUIRED
-  -> SUBMITTED
-  -> COMMUNE_CONFIRMATION
-  -> LAND_OFFICE_REVIEW
-  -> TAX_PENDING
-  -> TAX_COMPLETED
-  -> APPROVED
-  -> BLOCKCHAIN_RECORDED
-  -> COMPLETED
+MOI_TAO
+  -> CHO_TIEP_NHAN
+  -> CAN_BO_SUNG
+  -> CHO_TIEP_NHAN
+  -> DA_TIEP_NHAN
+  -> CHO_XAC_NHAN_CAP_XA
+  -> DA_XAC_NHAN_CAP_XA
+  -> DANG_THAM_DINH_VPDKDD
+  -> CHO_THUE
+  -> CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH
+  -> DA_HOAN_THANH_NGHIA_VU_TAI_CHINH
+  -> CHO_KY_CAP
+  -> DA_KY_CAP
+  -> DA_CAP
+  -> DA_CAP_NHAT_HO_SO_DIA_CHINH
+  -> DA_GHI_BLOCKCHAIN
+  -> DA_TRA_KET_QUA
 
-REJECTED
-CANCELLED
+TU_CHOI
+HUY_HO_SO
 ```
 
 ### 3.5. PlantUML tham khảo

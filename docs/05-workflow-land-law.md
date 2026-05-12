@@ -13,6 +13,15 @@ Mục tiêu của UrbanChain-VN là **mô phỏng số hóa quy trình đất đ
 - blockchain/IPFS chỉ hỗ trợ lưu vết, truy xuất và kiểm chứng dữ liệu số;
 - hồ sơ địa chính và cơ sở dữ liệu đất đai chính thức vẫn là nguồn dữ liệu pháp lý trung tâm.
 
+## 1.1. Legal Source Reference
+
+- Nguồn pháp lý chuẩn: [00-legal-basis-register.md](./00-legal-basis-register.md)
+- Ma trận traceability: [docs-legal-aligned/16-legal-requirement-traceability.md](./docs-legal-aligned/16-legal-requirement-traceability.md)
+
+Khi có mâu thuẫn tài liệu:
+- Ưu tiên bộ `docs/docs-legal-aligned/*` và ma trận traceability.
+- Snapshot closure cũ chỉ dùng truy vết, không dùng làm nguồn chốt trạng thái hiện tại.
+
 ---
 
 ## 2. Các nguyên tắc nghiệp vụ bắt buộc

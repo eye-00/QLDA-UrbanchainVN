@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { apiGet, apiPatch, apiPost } from '../lib/api';
+import { useNavigate } from 'react-router-dom';
+import { apiGet, apiPost } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { loadCommuneOptionsByProvince, loadProvinceOptions, type CommuneOption, type ProvinceOption } from '../lib/vnAddress';
 import { useToast } from '../ui/ToastContext';
@@ -58,19 +59,17 @@ type LocationMode = 'api' | 'manual';
 export function LandManagementPage() {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const [items, setItems] = useState<LandItem[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [createForm, setCreateForm] = useState(initialCreateForm);
   const [filterForm, setFilterForm] = useState(initialFilterForm);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState(initialCreateForm);
   const [locationMode, setLocationMode] = useState<LocationMode>('api');
   const [locationNotice, setLocationNotice] = useState('');
   const [provinceOptions, setProvinceOptions] = useState<ProvinceOption[]>([]);
   const [createCommuneOptions, setCreateCommuneOptions] = useState<CommuneOption[]>([]);
   const [filterCommuneOptions, setFilterCommuneOptions] = useState<CommuneOption[]>([]);
-  const [editCommuneOptions, setEditCommuneOptions] = useState<CommuneOption[]>([]);
 
   const queryString = useMemo(() => buildLandQueryString(filterForm), [filterForm]);
   const provinceLabelMap = useMemo(() => {
@@ -104,19 +103,6 @@ export function LandManagementPage() {
     try {
       const communes = await loadCommuneOptionsByProvince(provinceCode);
       setFilterCommuneOptions(communes);
-    } catch {
-      switchToManualLocation('Không tải được danh mục địa giới. Hệ thống chuyển sang nhập tay.');
-    }
-  }
-
-  async function loadCommunesForEdit(provinceCode: string) {
-    if (!provinceCode || locationMode !== 'api') {
-      setEditCommuneOptions([]);
-      return;
-    }
-    try {
-      const communes = await loadCommuneOptionsByProvince(provinceCode);
-      setEditCommuneOptions(communes);
     } catch {
       switchToManualLocation('Không tải được danh mục địa giới. Hệ thống chuyển sang nhập tay.');
     }
@@ -175,41 +161,6 @@ export function LandManagementPage() {
     }
   }
 
-  function startEdit(item: LandItem) {
-    setEditId(item.id);
-    setEditForm({
-      parcelCode: item.parcelCode,
-      provinceCode: item.provinceCode,
-      communeName: item.communeName,
-      mapSheetNumber: item.mapSheetNumber,
-      parcelNumber: item.parcelNumber,
-      area: String(item.area),
-      landUsePurpose: item.landUsePurpose,
-      address: item.address,
-      ownerUserId: item.ownerUserId ?? ''
-    });
-    if (locationMode === 'api') {
-      void loadCommunesForEdit(item.provinceCode);
-    }
-  }
-
-  async function onUpdate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!editId) return;
-    setLoading(true);
-    try {
-      await apiPatch(`/lands/${editId}`, buildLandPayload(editForm));
-      showToast('success', 'Đã cập nhật thửa đất');
-      setEditId(null);
-      setEditCommuneOptions([]);
-      await loadLands();
-    } catch (error) {
-      showToast('error', error instanceof Error ? error.message : 'Không cập nhật được thửa đất');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function onCreateProvinceChange(provinceCode: string) {
     setCreateForm({ ...createForm, provinceCode, communeName: '' });
     await loadCommunesForCreate(provinceCode);
@@ -218,11 +169,6 @@ export function LandManagementPage() {
   async function onFilterProvinceChange(provinceCode: string) {
     setFilterForm({ ...filterForm, provinceCode, communeName: '' });
     await loadCommunesForFilter(provinceCode);
-  }
-
-  async function onEditProvinceChange(provinceCode: string) {
-    setEditForm({ ...editForm, provinceCode, communeName: '' });
-    await loadCommunesForEdit(provinceCode);
   }
 
   const canUseCatalog = locationMode === 'api' && provinceOptions.length > 0;
@@ -463,7 +409,12 @@ export function LandManagementPage() {
                     <td>{item.landUsePurpose}</td>
                     <td>{item.owner ? `${item.owner.fullName} (${item.owner.email})` : 'Chưa gán'}</td>
                     <td>
-                      <button type="button" className="btn btn-outline" onClick={() => startEdit(item)} disabled={loading}>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => navigate(`/lands/${item.id}/edit`)}
+                        disabled={loading}
+                      >
                         Cập nhật
                       </button>
                     </td>
@@ -473,140 +424,6 @@ export function LandManagementPage() {
             </table>
           </div>
         </div>
-      )}
-
-      {editId && (
-        <form className="card form-grid-4" onSubmit={onUpdate}>
-          <h3>Cập nhật thửa đất</h3>
-          <label>
-            Mã thửa
-            <input
-              value={editForm.parcelCode}
-              onChange={(event) => setEditForm({ ...editForm, parcelCode: event.target.value })}
-              required
-            />
-          </label>
-          {canUseCatalog ? (
-            <>
-              <label>
-                Tỉnh/Thành phố
-                <select
-                  value={editForm.provinceCode}
-                  onChange={(event) => void onEditProvinceChange(event.target.value)}
-                  required
-                >
-                  <option value="">Chọn Tỉnh/Thành phố</option>
-                  {provinceOptions.map((item) => (
-                    <option key={item.code} value={item.code}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Xã/Phường/Đặc khu
-                <select
-                  value={editForm.communeName}
-                  onChange={(event) => setEditForm({ ...editForm, communeName: event.target.value })}
-                  required
-                  disabled={!editForm.provinceCode}
-                >
-                  <option value="">
-                    {editForm.provinceCode ? 'Chọn Xã/Phường/Đặc khu' : 'Chọn Tỉnh/Thành phố trước'}
-                  </option>
-                  {editCommuneOptions.map((item) => (
-                    <option key={item.code} value={item.name}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </>
-          ) : (
-            <>
-              <label>
-                Tỉnh/Thành phố
-                <input
-                  value={editForm.provinceCode}
-                  onChange={(event) => setEditForm({ ...editForm, provinceCode: event.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                Xã/Phường/Đặc khu
-                <input
-                  value={editForm.communeName}
-                  onChange={(event) => setEditForm({ ...editForm, communeName: event.target.value })}
-                  required
-                />
-              </label>
-            </>
-          )}
-          <label>
-            Số tờ
-            <input
-              value={editForm.mapSheetNumber}
-              onChange={(event) => setEditForm({ ...editForm, mapSheetNumber: event.target.value })}
-              required
-            />
-          </label>
-          <label>
-            Số thửa
-            <input
-              value={editForm.parcelNumber}
-              onChange={(event) => setEditForm({ ...editForm, parcelNumber: event.target.value })}
-              required
-            />
-          </label>
-          <label>
-            Diện tích (m²)
-            <input
-              value={editForm.area}
-              onChange={(event) => setEditForm({ ...editForm, area: event.target.value })}
-              required
-            />
-          </label>
-          <label>
-            Mục đích sử dụng đất
-            <input
-              value={editForm.landUsePurpose}
-              onChange={(event) => setEditForm({ ...editForm, landUsePurpose: event.target.value })}
-              required
-            />
-          </label>
-          <label>
-            Địa chỉ thửa đất
-            <input
-              value={editForm.address}
-              onChange={(event) => setEditForm({ ...editForm, address: event.target.value })}
-              required
-            />
-          </label>
-          {user?.role === 'ADMIN' && (
-            <label>
-              Chủ sử dụng
-              <select
-                value={editForm.ownerUserId}
-                onChange={(event) => setEditForm({ ...editForm, ownerUserId: event.target.value })}
-              >
-                <option value="">Không gán</option>
-                {users.map((item) => (
-                  <option key={item.userId} value={item.userId}>
-                    {item.fullName} ({item.email})
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <div className="action-row">
-            <button type="submit" disabled={loading}>
-              Lưu thay đổi
-            </button>
-            <button type="button" onClick={() => setEditId(null)} disabled={loading}>
-              Hủy
-            </button>
-          </div>
-        </form>
       )}
     </section>
   );

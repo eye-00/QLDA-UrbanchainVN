@@ -1,5 +1,12 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { apiGet, apiPost } from '../lib/api';
+import {
+  DOCUMENT_TYPE_OPTIONS,
+  type UploadedFileItem,
+  shortValue,
+  uploadRegistrationFile
+} from '../lib/files';
 import { useToast } from '../ui/ToastContext';
 import { getRegistrationStatusBadgeClass, getRegistrationStatusLabel } from '../ui/registrationStatus';
 import { loadCommuneOptionsByProvince, loadProvinceOptions, type CommuneOption, type ProvinceOption } from '../lib/vnAddress';
@@ -31,6 +38,12 @@ type CreateRegistrationResponse = {
   status: string;
 };
 
+type UploadDraft = {
+  id: string;
+  documentType: string;
+  file: File | null;
+};
+
 const initialForm = {
   fullName: 'Nguyễn Văn A',
   identityNumber: '0482xxxxxxx',
@@ -45,6 +58,18 @@ const initialForm = {
 
 type LocationMode = 'api' | 'manual';
 
+function makeDraftId() {
+  return `upload-draft-${Date.now()}-${Math.round(Math.random() * 10000)}`;
+}
+
+function makeUploadDraft(): UploadDraft {
+  return {
+    id: makeDraftId(),
+    documentType: DOCUMENT_TYPE_OPTIONS[0].value,
+    file: null
+  };
+}
+
 export function CitizenRegistrationPage() {
   const { showToast } = useToast();
   const [form, setForm] = useState(initialForm);
@@ -54,6 +79,9 @@ export function CitizenRegistrationPage() {
   const [locationNotice, setLocationNotice] = useState('');
   const [provinceOptions, setProvinceOptions] = useState<ProvinceOption[]>([]);
   const [communeOptions, setCommuneOptions] = useState<CommuneOption[]>([]);
+  const [uploadDrafts, setUploadDrafts] = useState<UploadDraft[]>([makeUploadDraft()]);
+  const [uploadingDraftId, setUploadingDraftId] = useState<string | null>(null);
+  const [attachedFiles, setAttachedFiles] = useState<UploadedFileItem[]>([]);
 
   async function loadRegistrations() {
     try {
@@ -97,10 +125,53 @@ export function CitizenRegistrationPage() {
     void Promise.all([loadRegistrations(), loadLocationCatalog()]);
   }, []);
 
+  function updateUploadDraft(draftId: string, patch: Partial<UploadDraft>) {
+    setUploadDrafts((prev) => prev.map((item) => (item.id === draftId ? { ...item, ...patch } : item)));
+  }
+
+  function removeUploadDraft(draftId: string) {
+    setUploadDrafts((prev) => {
+      if (prev.length === 1) return prev;
+      return prev.filter((item) => item.id !== draftId);
+    });
+  }
+
+  function addUploadDraft() {
+    setUploadDrafts((prev) => [...prev, makeUploadDraft()]);
+  }
+
+  async function onUploadDraft(draftId: string) {
+    const draft = uploadDrafts.find((item) => item.id === draftId);
+    if (!draft?.file) {
+      showToast('error', 'Vui lòng chọn tệp trước khi tải lên.');
+      return;
+    }
+
+    setUploadingDraftId(draftId);
+    try {
+      const uploaded = await uploadRegistrationFile(draft.file, draft.documentType);
+      setAttachedFiles((prev) => [uploaded, ...prev]);
+      updateUploadDraft(draftId, { file: null });
+      showToast('success', `Đã tải tệp ${uploaded.originalName} lên IPFS.`);
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Tải tệp thất bại.');
+    } finally {
+      setUploadingDraftId(null);
+    }
+  }
+
+  function removeAttachedFile(fileId: string) {
+    setAttachedFiles((prev) => prev.filter((item) => item.id !== fileId));
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     try {
+      if (attachedFiles.length === 0) {
+        showToast('error', 'Bạn chưa đính kèm tài liệu. Vẫn có thể tạo hồ sơ và bổ sung sau.');
+      }
+
       const payload = {
         landInfo: {
           provinceCode: form.provinceCode,
@@ -116,10 +187,12 @@ export function CitizenRegistrationPage() {
           fullName: form.fullName,
           identityNumber: form.identityNumber
         },
-        fileIds: []
+        fileIds: attachedFiles.map((item) => item.id)
       };
       const data = await apiPost<CreateRegistrationResponse>('/registrations', payload);
       showToast('success', `Đã tạo hồ sơ ${data.registrationCode} (${getRegistrationStatusLabel(data.status)})`);
+      setAttachedFiles([]);
+      setUploadDrafts([makeUploadDraft()]);
       await loadRegistrations();
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Tạo hồ sơ thất bại');
@@ -149,12 +222,20 @@ export function CitizenRegistrationPage() {
         <div>
           <h2>Nộp hồ sơ đăng ký đất đai lần đầu</h2>
           <p className="section-subtitle">
-            Khai báo thông tin thửa đất theo địa giới 2 cấp và theo dõi trạng thái hồ sơ sau khi nộp.
+            Khai báo thông tin thửa đất theo địa giới 2 cấp, tải tài liệu hồ sơ và theo dõi trạng thái xử lý.
           </p>
+        </div>
+        <div className="action-row action-row-nowrap">
+          <Link to="/wallets" className="btn-link btn-link-outline">
+            Quản lý ví
+          </Link>
+          <button type="submit" form="citizen-registration-form" disabled={loading}>
+            {loading ? 'Đang tạo...' : 'Tạo hồ sơ'}
+          </button>
         </div>
       </div>
       {locationNotice && <p className="notice">{locationNotice}</p>}
-      <form onSubmit={onSubmit} className="card form-grid">
+      <form id="citizen-registration-form" onSubmit={onSubmit} className="card form-grid form-grid-fluid">
         <label>Họ tên người sử dụng đất
           <input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
         </label>
@@ -213,11 +294,111 @@ export function CitizenRegistrationPage() {
             </label>
           </>
         )}
-        <label>Địa chỉ thửa đất
+        <label className="field-span-2">Địa chỉ thửa đất
           <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
         </label>
-        <button type="submit" disabled={loading}>{loading ? 'Đang tạo...' : 'Tạo hồ sơ'}</button>
       </form>
+
+      <div className="card row-gap">
+        <div className="section-header">
+          <div>
+            <h3>Tài liệu hồ sơ</h3>
+            <p className="section-subtitle">Các loại giấy tờ bên dưới đều tùy chọn, bạn có thể tải lên từng tệp trước khi tạo hồ sơ.</p>
+          </div>
+          <button type="button" className="btn btn-outline" onClick={addUploadDraft}>
+            Thêm dòng tải tệp
+          </button>
+        </div>
+
+        {uploadDrafts.map((draft) => (
+          <div className="form-grid-4" key={draft.id}>
+            <label>
+              Loại giấy tờ
+              <select
+                value={draft.documentType}
+                onChange={(event) => updateUploadDraft(draft.id, { documentType: event.target.value })}
+              >
+                {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                  <option value={option.value} key={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Tệp đính kèm
+              <input
+                type="file"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  updateUploadDraft(draft.id, { file });
+                }}
+              />
+            </label>
+            <div className="row-gap">
+              <span className="muted">Tệp đã chọn</span>
+              <strong>{draft.file?.name ?? 'Chưa chọn tệp'}</strong>
+            </div>
+            <div className="action-row">
+              <button
+                type="button"
+                onClick={() => void onUploadDraft(draft.id)}
+                disabled={loading || uploadingDraftId === draft.id}
+              >
+                {uploadingDraftId === draft.id ? 'Đang tải...' : 'Tải tệp'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline"
+                disabled={uploadDrafts.length === 1 || loading || uploadingDraftId === draft.id}
+                onClick={() => removeUploadDraft(draft.id)}
+              >
+                Xóa dòng
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {attachedFiles.length === 0 ? (
+          <div className="empty-state">Chưa có tài liệu nào được đính kèm vào hồ sơ.</div>
+        ) : (
+          <div className="data-table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Tên tệp</th>
+                  <th>Loại giấy tờ</th>
+                  <th>Trạng thái</th>
+                  <th>CID</th>
+                  <th>Hash</th>
+                  <th>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {attachedFiles.map((file) => (
+                  <tr key={file.id}>
+                    <td>{file.originalName}</td>
+                    <td>{file.documentType}</td>
+                    <td>{file.storageStatus}</td>
+                    <td className="muted">{shortValue(file.cid)}</td>
+                    <td className="muted">{shortValue(file.hash)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => removeAttachedFile(file.id)}
+                        disabled={loading}
+                      >
+                        Gỡ khỏi hồ sơ
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="section-header">
         <h3>Danh sách hồ sơ đã tạo</h3>
@@ -290,3 +471,4 @@ export function CitizenRegistrationPage() {
     </section>
   );
 }
+

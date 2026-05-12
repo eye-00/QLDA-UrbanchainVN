@@ -6,7 +6,7 @@ import { prisma } from "../../lib/prisma.js";
 import { ok } from "../../lib/response.js";
 import { requireAuth, requireRoles } from "../auth/auth.middleware.js";
 
-const AUDIT_VIEW_ROLES: UserRole[] = ["LAND_REGISTRY_OFFICER", "ADMIN"];
+const AUDIT_VIEW_ROLES: UserRole[] = ["LAND_REGISTRY_OFFICER", "TAX_OFFICER", "AUDITOR", "ADMIN"];
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -80,7 +80,8 @@ auditRouter.get(
       { action: { startsWith: "REGISTRATION_" } },
       { action: { startsWith: "TRANSFER_" } },
       { action: { startsWith: "FILE_" } },
-      { action: { startsWith: "AUTH_PASSWORD_" } }
+      { action: { startsWith: "AUTH_PASSWORD_" } },
+      { action: { startsWith: "WALLET_" } }
     ];
     if (parsed.data.action) where.action = { contains: parsed.data.action };
     return ok(res, await fetchAuditLogs(parsed.data, where));

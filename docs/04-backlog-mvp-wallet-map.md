@@ -1,4 +1,4 @@
-# 04-backlog-mvp.md
+# 04-backlog-mvp-wallet-map.md
 
 > Bản backlog MVP đã được đồng bộ theo file Excel `Project15_sprint.xlsx` và bổ sung Epic 13 về quản lý ví blockchain.
 
@@ -20,6 +20,17 @@
 - Sheet `Tong Quan Sprint`: mục tiêu và số lượng backlog theo sprint.
 - Sheet `S1` đến `S8`: sprint backlog chi tiết.
 - Phần bổ sung theo yêu cầu mới: **Epic 13: Quản lý ví blockchain**, gồm `US-547` đến `US-588`.
+
+## 1.1. Source of Truth và Legal Override Rule
+
+Nguồn chuẩn để điều phối và chấm tiến độ hiện tại:
+
+1. `docs/docs-legal-aligned/04-backlog-mvp.current-wallet-map-doc-version-signature.md`
+2. `docs/docs-legal-aligned/04-backlog-mvp.legal-aligned-addendum.md`
+
+Quy tắc override:
+- Khi có mâu thuẫn giữa file này với `docs/04-backlog-mvp.md` (bản 546 US cũ), ưu tiên file này và bộ `docs-legal-aligned`.
+- `docs/04-backlog-mvp.md` được giữ làm lịch sử tham chiếu, không dùng làm nguồn chấm tiến độ hiện tại.
 
 > Ghi chú: Mã user story trong từng sprint không nhất thiết liên tục, vì Excel đã phân bổ một số nhóm QA, DevOps, documentation và compliance vào các sprint phù hợp theo tiến độ triển khai.
 
@@ -45,6 +56,7 @@ Theo bo tai lieu `docs/docs-legal-aligned`, trang thai closure sprint duoc cap n
 | Sprint 1 | Done | Done | Da dat full gate va wallet `US-547..558` da merge + smoke test. |
 | Sprint 2 | Done | Partial | Chua dat legal gates moi (procedure registry, versioning/snapshot, payment model, transition guard). |
 | Sprint 3 | Done | Partial | Phu thuoc legal gates Sprint 2 + chua khoa blockchain precondition/legal states day du. |
+| Sprint 4 | In Progress | Partial | Chua dat legal gate `LEG-S4-001` (precondition off-chain hop le truoc ghi chain). |
 
 ### Legal gap table (owner + remediation)
 
@@ -57,6 +69,23 @@ Theo bo tai lieu `docs/docs-legal-aligned`, trang thai closure sprint duoc cap n
 | Blockchain precondition guard | Chua khoa gate "chi ghi blockchain sau cap nhat ho so dia chinh hop le" | `LEG-S4-001`, `LEG-S7-001` | AI_04 + AI_02 + AI_15 | P0 |
 
 > Ghi chu: Cac closure snapshot cu ben duoi giu lai de truy vet lich su; khi xung dot, uu tien ket luan theo section legal rebaseline nay.
+
+### Legal backlog injection (canonical)
+
+| Backlog legal item | Sprint | Mô tả ngắn |
+|---|---|---|
+| `LEG-S2-001` | Sprint 2 | Legal Procedure Registry + authority matrix |
+| `LEG-S2-002` | Sprint 2 | Document versioning |
+| `LEG-S2-003` | Sprint 2 | Intake fee flag (`INTAKE_FEE`) |
+| `LEG-S2-004` | Sprint 2 | Submit snapshot khóa phiên bản tài liệu |
+| `LEG-S2-005` | Sprint 2 | Transition bắt buộc legal basis/reason |
+| `LEG-S3-001` | Sprint 3 | Commune confirmation legal-aligned |
+| `LEG-S3-002` | Sprint 3 | Supplement request có danh mục thiếu + deadline |
+| `LEG-S3-003` | Sprint 3 | Document version history timeline |
+| `LEG-S4-001` | Sprint 4 | Chỉ ghi blockchain sau cập nhật hồ sơ địa chính off-chain |
+| `LEG-S5-001` | Sprint 5 | Payment obligation off-chain model |
+| `LEG-S5-002` | Sprint 5 | Map legal source (`source_type`) |
+| `LEG-S7-001` | Sprint 7 | On-chain evidence only (hash/CID/tx, không PII) |
 
 ## 3. Tổng hợp theo mức ưu tiên
 
@@ -119,6 +148,8 @@ Mỗi dòng backlog giữ đúng cấu trúc từ Excel:
 - **Sprint đề xuất**: sprint triển khai.
 
 ## 7. Sprint backlog chi tiết
+
+> Lưu ý: các snapshot closure lịch sử bên dưới giữ để truy vết; trạng thái chốt hiện tại phải đọc theo `2.1 Legal rebaseline snapshot`.
 
 ## Sprint 1
 

@@ -3,12 +3,13 @@ import multer from "multer";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
 import { asyncHandler, badRequestError, forbiddenError, notFoundError } from "../../lib/errors.js";
+import { uploadToIpfs } from "../../lib/ipfs.js";
 import { created, ok } from "../../lib/response.js";
 import { prisma } from "../../lib/prisma.js";
 import { demoStore } from "../../lib/store/demo-store.js";
 import { AUTH_ROLES, requireAuth, requireRoles, type AuthenticatedRequest } from "../auth/auth.middleware.js";
 
-const upload = multer({ dest: "tmp/uploads" });
+const upload = multer({ storage: multer.memoryStorage() });
 export const fileRouter = Router();
 
 const uploadSchema = z.object({
@@ -56,7 +57,14 @@ fileRouter.post(
     if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
-    const originalName = req.file?.originalname ?? req.body.originalName ?? "document.bin";
+    if (!req.file?.buffer) throw badRequestError("Thiếu tệp tải lên");
+
+    const originalName = req.file.originalname ?? req.body.originalName ?? "document.bin";
+    const uploadResult = await uploadToIpfs({
+      buffer: req.file.buffer,
+      fileName: originalName,
+      contentType: req.file.mimetype
+    });
 
     if (parsed.data.registrationId) {
       const registration = await prisma.registration.findUnique({ where: { id: parsed.data.registrationId } });
@@ -70,8 +78,8 @@ fileRouter.post(
         documentType: parsed.data.documentType,
         originalName,
         storageStatus: "UPLOADED_IPFS",
-        cid: `bafy-upload-${Date.now()}`,
-        hash: `0x${Date.now().toString(16)}file`,
+        cid: uploadResult.cid,
+        hash: uploadResult.hash,
         registrationId: parsed.data.registrationId
       }
     });
@@ -84,7 +92,8 @@ fileRouter.post(
       payload: {
         documentType: createdFile.documentType,
         storageStatus: createdFile.storageStatus,
-        registrationId: createdFile.registrationId ?? null
+        registrationId: createdFile.registrationId ?? null,
+        provider: uploadResult.provider
       }
     });
 
@@ -96,7 +105,8 @@ fileRouter.post(
         documentType: createdFile.documentType,
         storageStatus: createdFile.storageStatus,
         cid: createdFile.cid,
-        hash: createdFile.hash
+        hash: createdFile.hash,
+        provider: uploadResult.provider
       },
       "Đã tải tệp và lưu metadata IPFS thành công"
     );

@@ -15,7 +15,9 @@ const roleSchema = z.enum([
   "RECEPTION_OFFICER",
   "COMMUNE_OFFICER",
   "LAND_REGISTRY_OFFICER",
+  "TAX_OFFICER",
   "APPROVAL_AUTHORITY",
+  "AUDITOR",
   "ADMIN"
 ]);
 const selfRegisterRoleSchema = z.enum(["CITIZEN", "BUSINESS"]);

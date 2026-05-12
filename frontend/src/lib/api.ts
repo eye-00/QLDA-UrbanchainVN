@@ -52,6 +52,13 @@ export function apiPost<T>(path: string, body: unknown): Promise<T> {
   });
 }
 
+export function apiPostFormData<T>(path: string, formData: FormData): Promise<T> {
+  return request<T>(path, {
+    method: 'POST',
+    body: formData
+  });
+}
+
 export function apiPatch<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, {
     method: 'PATCH',

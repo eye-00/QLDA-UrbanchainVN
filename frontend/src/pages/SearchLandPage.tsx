@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { apiGet } from '../lib/api';
 import { loadProvinceOptions, type ProvinceOption } from '../lib/vnAddress';
+import { useAuth } from '../auth/AuthContext';
+import { CITIZEN_ROLES, type UserRole } from '../auth/roles';
 
 type LandItem = {
   id: string;
@@ -20,7 +22,16 @@ type SearchResult = {
   total: number;
 };
 
+export function formatOwnerDisplay(owner: LandItem['owner'], role: UserRole | undefined) {
+  if (!owner) return 'Chưa gán';
+  if (role && CITIZEN_ROLES.includes(role)) {
+    return `${owner.fullName} (Email ẩn theo phân quyền)`;
+  }
+  return `${owner.fullName} (${owner.email})`;
+}
+
 export function SearchLandPage() {
+  const { user } = useAuth();
   const [query, setQuery] = useState('');
   const [result, setResult] = useState<SearchResult | null>(null);
   const [message, setMessage] = useState('');
@@ -88,7 +99,7 @@ export function SearchLandPage() {
                     <td>{item.mapSheetNumber} / {item.parcelNumber}</td>
                     <td>{item.area} m²</td>
                     <td>{item.landUsePurpose}</td>
-                    <td>{item.owner ? `${item.owner.fullName} (${item.owner.email})` : 'Chưa gán'}</td>
+                    <td>{formatOwnerDisplay(item.owner, user?.role)}</td>
                   </tr>
                 ))}
               </tbody>

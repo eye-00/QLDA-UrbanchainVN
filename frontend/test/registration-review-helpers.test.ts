@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildRegistrationReviewQuery,
+  getAllowedReviewActionsByStatus,
   getReviewPermissions,
   getReviewStepsByStatus,
+  isActionAllowedForStatus,
   isBlockchainSyncReady,
   isTaxTransferReady,
-  requiresActionNote
+  requiresActionNote,
+  toBlockchainDisplayValue
 } from '../src/pages/registrationReviewHelpers';
 
 describe('registration review helpers', () => {
@@ -29,6 +32,8 @@ describe('registration review helpers', () => {
     expect(getReviewPermissions('RECEPTION_OFFICER').canAccept).toBe(true);
     expect(getReviewPermissions('RECEPTION_OFFICER').canApprove).toBe(false);
     expect(getReviewPermissions('LAND_REGISTRY_OFFICER').canTaxTransfer).toBe(true);
+    expect(getReviewPermissions('TAX_OFFICER').canTaxTransfer).toBe(true);
+    expect(getReviewPermissions('LAND_REGISTRY_OFFICER').canCadastralUpdate).toBe(true);
     expect(getReviewPermissions('APPROVAL_AUTHORITY').canBlockchainSync).toBe(true);
     expect(getReviewPermissions('CITIZEN').canAccept).toBe(false);
     expect(getReviewPermissions('ADMIN').canApprove).toBe(true);
@@ -41,5 +46,27 @@ describe('registration review helpers', () => {
     const approved = getReviewStepsByStatus('DA_CAP');
     expect(approved[6].state).toBe('current');
     expect(approved[0].state).toBe('done');
+  });
+
+  it('maps status to allowed actions', () => {
+    expect(isActionAllowedForStatus('accept', 'CHO_TIEP_NHAN')).toBe(true);
+    expect(isActionAllowedForStatus('approve', 'CHO_TIEP_NHAN')).toBe(false);
+    expect(isActionAllowedForStatus('approve', 'CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH')).toBe(true);
+    expect(isActionAllowedForStatus('cadastralUpdate', 'DA_KY_CAP')).toBe(true);
+    expect(isActionAllowedForStatus('blockchainSync', 'DA_CAP_NHAT_HO_SO_DIA_CHINH')).toBe(true);
+    expect(isActionAllowedForStatus('blockchainSync', 'DA_CAP')).toBe(false);
+    expect(isActionAllowedForStatus('blockchainSync', 'CHO_KY_CAP')).toBe(false);
+
+    expect(getAllowedReviewActionsByStatus('DA_XAC_NHAN_CAP_XA')).toContain('taxTransfer');
+    expect(getAllowedReviewActionsByStatus('DA_XAC_NHAN_CAP_XA')).toContain('requestSupplement');
+    expect(getAllowedReviewActionsByStatus('DA_XAC_NHAN_CAP_XA')).not.toContain('approve');
+  });
+
+  it('formats blockchain display values with fallback', () => {
+    expect(toBlockchainDisplayValue(null)).toBe('Chưa có');
+    expect(toBlockchainDisplayValue(undefined)).toBe('Chưa có');
+    expect(toBlockchainDisplayValue('')).toBe('Chưa có');
+    expect(toBlockchainDisplayValue('0xabc')).toBe('0xabc');
+    expect(toBlockchainDisplayValue(1201)).toBe('1201');
   });
 });

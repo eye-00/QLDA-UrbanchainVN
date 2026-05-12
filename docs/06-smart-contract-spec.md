@@ -55,6 +55,17 @@ Tài liệu này phải được đọc cùng với:
 - Có cơ chế `pause` để dừng contract khi xảy ra sự cố.
 - Tách rõ quyền `ADMIN`, `REGISTRAR`, `TRANSFER_AGENT`, `AUDITOR`.
 
+### 3.4. Phạm vi Sprint 2/3/4 theo legal baseline
+
+- Sprint 2/3/4 ưu tiên hoàn tất legal gates ở tầng workflow/backend trước khi mở rộng contract.
+- Không thay đổi ABI contract đang chạy nếu legal gates chưa đạt (`LEG-S2-*`, `LEG-S3-*`, `LEG-S4-001`).
+- Dữ liệu on-chain tiếp tục giới hạn ở:
+  - mã định danh/tham chiếu,
+  - `CID`/`documentHash`,
+  - `txHash`/event metadata,
+  - trạng thái tham chiếu phục vụ truy vết.
+- Không đưa PII, bản scan hồ sơ, polygon đầy đủ hoặc dữ liệu nhạy cảm lên chain.
+
 ---
 
 ## 4. Kiến trúc contract đề xuất
