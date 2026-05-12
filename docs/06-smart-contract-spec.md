@@ -55,6 +55,17 @@ Tài liệu này phải được đọc cùng với:
 - Có cơ chế `pause` để dừng contract khi xảy ra sự cố.
 - Tách rõ quyền `ADMIN`, `REGISTRAR`, `TRANSFER_AGENT`, `AUDITOR`.
 
+### 3.4. Phạm vi Sprint 2/3/4 theo legal baseline
+
+- Sprint 2/3/4 ưu tiên hoàn tất legal gates ở tầng workflow/backend trước khi mở rộng contract.
+- Không thay đổi ABI contract đang chạy nếu legal gates chưa đạt (`LEG-S2-*`, `LEG-S3-*`, `LEG-S4-001`).
+- Dữ liệu on-chain tiếp tục giới hạn ở:
+  - mã định danh/tham chiếu,
+  - `CID`/`documentHash`,
+  - `txHash`/event metadata,
+  - trạng thái tham chiếu phục vụ truy vết.
+- Không đưa PII, bản scan hồ sơ, polygon đầy đủ hoặc dữ liệu nhạy cảm lên chain.
+
 ---
 
 ## 4. Kiến trúc contract đề xuất
@@ -580,3 +591,63 @@ Bắt buộc:
 - tạo test cho happy path và failure path
 - nếu thấy mâu thuẫn với API contract hoặc workflow thì dừng và ghi rõ assumption
 ```
+
+---
+
+# PHỤ LỤC — Smart Contract Legal Alignment Patch 2025
+
+## 1. Điều kiện pháp lý trước khi gọi contract
+
+Backend chỉ được gọi hàm ghi on-chain khi hồ sơ đạt đủ điều kiện off-chain:
+
+- Đăng ký lần đầu: đã ký cấp/phê duyệt, đã cập nhật hồ sơ địa chính/CSDL đất đai, đã khóa bộ tài liệu chính.
+- Biến động/chuyển nhượng: đã hoàn tất kiểm tra điều kiện, nghĩa vụ tài chính nếu có, cập nhật biến động trong CSDL nghiệp vụ.
+- Tài liệu: chỉ ghi `documentVersionHash`, `documentCid`, `signatureHash` của phiên bản đã khóa/đã xác minh.
+- Bản đồ: chỉ ghi `boundaryHash`/`mapDatasetHash`, không ghi polygon/tọa độ đầy đủ.
+- Thanh toán: chỉ ghi `paymentReceiptHash` sau khi off-chain xác nhận thanh toán/biên lai.
+
+## 2. Role contract bổ sung
+
+```solidity
+bytes32 public constant DOCUMENT_RECORDER_ROLE = keccak256("DOCUMENT_RECORDER_ROLE");
+bytes32 public constant PAYMENT_RECORDER_ROLE = keccak256("PAYMENT_RECORDER_ROLE");
+bytes32 public constant MAP_RECORDER_ROLE = keccak256("MAP_RECORDER_ROLE");
+```
+
+Không cấp role ghi on-chain trực tiếp cho người dân trong MVP. Người dân chỉ ký message/hash bằng ví để chứng minh quyền sở hữu ví hoặc đồng ý kỹ thuật.
+
+## 3. Event bổ sung
+
+```solidity
+event DocumentVersionRecorded(
+    string indexed applicationCode,
+    bytes32 indexed documentVersionHash,
+    string documentCid,
+    bytes32 signatureHash,
+    address executedBy,
+    uint64 recordedAt
+);
+
+event PaymentReceiptRecorded(
+    string indexed paymentObligationCode,
+    bytes32 indexed receiptHash,
+    uint256 amount,
+    address executedBy,
+    uint64 recordedAt
+);
+
+event ParcelBoundaryHashRecorded(
+    string indexed landCode,
+    bytes32 indexed boundaryHash,
+    string geometrySourceType,
+    address executedBy,
+    uint64 recordedAt
+);
+```
+
+## 4. Không được làm
+
+- Không lưu tên, CCCD, địa chỉ chi tiết, file scan, polygon/tọa độ đầy đủ, QR payload chứa thông tin cá nhân lên blockchain.
+- Không dùng `transferFrom` tự do để chuyển quyền sử dụng đất trong MVP.
+- Không cho chữ ký ví tự động thay thế bước ký cấp/phê duyệt của cơ quan có thẩm quyền.
+- Không mint khi hồ sơ mới ở trạng thái `CHO_TIEP_NHAN`, `DA_TIEP_NHAN`, `CHO_XAC_NHAN_CAP_XA`, `DANG_THAM_DINH_VPDKDD`, `CHO_THUE`, `CHO_KY_CAP`.

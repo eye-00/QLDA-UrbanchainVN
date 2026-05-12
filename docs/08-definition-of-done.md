@@ -1,5 +1,13 @@
 # Definition of Done
 
+## Legal Source Reference
+
+- Nguồn pháp lý chuẩn: [00-legal-basis-register.md](./00-legal-basis-register.md)
+- Ma trận traceability: [docs-legal-aligned/16-legal-requirement-traceability.md](./docs-legal-aligned/16-legal-requirement-traceability.md)
+
+Rule chấm tiến độ:
+- Không nâng `Done` cho US/LEG item nếu thiếu legal evidence tương ứng trong ma trận traceability.
+
 Mot backlog item duoc xem la Done khi:
 - Da map voi backlog ID
 - Code compile/build pass
@@ -31,23 +39,27 @@ Mot backlog item duoc xem la Done khi:
   - `README.md`
 - Backlog closure co bang trang thai `Done/Partial/Missing` va evidence.
 
-## Sprint 1 Closure Note (2026-04-28)
+## Sprint 1 Closure Note (2026-05-10)
 
 ### Co the verify local
 - Auth/Test/Audit evidence co san trong repo:
   - [backend/test/auth-rbac.test.ts](../backend/test/auth-rbac.test.ts)
   - [backend/src/modules/auth/auth.routes.ts](../backend/src/modules/auth/auth.routes.ts)
   - [backend/src/modules/audit/audit.routes.ts](../backend/src/modules/audit/audit.routes.ts)
+  - [backend/test/sprint1-wallet.test.ts](../backend/test/sprint1-wallet.test.ts)
+  - [frontend/test/wallet-helpers.test.ts](../frontend/test/wallet-helpers.test.ts)
+  - [frontend/src/pages/WalletManagementPage.tsx](../frontend/src/pages/WalletManagementPage.tsx)
   - [README.md#sprint-1-verification-commands](../README.md#sprint-1-verification-commands)
   - [.github/workflows/ci.yml](../.github/workflows/ci.yml)
 
-### Phu thuoc GitHub remote (khong verify day du bang local)
-- Branch protection rules cua nhanh dich.
-- Required checks da duoc bat va pass tren PR (backend-ci, frontend-ci, contracts-ci, docs-check).
-- Secret scanning / push protection trang thai pass tren repository.
+### Verify GitHub remote (da xac nhan)
+- PR wallet backend/data: [#6](https://github.com/eye-00/QLDA-UrbanchainVN/pull/6) da merge vao `develop` (merge commit `89c85ed`), checks pass theo policy.
+- PR wallet frontend/docs: [#7](https://github.com/eye-00/QLDA-UrbanchainVN/pull/7) da merge vao `develop` (merge commit `e8605bf`), checks pass theo policy.
+- Branch protection `develop` bat required checks `backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`.
+- Secret scanning + push protection dang bat, open alerts = `0`.
 
 ### Trang thai closure ghi nhan
-- Nhom US Auth/Test/Audit: `Partial` (da co endpoint/test/evidence link trong repo, con phu thuoc gate remote de chot Done).
+- Nhom US Sprint 1 (bao gom wallet `US-547..558`): `Done`.
 
 ## Sprint 2 Full Gate (bat buoc)
 - CI lane checks pass: `backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`.
@@ -67,7 +79,7 @@ Mot backlog item duoc xem la Done khi:
   - `README.md`
 - Backlog closure Sprint 2 co bang `Done/Partial/Missing` + evidence.
 
-## Sprint 2 Closure Note (2026-04-28, cập nhật remote gate 19:20 ICT)
+## Sprint 2 Closure Note (2026-04-28, cập nhật remote gate 19:20 ICT) — Historical Snapshot
 
 ### Co the verify local
 - Backend sprint 2 implementation va regression:
@@ -94,42 +106,10 @@ Mot backlog item duoc xem la Done khi:
 - Required checks tren PR #1 da pass: `changes`, `backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`.
 - Merge commit tren `develop`: `f211a90`.
 
-### Trang thai closure ghi nhan
-- Nhom US Sprint 2 Must+Should: `Done`.
+### Trang thai closure ghi nhan (truoc legal rebaseline)
+- Nhom US Sprint 2 Must+Should: `Done` theo snapshot cu.
 
-## Sprint 2 Legal-Aligned Gate (2026-05-10)
-
-### Co the verify local
-- Legal entities + migration + seed:
-  - [backend/prisma/schema.prisma](../backend/prisma/schema.prisma)
-  - [backend/prisma/migrations/20260510120000_sprint2_legal_core/migration.sql](../backend/prisma/migrations/20260510120000_sprint2_legal_core/migration.sql)
-  - [backend/prisma/seed.ts](../backend/prisma/seed.ts)
-- Legal APIs/guards:
-  - [backend/src/modules/legal/legal.routes.ts](../backend/src/modules/legal/legal.routes.ts)
-  - [backend/src/modules/registrations/registration.routes.ts](../backend/src/modules/registrations/registration.routes.ts)
-  - [backend/src/modules/files/file.routes.ts](../backend/src/modules/files/file.routes.ts)
-- Frontend legal UX:
-  - [frontend/src/pages/RegistrationReviewPage.tsx](../frontend/src/pages/RegistrationReviewPage.tsx)
-  - [frontend/src/pages/CitizenRegistrationPage.tsx](../frontend/src/pages/CitizenRegistrationPage.tsx)
-  - [frontend/src/ui/registrationStatus.ts](../frontend/src/ui/registrationStatus.ts)
-- Test evidence:
-  - [backend/test/sprint2-legal.test.ts](../backend/test/sprint2-legal.test.ts)
-  - [backend/test/sprint3-registration.test.ts](../backend/test/sprint3-registration.test.ts)
-  - [frontend/test/registration-review-helpers.test.ts](../frontend/test/registration-review-helpers.test.ts)
-
-### Gate command status (local)
-- `npm run db:generate` ✅
-- `npm run db:migrate` ✅
-- `npm run db:seed` ✅
-- `npm run lint` ✅ (còn warning hooks frontend, không fail gate)
-- `npm run build` ✅
-- `npm test` ✅
-
-### Trang thai closure ghi nhan
-- `LEG-S2-001..005`: `Done (local)`.
-- Sprint 2 legal-aligned overall: `Partial` cho đến khi pass required checks remote trên chuỗi PR (`backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`).
-
-## Sprint 3 Phase 1 Gate (Registration core)
+## Sprint 3 Phase 1 Gate (Registration core) — Historical Snapshot
 - Data + API core da duoc mo:
   - `POST /registrations`
   - `POST /registrations/:id/submit`
@@ -148,7 +128,7 @@ Mot backlog item duoc xem la Done khi:
   - `npm --workspace backend run test -- auth-rbac.test.ts`
 - Trang thai phase: `Done` (da co implementation + test + remote gate evidence tren PR #4).
 
-## Sprint 3 Phase 2 Gate (Registration review UI)
+## Sprint 3 Phase 2 Gate (Registration review UI) — Historical Snapshot
 - Frontend officer review scope da co:
   - [frontend/src/pages/RegistrationReviewPage.tsx](../frontend/src/pages/RegistrationReviewPage.tsx)
   - [frontend/src/pages/CitizenRegistrationPage.tsx](../frontend/src/pages/CitizenRegistrationPage.tsx)
@@ -168,20 +148,27 @@ Mot backlog item duoc xem la Done khi:
 | APPROVAL_AUTHORITY | No | No | Yes | No | No | Yes | Yes |
 | ADMIN | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 
-## Sprint 3 Legal Hardening Wave (2026-05-10)
-- Scope mo rong tu phase Sprint 3:
-  - `commune-confirm` bat buoc `notes` + `evidenceFileId` hop le theo ho so.
-  - `request-supplement` bat buoc checklist `missingItems` + `deadlineAt` tuong lai.
-  - bo sung endpoint timeline `GET /registrations/:id/document-history`.
-- Chuoi PR da hoan tat:
-  - PR #16: backend core hardening ([link](https://github.com/eye-00/QLDA-UrbanchainVN/pull/16)).
-  - PR #17: frontend legal UX alignment ([link](https://github.com/eye-00/QLDA-UrbanchainVN/pull/17)).
-  - PR #18: QA/docs closeout ([link](https://github.com/eye-00/QLDA-UrbanchainVN/pull/18)).
+## Legal Rebaseline Note (2026-05-10)
 
-### Trang thai gate hien tai
-- Local backend tests: `pass` (bao gom `sprint3-registration.test.ts` va full backend test).
-- Local frontend test/build: `pass`.
-- Remote gate: `Done` (chuoi PR #16 -> #17 -> #18 da merge vao `develop`, required checks pass tren tung PR).
+Sau khi doi soat theo bo tai lieu `docs/docs-legal-aligned`, trang thai sprint duoc cap nhat theo legal baseline moi:
+
+- Sprint 1: `Done` (giu nguyen, bao gom wallet `US-547..558`).
+- Sprint 2: `Partial` (chua dat day du legal gates moi).
+- Sprint 3: `Partial` (chua dat day du legal gates moi).
+- Sprint 4: `Partial` (chua dat legal gate `LEG-S4-001`).
+
+Legal gaps bat buoc phai dong truoc khi nang lai `Done` cho Sprint 2/3:
+
+1. Chua co legal procedure registry + authority matrix day du.
+2. Chua co document versioning + submit snapshot theo workflow phap ly.
+3. Chua tach day du payment model (`INTAKE_FEE` va `LAND_FINANCIAL_OBLIGATION`).
+4. Chua khoa transition gate bat buoc `legalBasisCode` + actor/status validation.
+5. Chua khoa precondition "chi ghi blockchain sau khi off-chain dat trang thai hop le".
+
+Luu y:
+- Ket luan rebaseline nay uu tien hon cac closure snapshot cu trong tai lieu.
+- Remote gate pass khong du de danh dau `Done` neu legal gates chua dat.
+- Cac section "closure snapshot" cu (neu co) chi de truy vet lich su, khong dung de chot trang thai hien tai.
 
 ## Sprint 1-2-3 US Audit Note (2026-04-29)
 - Bao cao chi tiet tung US: [docs/12-us-audit-sprint1-3.md](./12-us-audit-sprint1-3.md).
@@ -193,26 +180,52 @@ Mot backlog item duoc xem la Done khi:
   - Khong nang `Done` neu thieu evidence remote gate.
   - US `Missing` phai co implementation/test/docs bo sung truoc khi chot sprint.
 
-## Sprint 4 Gate (Blockchain registration sync)
+---
 
-### Local verification (2026-05-12)
-- Backend:
-  - `npm run db:migrate` ✅
-  - `npm run db:seed` ✅
-  - `npm --workspace backend run build` ✅
-  - `npm run lint:backend` ✅
-  - `npm --workspace backend run test` ✅
-- Frontend:
-  - `npm --workspace frontend run test` ✅
-  - `npm --workspace frontend run build` ✅
-  - `npm run lint:frontend` ✅ (warning hooks khong fail gate)
+# PHỤ LỤC — Legal Definition of Done cho Sprint 2+
 
-### Scope implementation chain
-- PR #20, #21, #22, #23 (nen Sprint 4 da merge).
-- PR #26 (S4-LGL-01): service-wallet governance + guard/legal check tại service-layer + tx lifecycle backend.
-- PR #27 (S4-LGL-02): UI ví công vụ + luồng ký xác nhận blockchain cho can bo.
-- PR #28 (S4-LGL-03): QA/docs closeout (merged).
+Một US từ Sprint 2 trở đi chỉ được `Done` khi đạt thêm các điều kiện pháp lý/nghiệp vụ sau:
 
-### Sprint 4 closure status
-- `Done`: legal core + frontend signing flow + QA/docs closeout da merge day du.
-- Required checks tren PR #28: `backend-ci` pass, `frontend-ci` pass, `docs-check` pass (contracts-ci skip theo scope docs-only).
+## 1. Legal source mapping
+
+- [ ] Có `legalBasis` hoặc `procedureCode` nếu liên quan thủ tục đất đai.
+- [ ] Đã kiểm tra QĐ 3380 trước QĐ 2304 khi thủ tục có sửa đổi/bổ sung.
+- [ ] Actor xử lý khớp NĐ 151/2025 về phân định thẩm quyền 02 cấp.
+- [ ] Nếu không chắc nguồn pháp lý, gắn `NEEDS_PM_DECISION`.
+
+## 2. Workflow/state gate
+
+- [ ] Không bỏ qua cơ quan tiếp nhận.
+- [ ] Không bỏ qua UBND cấp xã nếu workflow yêu cầu.
+- [ ] Không bỏ qua VPĐKĐĐ/Chi nhánh ở bước thẩm định/cập nhật hồ sơ địa chính.
+- [ ] Không bỏ qua cơ quan thuế nếu có nghĩa vụ tài chính.
+- [ ] Không ghi blockchain trước khi off-chain đạt trạng thái hợp lệ.
+
+## 3. Data privacy/on-chain gate
+
+- [ ] Không lưu PII/file scan/polygon đầy đủ on-chain.
+- [ ] Chỉ ghi hash/CID/tx/event/reference.
+- [ ] Signature payload không chứa dữ liệu cá nhân nhạy cảm.
+- [ ] QR/payment payload không lộ CCCD, địa chỉ chi tiết, hồ sơ nhạy cảm.
+
+## 4. Document version/signature gate
+
+- [ ] Upload/thay thế tài liệu tạo version mới.
+- [ ] Submit hồ sơ khóa snapshot tài liệu.
+- [ ] Yêu cầu bổ sung không xóa bản cũ.
+- [ ] Ký số/ví chỉ ký hash/metadata an toàn.
+- [ ] Xác minh chữ ký/hash có test positive/negative.
+
+## 5. Map parcel gate
+
+- [ ] Có `geometry_source_type`.
+- [ ] Dữ liệu demo phải có nhãn demo.
+- [ ] Nếu ghi blockchain chỉ ghi boundary/dataset hash.
+- [ ] Có test role-based access cho bản đồ.
+
+## 6. Payment gate
+
+- [ ] Tách `INTAKE_FEE` và `LAND_FINANCIAL_OBLIGATION`.
+- [ ] MoMo Test/QR được ghi rõ là mô phỏng.
+- [ ] Không gọi crypto/token là phương tiện nộp thuế/phí thật.
+- [ ] Có audit log khi xác nhận/ghi biên lai.

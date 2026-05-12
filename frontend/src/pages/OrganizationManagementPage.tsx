@@ -1,10 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import { useToast } from '../ui/ToastContext';
 import { getAccountStatusLabel } from '../ui/statusLabels';
 import {
-  buildOrganizationCreatePayload,
-  buildOrganizationUpdatePayload
+  buildOrganizationCreatePayload
 } from './sprint2PageHelpers';
 
 type OrganizationItem = {
@@ -41,17 +41,11 @@ const initialCreateForm = {
 
 export function OrganizationManagementPage() {
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const [organizations, setOrganizations] = useState<OrganizationItem[]>([]);
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState(initialCreateForm);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({
-    code: '',
-    name: '',
-    description: '',
-    isActive: true
-  });
   const [assignment, setAssignment] = useState({
     userId: '',
     organizationId: ''
@@ -87,32 +81,6 @@ export function OrganizationManagementPage() {
       await loadData();
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Không tạo được đơn vị');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function startEdit(item: OrganizationItem) {
-    setEditId(item.id);
-    setEditForm({
-      code: item.code,
-      name: item.name,
-      description: item.description ?? '',
-      isActive: item.isActive
-    });
-  }
-
-  async function onUpdate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!editId) return;
-    setLoading(true);
-    try {
-      await apiPatch(`/organizations/${editId}`, buildOrganizationUpdatePayload(editForm));
-      showToast('success', 'Đã cập nhật đơn vị');
-      setEditId(null);
-      await loadData();
-    } catch (error) {
-      showToast('error', error instanceof Error ? error.message : 'Không cập nhật được đơn vị');
     } finally {
       setLoading(false);
     }
@@ -248,7 +216,12 @@ export function OrganizationManagementPage() {
                     </td>
                     <td>
                       <div className="action-row">
-                        <button type="button" className="btn btn-outline" onClick={() => startEdit(item)} disabled={loading}>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => navigate(`/admin/organizations/${item.id}/edit`)}
+                          disabled={loading}
+                        >
                           Cập nhật
                         </button>
                         <button
@@ -266,43 +239,6 @@ export function OrganizationManagementPage() {
             </table>
           </div>
         </div>
-      )}
-
-      {editId && (
-        <form className="card form-grid-4" onSubmit={onUpdate}>
-          <h3>Cập nhật đơn vị</h3>
-          <label>
-            Mã đơn vị
-            <input value={editForm.code} onChange={(event) => setEditForm({ ...editForm, code: event.target.value })} />
-          </label>
-          <label>
-            Tên đơn vị
-            <input value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} />
-          </label>
-          <label>
-            Mô tả
-            <input
-              value={editForm.description}
-              onChange={(event) => setEditForm({ ...editForm, description: event.target.value })}
-            />
-          </label>
-          <label className="checkbox-field">
-            <input
-              type="checkbox"
-              checked={editForm.isActive}
-              onChange={(event) => setEditForm({ ...editForm, isActive: event.target.checked })}
-            />
-            Kích hoạt đơn vị
-          </label>
-          <div className="action-row">
-            <button type="submit" disabled={loading}>
-              Lưu thay đổi
-            </button>
-            <button type="button" onClick={() => setEditId(null)} disabled={loading}>
-              Hủy
-            </button>
-          </div>
-        </form>
       )}
     </section>
   );

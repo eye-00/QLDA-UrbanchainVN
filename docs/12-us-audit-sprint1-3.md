@@ -1,19 +1,71 @@
 # US Audit Matrix - Sprint 1, Sprint 2, Sprint 3
 
-Cập nhật: 2026-05-10 16:15:00
+Cập nhật: 2026-05-10 10:10:00
+
+## Nguồn chuẩn dùng để audit
+
+- Canonical backlog: `docs/docs-legal-aligned/04-backlog-mvp.current-wallet-map-doc-version-signature.md`
+- Legal addendum: `docs/docs-legal-aligned/04-backlog-mvp.legal-aligned-addendum.md`
+- Khi mâu thuẫn với `docs/04-backlog-mvp.md` (546 US), ưu tiên canonical backlog ở trên.
 
 ## Quy ước đánh giá
 - `Done`: có implementation + test/evidence phù hợp + không mâu thuẫn docs/workflow.
 - `Partial`: đã có một phần hoặc pass local nhưng còn thiếu gate/evidence remote hoặc coverage acceptance chưa đủ.
 - `Missing`: chưa có dấu vết triển khai đáng tin cậy theo acceptance.
 
+## Legal evidence policy
+
+- Nguồn pháp lý chuẩn: [docs-legal-aligned/16-legal-requirement-traceability.md](./docs-legal-aligned/16-legal-requirement-traceability.md).
+- Một US/nhóm US chỉ được chấm `Done` khi có legal evidence map được tới ít nhất một hàng trong ma trận traceability.
+- Nếu chỉ pass remote checks nhưng thiếu legal proof hoặc còn `NEEDS_PM_DECISION`, trạng thái tối đa là `Partial`.
+
 ## Tổng hợp theo sprint
 
 | Sprint | Done | Partial | Missing | Tổng US | % Có đáp ứng (Done+Partial) |
 |---|---:|---:|---:|---:|---:|
 | Sprint 1 | 90 | 0 | 0 | 90 | 100% |
-| Sprint 2 | 72 | 0 | 0 | 72 | 100% |
-| Sprint 3 | 72 | 0 | 0 | 72 | 100% |
+| Sprint 2 | 0 | 72 | 0 | 72 | 100% |
+| Sprint 3 | 0 | 72 | 0 | 72 | 100% |
+
+## Legal Rebaseline Override (2026-05-10)
+
+- Nguon chuan moi: `docs/docs-legal-aligned`.
+- Trang thai tong:
+  - Sprint 1 giu `Done` (bao gom wallet `US-547..558`).
+  - Sprint 2 ha ve `Partial` do chua dat legal gates moi.
+  - Sprint 3 ha ve `Partial` do chua dat legal gates moi.
+
+Ghi chu:
+- File nay audit Sprint 1-3; trang thai Sprint 4 duoc theo doi o backlog canonical va docs closure sprint tuong ung.
+
+Legal blockers dang mo (owner phoi hop):
+
+| Legal gap | Anh huong sprint | Owner chinh | Ma backlog legal |
+|---|---|---|---|
+| Legal procedure registry + authority matrix | Sprint 2, Sprint 3 | AI_04 Backend API | `LEG-S2-001` |
+| Document versioning + submit snapshot | Sprint 2, Sprint 3 | AI_06 DB & IPFS + AI_04 Backend API | `LEG-S2-002`, `LEG-S2-004` |
+| Payment obligation model off-chain | Sprint 2, Sprint 3 | AI_04 Backend API | `LEG-S2-003`, `LEG-S5-001` |
+| Transition guard legalBasis/actor/status | Sprint 2, Sprint 3 | AI_15 Compliance + AI_04 Backend API | `LEG-S2-005` |
+| Blockchain precondition guard sau cap nhat ho so dia chinh | Sprint 3+ | AI_04 Backend API + AI_02 Blockchain Core Dev | `LEG-S4-001`, `LEG-S7-001` |
+
+Ghi chu:
+- Cac dong US chi tiet ben duoi duoc xem la "implementation evidence" hien co.
+- Ket luan chot trang thai sprint phai uu tien theo legal override nay cho den khi legal gaps duoc dong.
+
+## Bổ sung backlog ví blockchain (Sprint 1 Epic 13)
+
+- Backlog mới bổ sung nhóm `US-547..558` cho Sprint 1 (kết nối ví + xác minh chữ ký).
+- Trạng thái hiện tại: `Done` (implementation + local tests + remote gate đã xác nhận và merge).
+- Evidence local:
+  - [backend/src/modules/wallets/wallet.routes.ts](../backend/src/modules/wallets/wallet.routes.ts)
+  - [backend/test/sprint1-wallet.test.ts](../backend/test/sprint1-wallet.test.ts)
+  - [frontend/src/pages/WalletManagementPage.tsx](../frontend/src/pages/WalletManagementPage.tsx)
+  - [frontend/test/wallet-helpers.test.ts](../frontend/test/wallet-helpers.test.ts)
+  - [docs/07-api-contract.md](./07-api-contract.md)
+- Evidence remote:
+  - [PR #6](https://github.com/eye-00/QLDA-UrbanchainVN/pull/6) (merge commit `89c85ed`)
+  - [PR #7](https://github.com/eye-00/QLDA-UrbanchainVN/pull/7) (merge commit `e8605bf`)
+  - Required checks + branch protection + secret scanning/push protection: pass theo policy repo.
 
 ## Bổ sung backlog ví blockchain (Sprint 1 Epic 13)
 

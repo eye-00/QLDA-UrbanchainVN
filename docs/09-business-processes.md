@@ -30,6 +30,26 @@ Các nguyên tắc bắt buộc:
 
 5. **Mọi thao tác quan trọng phải có audit log.**
 
+### Legal Source Reference
+
+- Nguồn pháp lý chuẩn: [00-legal-basis-register.md](./00-legal-basis-register.md)
+- Ma trận traceability: [docs-legal-aligned/16-legal-requirement-traceability.md](./docs-legal-aligned/16-legal-requirement-traceability.md)
+
+Rule triển khai nghiệp vụ:
+- Actor phải đúng theo phân định thẩm quyền 2 cấp.
+- Phí/lệ phí tiếp nhận và nghĩa vụ tài chính phải tách ở off-chain.
+- Chỉ ghi blockchain sau khi bước cập nhật hồ sơ địa chính/CSDL đất đai đã hợp lệ.
+
+### Legal override rule (2026-05-10)
+
+- Nguồn pháp lý chuẩn: `docs/docs-legal-aligned/*`.
+- Nếu nội dung mô tả workflow cũ (English states) mâu thuẫn với state machine legal-aligned, ưu tiên state machine legal-aligned trong phụ lục của tài liệu này và trong `docs/05-workflow-land-law.md`.
+- Trạng thái triển khai hiện tại theo legal baseline:
+  - Sprint 1: `Done`
+  - Sprint 2: `Partial` (còn `LEG-S2-001..005`)
+  - Sprint 3: `Partial` (phụ thuộc LEG-S2 + `LEG-S3-*`)
+  - Sprint 4: `Partial` (còn `LEG-S4-001`)
+
 ---
 
 ## 2. Tác nhân nghiệp vụ
@@ -91,21 +111,26 @@ Người dân nộp hồ sơ đăng ký đất đai lần đầu. Hệ thống h
 ### 3.4. State machine
 
 ```text
-DRAFT
-  -> SUBMITTED
-  -> INTAKE_REVIEW
-  -> SUPPLEMENT_REQUIRED
-  -> SUBMITTED
-  -> COMMUNE_CONFIRMATION
-  -> LAND_OFFICE_REVIEW
-  -> TAX_PENDING
-  -> TAX_COMPLETED
-  -> APPROVED
-  -> BLOCKCHAIN_RECORDED
-  -> COMPLETED
+MOI_TAO
+  -> CHO_TIEP_NHAN
+  -> CAN_BO_SUNG
+  -> CHO_TIEP_NHAN
+  -> DA_TIEP_NHAN
+  -> CHO_XAC_NHAN_CAP_XA
+  -> DA_XAC_NHAN_CAP_XA
+  -> DANG_THAM_DINH_VPDKDD
+  -> CHO_THUE
+  -> CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH
+  -> DA_HOAN_THANH_NGHIA_VU_TAI_CHINH
+  -> CHO_KY_CAP
+  -> DA_KY_CAP
+  -> DA_CAP
+  -> DA_CAP_NHAT_HO_SO_DIA_CHINH
+  -> DA_GHI_BLOCKCHAIN
+  -> DA_TRA_KET_QUA
 
-REJECTED
-CANCELLED
+TU_CHOI
+HUY_HO_SO
 ```
 
 ### 3.5. PlantUML tham khảo
@@ -393,3 +418,59 @@ Một quy trình được xem là đúng nghiệp vụ khi:
 - không để blockchain cập nhật trước khi hồ sơ hợp lệ;
 - trạng thái frontend/backend/DB/contract-facing logic thống nhất;
 - có test cho happy path và invalid state.
+
+---
+
+# PHỤ LỤC — Business Process Legal Alignment 2025
+
+## 1. Quy trình đăng ký lần đầu sau chỉnh pháp lý
+
+| Pha | Actor quyết định | Module | Trạng thái vào | Trạng thái ra | Gate bắt buộc |
+|---|---|---|---|---|---|
+| Tạo hồ sơ | Người dân | Citizen Portal | `MOI_TAO` | `CHO_TIEP_NHAN` | Đủ form tối thiểu + tài liệu bắt buộc |
+| Tiếp nhận | Cơ quan tiếp nhận | Intake | `CHO_TIEP_NHAN` | `DA_TIEP_NHAN` hoặc `CAN_BO_SUNG` | Kiểm tra thành phần hồ sơ, có giấy tiếp nhận/hẹn trả nếu đủ |
+| Xác nhận cấp xã | UBND cấp xã/cơ quan chuyên môn cấp xã | Commune Review | `DA_TIEP_NHAN` | `DA_XAC_NHAN_CAP_XA` | Biên bản/ý kiến xác nhận, công khai/ghi nhận ý kiến nếu workflow yêu cầu |
+| Thẩm định | VPĐKĐĐ/Chi nhánh | Land Registry Review | `DA_XAC_NHAN_CAP_XA` | `CHO_THUE` hoặc `CHO_KY_CAP` hoặc `TU_CHOI` | Kiểm tra điều kiện pháp lý/nghiệp vụ, bản đồ/hồ sơ địa chính |
+| Nghĩa vụ tài chính | Cơ quan thuế | Tax/Payment | `CHO_THUE` | `DA_HOAN_THANH_NGHIA_VU_TAI_CHINH` | Có thông báo nghĩa vụ + bằng chứng hoàn thành |
+| Ký cấp/phê duyệt | Cơ quan có thẩm quyền | Approval | `CHO_KY_CAP` | `DA_KY_CAP` | Actor đúng quyền, có quyết định/ký cấp |
+| Cập nhật CSDL đất đai | VPĐKĐĐ/Chi nhánh | Land DB | `DA_KY_CAP` | `DA_CAP_NHAT_HO_SO_DIA_CHINH` | Chỉ cập nhật khi kết quả đã ký cấp/phê duyệt |
+| Ghi blockchain | Backend service wallet/contract role | Blockchain | `DA_CAP_NHAT_HO_SO_DIA_CHINH` | `DA_GHI_BLOCKCHAIN` | Chỉ hash/CID/tx, không PII |
+| Trả kết quả | Cơ quan tiếp nhận/hệ thống | Result | `DA_GHI_BLOCKCHAIN` hoặc `DA_CAP_NHAT_HO_SO_DIA_CHINH` | `DA_TRA_KET_QUA` | Thông báo người dân, audit log |
+
+## 2. Quy trình đăng ký biến động/chuyển nhượng sau chỉnh pháp lý
+
+| Bước | Actor | Gate |
+|---|---|---|
+| Tạo hồ sơ biến động | Bên chuyển/bên nhận | Thông tin bên tham gia, tài liệu giao dịch, giấy chứng nhận/hợp đồng |
+| Xác nhận bên nhận | Bên nhận | Không làm phát sinh chuyển quyền on-chain |
+| Tiếp nhận | Cơ quan tiếp nhận | Kiểm tra thành phần, yêu cầu bổ sung nếu thiếu |
+| Kiểm tra điều kiện thực hiện quyền | VPĐKĐĐ/Chi nhánh | Không đủ điều kiện thì từ chối có lý do |
+| Nghĩa vụ tài chính | Cơ quan thuế | Chờ hoàn thành nếu phát sinh |
+| Cập nhật biến động | VPĐKĐĐ/Chi nhánh | Cập nhật hồ sơ địa chính/CSDL đất đai trước |
+| Ghi blockchain | Backend service wallet | Ghi lịch sử transfer sau khi off-chain hoàn tất |
+
+## 3. Quy trình document version/signature
+
+```text
+UPLOAD_DRAFT
+  -> VERSION_CREATED
+  -> SNAPSHOT_LOCKED_ON_SUBMIT
+  -> INTAKE_REVIEWED
+  -> SIGNED_BY_CITIZEN_OR_OFFICER
+  -> VERIFIED
+  -> INCLUDED_IN_APPROVAL_DOSSIER
+  -> HASH_RECORDED_ON_CHAIN
+```
+
+Rule: chữ ký ví/MetaMask chỉ là bằng chứng kỹ thuật trong MVP; không tự động thay thế chữ ký pháp lý của người/cơ quan có thẩm quyền.
+
+## 4. Quy trình map parcel
+
+```text
+GEOMETRY_DRAFT
+  -> GEOMETRY_REVIEWED
+  -> GEOMETRY_APPROVED_OFFCHAIN
+  -> BOUNDARY_HASH_RECORDED
+```
+
+Rule: Nếu `geometry_source_type = DEMO` thì không cho hiển thị như dữ liệu pháp lý chính thức.

@@ -23,6 +23,17 @@ Nguyên tắc quan trọng:
 - AI chỉ hỗ trợ kiểm tra hồ sơ, không tự động ra quyết định hành chính.
 - Mọi quyết định nghiệp vụ phải do vai trò cán bộ/cơ quan có thẩm quyền thực hiện.
 
+## 1.1. Legal Source Reference
+
+- Nguồn pháp lý chuẩn: [00-legal-basis-register.md](./00-legal-basis-register.md)
+- Ma trận traceability: [docs-legal-aligned/16-legal-requirement-traceability.md](./docs-legal-aligned/16-legal-requirement-traceability.md)
+
+Ràng buộc thiết kế bắt buộc:
+- Authority-routing theo mô hình địa phương 2 cấp.
+- Payment model off-chain tách `INTAKE_FEE` và `LAND_FINANCIAL_OBLIGATION`.
+- Map module có nhãn nguồn dữ liệu và chính sách VN-2000/reference.
+- Blockchain precondition: chỉ ghi sau cập nhật hồ sơ địa chính/CSDL đất đai hợp lệ.
+
 ---
 
 ## 2. Phạm vi MVP
@@ -86,6 +97,24 @@ MVP tập trung vào các nhóm chức năng:
 | Smart Contract | Solidity + Hardhat | Ghi nhận bản ghi đất và lịch sử chuyển nhượng số |
 | OCR Service | Mock OCR / Tesseract / PaddleOCR | Trích xuất dữ liệu từ tài liệu scan, cảnh báo sai lệch |
 | DevOps | Docker Compose, Hardhat, scripts | Chạy môi trường local/demo |
+
+### 3.3. Legal-aligned architecture baseline (2026-05-10)
+
+Các thành phần bắt buộc bổ sung từ Sprint 2+ theo legal baseline:
+
+| Thành phần | Mục đích | Legal backlog mapping |
+|---|---|---|
+| `Procedure Registry` | Lưu `procedureCode`, `legalBasis`, actor thẩm quyền | `LEG-S2-001` |
+| `Authority Matrix` | Ràng buộc `role x action x status` theo thủ tục | `LEG-S2-001`, `LEG-S2-005` |
+| `Document Versioning` | Mỗi lần upload/thay thế tạo version mới | `LEG-S2-002` |
+| `Submit Snapshot` | Khóa snapshot tài liệu tại thời điểm submit | `LEG-S2-004` |
+| `Payment Obligation` | Tách `INTAKE_FEE` và `LAND_FINANCIAL_OBLIGATION` | `LEG-S2-003`, `LEG-S5-001` |
+| `Blockchain Precondition Guard` | Chặn ghi on-chain nếu chưa hoàn tất off-chain hợp lệ | `LEG-S4-001`, `LEG-S7-001` |
+
+Quy tắc kiến trúc:
+- Nguồn quyết định nghiệp vụ luôn là off-chain workflow.
+- Blockchain chỉ nhận hash/CID/tx metadata sau khi đạt trạng thái off-chain hợp lệ.
+- Không đổi ABI smart contract cho Sprint 2/3/4 nếu legal gates chưa đạt.
 
 ---
 
@@ -234,6 +263,16 @@ DRAFT
 Các trạng thái kết thúc lỗi:
   -> REJECTED
   -> CANCELLED
+```
+
+Legal-aligned canonical states cho đăng ký lần đầu:
+
+```text
+MOI_TAO -> CHO_TIEP_NHAN -> CAN_BO_SUNG -> DA_TIEP_NHAN -> CHO_XAC_NHAN_CAP_XA
+-> DA_XAC_NHAN_CAP_XA -> DANG_THAM_DINH_VPDKDD -> CHO_THUE
+-> CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH -> DA_HOAN_THANH_NGHIA_VU_TAI_CHINH
+-> CHO_KY_CAP -> DA_KY_CAP -> DA_CAP -> DA_CAP_NHAT_HO_SO_DIA_CHINH
+-> DA_GHI_BLOCKCHAIN -> DA_TRA_KET_QUA
 ```
 
 ### 6.2. Hồ sơ biến động/chuyển nhượng
@@ -485,3 +524,60 @@ Một feature chỉ được xem là hoàn thành khi:
 9. OCR warning.
 10. Dashboard/report.
 11. E2E + deployment.
+
+---
+
+# PHỤ LỤC — Legal-aligned System Design Patch 2025
+
+## 1. Module mới/bắt buộc từ Sprint 2+
+
+```text
+Legal Procedure Registry
+Document Versioning Service
+Intake & Workflow Engine
+Commune Confirmation Module
+Land Registry Review Module
+Tax/Payment Obligation Module
+Approval & Issuance Module
+Cadastral Update Module
+Map Parcel Service
+Blockchain Evidence Recorder
+```
+
+## 2. Ranh giới hệ thống
+
+| Lớp | Nguồn sự thật | Ghi chú |
+|---|---|---|
+| Nghiệp vụ đất đai | Off-chain DB + hồ sơ địa chính/CSDL đất đai mô phỏng | Blockchain không thay thế |
+| Tài liệu scan/PDF | IPFS/off-chain object storage | DB lưu metadata/CID/hash |
+| Blockchain | Hash/CID/tx/event | Chỉ ghi sau khi off-chain hợp lệ |
+| AI OCR | OCR result/warning | Không chuyển trạng thái tự động |
+| Bản đồ | GeoJSON/geometry off-chain | Ghi hash ranh giới nếu đã duyệt |
+| Thanh toán | Payment obligation/receipt off-chain | MoMo Test/QR chỉ mô phỏng |
+
+## 3. Service interaction cho đăng ký lần đầu
+
+```text
+Citizen Portal
+ -> Registration API
+ -> Document Versioning + IPFS
+ -> OCR Assistant
+ -> Intake Workflow
+ -> Commune Confirmation
+ -> Land Registry Review
+ -> Tax/Payment Obligation
+ -> Approval & Issuance
+ -> Cadastral Update
+ -> Blockchain Evidence Recorder
+ -> Result Notification
+```
+
+## 4. Sprint 1 wallet đã xong — tác động tới thiết kế
+
+Wallet module được giữ như lớp xác minh ví/ký kỹ thuật:
+
+- dùng để ký nonce/challenge;
+- ký hash tài liệu hoặc xác nhận thao tác demo;
+- không dùng để tự động phê duyệt hồ sơ;
+- không dùng để nộp thuế/phí thật bằng crypto/token;
+- mọi chữ ký ví phải gắn với tài khoản đã RBAC và audit log.

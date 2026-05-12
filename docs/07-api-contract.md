@@ -13,6 +13,19 @@ Nguyên tắc:
 - blockchain chỉ trả metadata/hash/transaction cần thiết;
 - trạng thái hồ sơ phải dùng enum thống nhất.
 
+## 1.1. Legal Source Reference
+
+- Nguồn pháp lý chuẩn: [00-legal-basis-register.md](./00-legal-basis-register.md)
+- Ma trận traceability: [docs-legal-aligned/16-legal-requirement-traceability.md](./docs-legal-aligned/16-legal-requirement-traceability.md)
+
+Rule bắt buộc cho endpoint transition nhạy cảm:
+- Có `procedureCode`.
+- Có `legalBasisCode`.
+- Có `actorRole`.
+- Có `reason`.
+- Có `evidence` hoặc `evidenceIds`.
+- nếu có khác biệt giữa mô tả cũ và legal patch, ưu tiên baseline `docs/docs-legal-aligned`.
+
 ---
 
 ## 2. Quy ước kỹ thuật
@@ -69,8 +82,8 @@ Authorization: Bearer <token>
 - `RECEPTION_OFFICER`
 - `COMMUNE_OFFICER`
 - `LAND_REGISTRY_OFFICER`
-- `APPROVAL_AUTHORITY`
 - `TAX_OFFICER`
+- `APPROVAL_AUTHORITY`
 - `AUDITOR`
 - `ADMIN`
 
@@ -436,17 +449,25 @@ Upload tài liệu hồ sơ.
 - `documentType`
 - `ownerType`
 - `ownerId`
+- `registrationId` (optional)
 
 ### Response data
 ```json
 {
-  "fileId": "fil_001",
+  "id": "fil_001",
   "documentType": "PROOF_OF_LAND_USE",
   "storageStatus": "UPLOADED_IPFS",
   "cid": "bafy...",
-  "hash": "0xabc123"
+  "hash": "0xabc123",
+  "provider": "mock"
 }
 ```
+
+`provider` cho biết backend đang upload qua `mock`, `local` hoặc `pinata`.
+
+### Khuyến nghị luồng FE
+- Luồng chuẩn cho màn công dân: **upload trước** qua `/files/upload`, nhận `fileId`, sau đó gọi `POST /registrations` với `fileIds`.
+- `documentType` do UI chọn từ catalog nghiệp vụ; backend hiện chưa ép enum cứng theo loại giấy tờ.
 
 ## 7.2. GET /files/:fileId
 Lấy metadata file.
@@ -505,6 +526,11 @@ Tạo hồ sơ đăng ký lần đầu.
 ```
 
 > Compatibility note: backend hien cho phep ca `attachedFileIds` va `fileIds` de tuong thich nguoc UI.
+
+### Business rules (attach file)
+- Với `CITIZEN`/`BUSINESS`, chỉ được đính kèm file thuộc quyền sở hữu của chính user hoặc file đã gắn registration của chính user.
+- Nếu `fileIds` chứa file không tồn tại -> trả `400`.
+- Nếu `fileIds` chứa file không thuộc quyền -> trả `403`.
 
 ### Response data
 ```json
@@ -577,6 +603,7 @@ Danh sách hồ sơ, hỗ trợ filter theo vai trò.
 - Chỉ role phù hợp mới được đổi sang trạng thái tương ứng.
 - Mọi thay đổi trạng thái phải lưu audit trail.
 - `reason` là bắt buộc với các trạng thái từ chối hoặc yêu cầu bổ sung.
+- Khi chuyển trạng thái sai workflow (`currentStatus` -> `nextStatus` không hợp lệ), API trả `409` với error envelope chuẩn.
 
 ## 8.6. POST /registrations/:registrationId/commune-confirm
 UBND cấp xã xác nhận xử lý.
@@ -622,6 +649,10 @@ Phê duyệt/ký cấp kết quả.
 }
 ```
 
+### Sprint 4 behavior
+- Khi `BLOCKCHAIN_MODE=rpc`: backend gọi smart contract `UrbanLandRegistry.registerLand`, lưu `txHash`, `tokenId`, `landCode`.
+- Khi `BLOCKCHAIN_MODE=mock`: backend vẫn trả `txHash`/`tokenId` mock để giữ luồng demo.
+
 ## 8.9. POST /registrations/:registrationId/blockchain-sync
 Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
 
@@ -645,19 +676,15 @@ Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
   "registrationId": "reg_001",
   "tokenId": 1001,
   "txHash": "0x123456",
-  "chainId": 11155111,
-  "contractAddress": "0xabc...",
-  "cid": "bafy...",
-  "metadataHash": "0xabc123"
+  "tokenId": 1001,
+  "metadataHash": "0xabc123",
+  "blockchainMode": "mock"
 }
 ```
 
-### Validation rules
-- Từ chối `409 Conflict` nếu hồ sơ đã có `txHash`/`tokenId` off-chain.
-- Từ chối `409 Conflict` nếu precheck phát hiện `registrationCode` hoặc `landCode` đã tồn tại on-chain.
-- Từ chối `409 Conflict` nếu hồ sơ chưa đạt `DA_CAP_NHAT_HO_SO_DIA_CHINH` (legal precondition).
-- Từ chối `403 Forbidden` nếu actor không có `service-wallet authorization` hợp lệ theo role/network/chainId.
-- Từ chối `400 Bad Request` nếu chữ ký `personal_sign` không hợp lệ hoặc không khớp `signerWalletAddress`.
+### Business rules
+- Chỉ cho phép đồng bộ blockchain khi hồ sơ đang ở trạng thái `DA_CAP`.
+- Nếu gọi sai trạng thái hiện tại, API trả `409` với error envelope chuẩn.
 
 ## 8.10. GET /registrations/:registrationId/notifications
 Lấy lịch sử thông báo kết quả xử lý hồ sơ theo RBAC/ownership.
@@ -1175,3 +1202,150 @@ Ví dụ:
 | `ocr` | OCR jobs, extraction, warnings |
 | `dashboard` | Dashboard, reports |
 | `audit` | Lịch sử thay đổi |
+
+---
+
+# PHỤ LỤC — Legal-aligned API Patch 2025
+
+## 1. Role codes bổ sung/chuẩn hóa
+
+```text
+CITIZEN
+BUSINESS
+RECEPTION_OFFICER
+COMMUNE_OFFICER
+LAND_REGISTRY_OFFICER
+TAX_OFFICER
+APPROVAL_AUTHORITY
+ADMIN
+AUDITOR
+```
+
+## 2. Enum RegistrationStatus chuẩn từ Sprint 2+
+
+```text
+MOI_TAO
+CHO_TIEP_NHAN
+CAN_BO_SUNG
+DA_TIEP_NHAN
+CHO_XAC_NHAN_CAP_XA
+DA_XAC_NHAN_CAP_XA
+DANG_THAM_DINH_VPDKDD
+CHO_THUE
+CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH
+DA_HOAN_THANH_NGHIA_VU_TAI_CHINH
+CHO_KY_CAP
+DA_KY_CAP
+DA_CAP
+DA_CAP_NHAT_HO_SO_DIA_CHINH
+DA_GHI_BLOCKCHAIN
+DA_TRA_KET_QUA
+TU_CHOI
+HUY_HO_SO
+```
+
+## 3. Legal procedure metadata endpoints
+
+```http
+GET /api/v1/legal/procedures
+GET /api/v1/legal/procedures/:procedureCode
+GET /api/v1/legal/authority-matrix
+```
+
+### `LegalProcedure` DTO
+
+```json
+{
+  "procedureCode": "1.013978",
+  "procedureName": "Đăng ký đất đai, tài sản gắn liền với đất, cấp Giấy chứng nhận lần đầu...",
+  "sourceDecision": "3380/QĐ-BNNMT/2025",
+  "fallbackSourceDecision": "2304/QĐ-BNNMT/2025",
+  "legalBasis": ["151/2025/NĐ-CP", "118/2025/NĐ-CP", "101/2024/NĐ-CP"],
+  "level": "CAP_XA|CAP_TINH|TRUNG_UONG",
+  "authorityActors": ["RECEPTION_OFFICER", "COMMUNE_OFFICER", "LAND_REGISTRY_OFFICER", "TAX_OFFICER", "APPROVAL_AUTHORITY"],
+  "requiresTaxStep": true,
+  "requiresCommuneConfirmation": true,
+  "isMockedForMvp": true
+}
+```
+
+## 4. Document version endpoints
+
+```http
+GET  /api/v1/documents/:documentId/versions
+POST /api/v1/documents/:documentId/versions
+POST /api/v1/document-versions/:versionId/lock
+POST /api/v1/document-versions/:versionId/supersede
+POST /api/v1/document-versions/:versionId/sign/mock
+POST /api/v1/document-versions/:versionId/sign/wallet
+POST /api/v1/document-versions/:versionId/verify
+POST /api/v1/document-versions/:versionId/record-on-chain
+```
+
+Rule: không trả PII dư thừa; signature payload chỉ chứa hash/id/timestamp/role, không chứa toàn văn giấy tờ.
+
+## 5. Payment obligation endpoints
+
+```http
+POST /api/v1/payment-obligations
+GET  /api/v1/payment-obligations/:id
+POST /api/v1/payment-obligations/:id/generate-qr-test
+POST /api/v1/payment-obligations/:id/mock-confirm
+POST /api/v1/payment-obligations/:id/verify-receipt
+POST /api/v1/payment-obligations/:id/record-on-chain
+```
+
+### `PaymentObligationType`
+
+```text
+INTAKE_FEE
+LAND_FINANCIAL_OBLIGATION
+REGISTRATION_FEE
+LATE_FEE
+OTHER_LEGAL_FEE
+```
+
+Rule: MoMo Test/QR test là mô phỏng. Không mô tả `paidByBlockchain=true` cho thuế/phí thật.
+
+## 6. Map parcel endpoints
+
+```http
+GET  /api/v1/map/parcels
+GET  /api/v1/map/parcels/:landRecordId
+POST /api/v1/map/parcels/:landRecordId/geometry
+POST /api/v1/map/parcels/:landRecordId/review
+POST /api/v1/map/parcels/:landRecordId/approve-offchain
+POST /api/v1/map/parcels/:landRecordId/record-boundary-hash
+GET  /api/v1/map/layers
+```
+
+### Geometry source enum
+
+```text
+DEMO
+IMPORTED
+OFFICIAL_REFERENCE
+UNKNOWN_NEEDS_REVIEW
+```
+
+## 7. Workflow transition endpoint rule
+
+```http
+POST /api/v1/registrations/:id/transition
+```
+
+Request phải có:
+
+```json
+{
+  "fromStatus": "DA_TIEP_NHAN",
+  "toStatus": "CHO_XAC_NHAN_CAP_XA",
+  "actorRole": "RECEPTION_OFFICER",
+  "reason": "Hồ sơ đủ thành phần",
+  "legalBasisCode": "151/2025-ND-CP|3380/QD-BNNMT",
+  "evidenceIds": ["docver_..."],
+  "requiresPmDecision": false
+}
+```
+
+Backend phải reject nếu actor/status transition không khớp legal workflow.

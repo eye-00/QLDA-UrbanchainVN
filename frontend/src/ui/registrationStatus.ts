@@ -24,24 +24,8 @@ export function getRegistrationStatusLabel(status: string) {
 }
 
 export function getRegistrationStatusBadgeClass(status: string) {
-  if (
-    status === 'DA_XAC_NHAN_CAP_XA' ||
-    status === 'DA_HOAN_THANH_NGHIA_VU_TAI_CHINH' ||
-    status === 'DA_CAP_NHAT_HO_SO_DIA_CHINH' ||
-    status === 'DA_GHI_BLOCKCHAIN' ||
-    status === 'DA_CAP' ||
-    status === 'DA_TRA_KET_QUA'
-  ) {
-    return 'badge-success';
-  }
+  if (status === 'DA_CAP' || status === 'DA_TRA_KET_QUA' || status === 'DA_XAC_NHAN_CAP_XA' || status === 'DA_GHI_BLOCKCHAIN' || status === 'DA_CAP_NHAT_HO_SO_DIA_CHINH') return 'badge-success';
   if (status === 'CAN_BO_SUNG' || status === 'TU_CHOI' || status === 'HUY_HO_SO') return 'badge-danger';
-  if (
-    status === 'CHO_TIEP_NHAN' ||
-    status === 'CHO_THUE' ||
-    status === 'CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH' ||
-    status === 'CHO_KY_CAP'
-  ) {
-    return 'badge-warning';
-  }
+  if (status === 'CHO_TIEP_NHAN' || status === 'CHO_THUE' || status === 'CHO_KY_CAP' || status === 'CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH') return 'badge-warning';
   return '';
 }

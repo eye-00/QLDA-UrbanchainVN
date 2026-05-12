@@ -35,6 +35,53 @@
 | Sprint 7 | AI hỗ trợ MVP và giám sát: OCR, kiểm tra hồ sơ, cảnh báo AI, KPI, tài liệu API và compliance dữ liệu. | 78 | 6 | 41 | 31 | 0 |
 | Sprint 8 | Đóng gói, hướng dẫn sử dụng và bàn giao cuối kỳ. | 18 | 2 | 15 | 1 | 0 |
 
+## 2.1. Legal rebaseline snapshot (2026-05-10)
+
+Theo bo tai lieu `docs/docs-legal-aligned`, closure status sprint duoc cap nhat:
+
+| Sprint | Trang thai |
+|---|---|
+| Sprint 1 | Done |
+| Sprint 2 | Partial |
+| Sprint 3 | Partial |
+
+Ly do Sprint 2/3 duoc dua ve `Partial`: chua dat day du legal gates moi (legal procedure registry, document versioning + submit snapshot, payment model off-chain, transition legal guard, blockchain precondition guard).
+
+## 2.2. Legal backlog injection (addendum)
+
+Nguon: [docs/docs-legal-aligned/04-backlog-mvp.legal-aligned-addendum.md](./docs-legal-aligned/04-backlog-mvp.legal-aligned-addendum.md)
+
+### Sprint 2 - LEG-S2
+
+| ID tạm | Feature | User story | Acceptance Criteria | Agent owner |
+|---|---|---|---|---|
+| LEG-S2-001 | Legal Procedure Registry | As system, I want lưu danh mục thủ tục pháp lý liên quan để workflow biết thủ tục nào dùng nguồn nào | Có `procedureCode`, `sourceDecision`, `legalBasis`, `level`, `authorityActors`, `requiresTaxStep` | AI_04 Backend API |
+| LEG-S2-002 | Document Versioning | As citizen, I want mỗi lần upload/thay thế tạo phiên bản mới | Không ghi đè bản cũ; mỗi version có CID/hash/status | AI_06 DB & IPFS |
+| LEG-S2-003 | Intake Fee Flag | As system, I want đánh dấu thủ tục có phí/lệ phí khi nộp hồ sơ | Có type `INTAKE_FEE`, không dùng crypto/token thật | AI_04 Backend API |
+| LEG-S2-004 | Legal Form Snapshot | As officer, I want snapshot bộ hồ sơ tại thời điểm submit | Submit khóa version hiện hành vào application snapshot | AI_04 Backend API |
+| LEG-S2-005 | Audit Legal Basis | As auditor, I want mỗi transition có legalBasis/reason | Transition thiếu legalBasis/reason bị reject với workflow nhạy cảm | AI_15 Compliance |
+
+### Sprint 3 - LEG-S3
+
+| ID tạm | Feature | User story | Acceptance Criteria | Agent owner |
+|---|---|---|---|---|
+| LEG-S3-001 | Commune Confirmation | As commune officer, I want xác nhận thông tin thuộc thẩm quyền cấp xã | Có trạng thái vào/ra, lý do, file evidence, audit log | AI_08 Frontend Admin + AI_04 Backend |
+| LEG-S3-002 | Supplement Request | As reception officer, I want yêu cầu bổ sung phân biệt với từ chối | Bắt buộc có danh mục thiếu và deadline/ghi chú | AI_04 Backend API |
+| LEG-S3-003 | Document Version History | As officer, I want xem lịch sử phiên bản tài liệu | Có timeline upload/replaced/locked/signed | AI_07/AI_08 Frontend |
+
+### Sprint 4/5/7 - LEG-S4, LEG-S5, LEG-S7
+
+| ID tạm | Sprint | Feature | User story | Acceptance Criteria | Agent owner |
+|---|---|---|---|---|---|
+| LEG-S4-001 | Sprint 4 | Approval Precondition | As system, I want chỉ ghi on-chain nếu hồ sơ đã ký cấp/cập nhật CSDL | Contract call bị block nếu status chưa đủ | AI_04 + AI_02 |
+| LEG-S5-001 | Sprint 5 | Tax/Financial Obligation | As tax officer, I want xác định nghĩa vụ tài chính off-chain | Có obligation, notice, receipt, status | AI_04 + AI_08 |
+| LEG-S5-002 | Sprint 5 | Map Legal Source | As officer, I want biết nguồn dữ liệu bản đồ là demo hay chính thức | UI hiển thị `source_type` và warning demo | AI_08 |
+| LEG-S7-001 | Sprint 7 | On-chain Evidence Only | As auditor, I want blockchain chỉ có hash/CID/tx | Test kiểm tra không có PII/polygon/full document on-chain | AI_03 + AI_15 |
+
+Quy tắc dong sprint:
+- Khong dong Sprint 2+ neu thieu mapping legalBasis cho workflow dat dai.
+- Cac ID `LEG-*` la ID tam, duoc doi sang US ID chinh thuc khi PM duyet merge backlog.
+
 ## 3. Tổng hợp theo mức ưu tiên
 
 | Mức ưu tiên | Số lượng |

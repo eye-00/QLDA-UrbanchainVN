@@ -4,8 +4,8 @@ export type UserRole =
   | 'RECEPTION_OFFICER'
   | 'COMMUNE_OFFICER'
   | 'LAND_REGISTRY_OFFICER'
-  | 'APPROVAL_AUTHORITY'
   | 'TAX_OFFICER'
+  | 'APPROVAL_AUTHORITY'
   | 'AUDITOR'
   | 'ADMIN';
 
@@ -15,9 +15,9 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   RECEPTION_OFFICER: 'Cán bộ tiếp nhận',
   COMMUNE_OFFICER: 'Cán bộ cấp xã',
   LAND_REGISTRY_OFFICER: 'Cán bộ VPĐKĐĐ',
-  APPROVAL_AUTHORITY: 'Cơ quan phê duyệt',
   TAX_OFFICER: 'Cán bộ thuế',
-  AUDITOR: 'Kiểm toán',
+  APPROVAL_AUTHORITY: 'Cơ quan phê duyệt',
+  AUDITOR: 'Kiểm soát tuân thủ',
   ADMIN: 'Quản trị'
 };
 
@@ -26,8 +26,8 @@ export const OFFICER_ROLES: UserRole[] = [
   'RECEPTION_OFFICER',
   'COMMUNE_OFFICER',
   'LAND_REGISTRY_OFFICER',
-  'APPROVAL_AUTHORITY',
   'TAX_OFFICER',
+  'APPROVAL_AUTHORITY',
   'AUDITOR',
   'ADMIN'
 ];

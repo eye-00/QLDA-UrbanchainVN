@@ -14,12 +14,15 @@ import { CitizenRegistrationPage } from './pages/CitizenRegistrationPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { UserManagementPage } from './pages/UserManagementPage';
+import { UserEditPage } from './pages/UserEditPage';
 import { OrganizationManagementPage } from './pages/OrganizationManagementPage';
+import { OrganizationEditPage } from './pages/OrganizationEditPage';
 import { LandManagementPage } from './pages/LandManagementPage';
+import { LandEditPage } from './pages/LandEditPage';
 import { SearchLandPage } from './pages/SearchLandPage';
 import { RegistrationReviewPage } from './pages/RegistrationReviewPage';
+import { RegistrationReviewDetailPage } from './pages/RegistrationReviewDetailPage';
 import { WalletManagementPage } from './pages/WalletManagementPage';
-import { ServiceWalletManagementPage } from './pages/ServiceWalletManagementPage';
 
 function hasRole(role: UserRole | undefined, roles: UserRole[]) {
   return Boolean(role && roles.includes(role));
@@ -57,19 +60,39 @@ const PAGE_LABELS: Record<string, string> = {
   '/registrations/create': 'Nộp hồ sơ đăng ký lần đầu',
   '/wallets': 'Quản lý ví blockchain',
   '/admin/users': 'Quản lý người dùng',
+  '/admin/users/edit': 'Cập nhật người dùng',
   '/admin/organizations': 'Quản lý đơn vị',
-  '/admin/service-wallets': 'Quản trị ví công vụ',
+  '/admin/organizations/edit': 'Cập nhật đơn vị',
   '/lands': 'Quản lý thửa đất',
+  '/lands/edit': 'Cập nhật thửa đất',
   '/registrations/review': 'Xử lý hồ sơ đăng ký',
+  '/registrations/review/detail': 'Chi tiết xử lý hồ sơ',
   '/lands/search': 'Tra cứu thửa đất',
   '/forbidden': 'Không có quyền truy cập'
 };
+
+function isNavItemActive(pathname: string, to: string) {
+  if (pathname === to) return true;
+  if (to === '/admin/users' && pathname.startsWith('/admin/users/')) return true;
+  if (to === '/admin/organizations' && pathname.startsWith('/admin/organizations/')) return true;
+  if (to === '/lands' && pathname.startsWith('/lands/')) return true;
+  if (to === '/registrations/review' && pathname.startsWith('/registrations/review/')) return true;
+  return false;
+}
+
+function getCurrentPageLabel(pathname: string) {
+  if (pathname.startsWith('/admin/users/') && pathname.endsWith('/edit')) return PAGE_LABELS['/admin/users/edit'];
+  if (pathname.startsWith('/admin/organizations/') && pathname.endsWith('/edit')) return PAGE_LABELS['/admin/organizations/edit'];
+  if (pathname.startsWith('/lands/') && pathname.endsWith('/edit')) return PAGE_LABELS['/lands/edit'];
+  if (pathname.startsWith('/registrations/review/')) return PAGE_LABELS['/registrations/review/detail'];
+  return PAGE_LABELS[pathname] ?? 'UrbanChain-VN';
+}
 
 export function App() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const currentPageLabel = PAGE_LABELS[location.pathname] ?? 'UrbanChain-VN';
+  const currentPageLabel = getCurrentPageLabel(location.pathname);
 
   async function handleLogout() {
     await logout();
@@ -98,7 +121,7 @@ export function App() {
         </div>
         <nav className="sidebar-nav">
           {visibleNavItems.map((item) => (
-            <Link key={item.to} to={item.to} className={location.pathname === item.to ? 'active' : ''}>
+            <Link key={item.to} to={item.to} className={isNavItemActive(location.pathname, item.to) ? 'active' : ''}>
               {item.label}
             </Link>
           ))}
@@ -134,10 +157,13 @@ export function App() {
           <Route path="/wallets" element={<RequireAuth roles={CITIZEN_ROLES}><WalletManagementPage /></RequireAuth>} />
           <Route path="/dashboard" element={<RequireAuth roles={DASHBOARD_ROLES}><AdminDashboardPage /></RequireAuth>} />
           <Route path="/admin/users" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><UserManagementPage /></RequireAuth>} />
+          <Route path="/admin/users/:id/edit" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><UserEditPage /></RequireAuth>} />
           <Route path="/admin/organizations" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><OrganizationManagementPage /></RequireAuth>} />
-          <Route path="/admin/service-wallets" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><ServiceWalletManagementPage /></RequireAuth>} />
+          <Route path="/admin/organizations/:id/edit" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><OrganizationEditPage /></RequireAuth>} />
           <Route path="/lands" element={<RequireAuth roles={LAND_MANAGEMENT_ROLES}><LandManagementPage /></RequireAuth>} />
+          <Route path="/lands/:id/edit" element={<RequireAuth roles={LAND_MANAGEMENT_ROLES}><LandEditPage /></RequireAuth>} />
           <Route path="/registrations/review" element={<RequireAuth roles={REGISTRATION_REVIEW_ROLES}><RegistrationReviewPage /></RequireAuth>} />
+          <Route path="/registrations/review/:id" element={<RequireAuth roles={REGISTRATION_REVIEW_ROLES}><RegistrationReviewDetailPage /></RequireAuth>} />
           <Route path="/lands/search" element={<RequireAuth roles={DASHBOARD_ROLES}><SearchLandPage /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

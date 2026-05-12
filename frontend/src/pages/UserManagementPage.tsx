@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiGet, apiPatch, apiPost } from '../lib/api';
 import { ROLE_LABELS, UserRole } from '../auth/roles';
 import { useToast } from '../ui/ToastContext';
@@ -6,7 +7,6 @@ import { getAccountStatusLabel } from '../ui/statusLabels';
 import {
   buildUserCreatePayload,
   buildUserQueryString,
-  buildUserUpdatePayload,
   getNextUserStatus
 } from './sprint2PageHelpers';
 
@@ -43,8 +43,8 @@ const roleOptions: UserRole[] = [
   'RECEPTION_OFFICER',
   'COMMUNE_OFFICER',
   'LAND_REGISTRY_OFFICER',
-  'APPROVAL_AUTHORITY',
   'TAX_OFFICER',
+  'APPROVAL_AUTHORITY',
   'AUDITOR',
   'ADMIN'
 ];
@@ -66,23 +66,12 @@ const initialFilter = {
 
 export function UserManagementPage() {
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const [items, setItems] = useState<UserItem[]>([]);
   const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState(initialCreateForm);
   const [filters, setFilters] = useState(initialFilter);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{
-    fullName: string;
-    email: string;
-    role: UserRole;
-    organizationId: string;
-  }>({
-    fullName: '',
-    email: '',
-    role: 'RECEPTION_OFFICER',
-    organizationId: ''
-  });
 
   const queryString = useMemo(() => {
     return buildUserQueryString(filters);
@@ -120,32 +109,6 @@ export function UserManagementPage() {
       await loadUsers();
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Không tạo được người dùng');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function startEdit(user: UserItem) {
-    setEditingId(user.userId);
-    setEditForm({
-      fullName: user.fullName,
-      email: user.email,
-      role: user.role,
-      organizationId: user.organizationId ?? ''
-    });
-  }
-
-  async function onUpdateUser(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!editingId) return;
-    setLoading(true);
-    try {
-      await apiPatch<UserItem>(`/users/${editingId}`, buildUserUpdatePayload(editForm));
-      showToast('success', 'Đã cập nhật người dùng');
-      setEditingId(null);
-      await loadUsers();
-    } catch (error) {
-      showToast('error', error instanceof Error ? error.message : 'Không cập nhật được người dùng');
     } finally {
       setLoading(false);
     }
@@ -293,7 +256,12 @@ export function UserManagementPage() {
                     </td>
                     <td>
                       <div className="action-row">
-                        <button type="button" className="btn btn-outline" onClick={() => startEdit(item)} disabled={loading}>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => navigate(`/admin/users/${item.userId}/edit`)}
+                          disabled={loading}
+                        >
                           Cập nhật
                         </button>
                         <button type="button" onClick={() => void onToggleStatus(item)} disabled={loading}>
@@ -307,64 +275,6 @@ export function UserManagementPage() {
             </table>
           </div>
         </div>
-      )}
-
-      {editingId && (
-        <form className="card form-grid-4" onSubmit={onUpdateUser}>
-          <h3>Cập nhật người dùng</h3>
-          <label>
-            Họ tên
-            <input
-              value={editForm.fullName}
-              onChange={(event) => setEditForm({ ...editForm, fullName: event.target.value })}
-              required
-            />
-          </label>
-          <label>
-            Email
-            <input
-              type="email"
-              value={editForm.email}
-              onChange={(event) => setEditForm({ ...editForm, email: event.target.value })}
-              required
-            />
-          </label>
-          <label>
-            Vai trò
-            <select
-              value={editForm.role}
-              onChange={(event) => setEditForm({ ...editForm, role: event.target.value as UserRole })}
-            >
-              {roleOptions.map((role) => (
-                <option value={role} key={role}>
-                  {ROLE_LABELS[role]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Đơn vị
-            <select
-              value={editForm.organizationId}
-              onChange={(event) => setEditForm({ ...editForm, organizationId: event.target.value })}
-            >
-              <option value="">Không gán</option>
-              {organizations.map((item) => (
-                <option value={item.id} key={item.id}>
-                  {item.code} - {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="action-row">
-            <button type="submit" disabled={loading}>
-              Lưu thay đổi
-            </button>
-            <button type="button" onClick={() => setEditingId(null)} disabled={loading}>
-              Hủy
-            </button>
-          </div>
-        </form>
       )}
     </section>
   );
