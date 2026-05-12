@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
+import { UserRole } from '../auth/roles';
 import { useToast } from '../ui/ToastContext';
 import { getRegistrationStatusBadgeClass, getRegistrationStatusLabel } from '../ui/registrationStatus';
 import {
@@ -102,6 +103,41 @@ type BlockchainStatusPayload = {
   inSync: boolean;
 };
 
+type ServiceWalletAuthorizationItem = {
+  id: string;
+  walletId: string;
+  walletAddress: string;
+  network: 'SEPOLIA' | 'HARDHAT' | 'GANACHE';
+  chainId: number;
+  status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
+  roleScope: UserRole;
+};
+
+type ServiceWalletAuthorizationListResponse = {
+  items: ServiceWalletAuthorizationItem[];
+  total: number;
+};
+
+type BlockchainTxLifecycleItem = {
+  id: string;
+  action: string;
+  network: 'SEPOLIA' | 'HARDHAT' | 'GANACHE';
+  chainId: number;
+  walletAddress: string;
+  txHash: string | null;
+  explorerUrl: string | null;
+  status: 'PENDING' | 'CONFIRMED' | 'FAILED' | 'REJECTED';
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type BlockchainTxLifecycleResponse = {
+  items: BlockchainTxLifecycleItem[];
+  total: number;
+};
+
 const STATUS_FILTER_OPTIONS = [
   'CHO_TIEP_NHAN',
   'CAN_BO_SUNG',
@@ -143,6 +179,14 @@ export function RegistrationReviewPage() {
   const [documentHistory, setDocumentHistory] = useState<DocumentHistoryEvent[]>([]);
   const [blockchainStatus, setBlockchainStatus] = useState<BlockchainStatusPayload | null>(null);
   const [loadingBlockchainStatus, setLoadingBlockchainStatus] = useState(false);
+  const [serviceWallets, setServiceWallets] = useState<ServiceWalletAuthorizationItem[]>([]);
+  const [selectedServiceWalletId, setSelectedServiceWalletId] = useState('');
+  const [signingMessage, setSigningMessage] = useState('');
+  const [signingAddress, setSigningAddress] = useState('');
+  const [signingChainId, setSigningChainId] = useState(Number(import.meta.env.VITE_BLOCKCHAIN_CHAIN_ID ?? 11155111));
+  const [signature, setSignature] = useState('');
+  const [confirmReady, setConfirmReady] = useState(false);
+  const [txLifecycle, setTxLifecycle] = useState<BlockchainTxLifecycleItem[]>([]);
   const [missingItemsInput, setMissingItemsInput] = useState('');
   const [supplementDeadline, setSupplementDeadline] = useState('');
   const [communeEvidenceFileId, setCommuneEvidenceFileId] = useState('');
@@ -182,19 +226,33 @@ export function RegistrationReviewPage() {
       setPaymentObligations([]);
       setDocumentHistory([]);
       setBlockchainStatus(null);
+      setTxLifecycle([]);
       setCommuneEvidenceFileId('');
+      setConfirmReady(false);
+      setSignature('');
+      setSigningMessage('');
       return;
     }
     setLegalBasisCode(selected.legalBasisCode ?? selected.procedureCode ?? '');
     setCommuneEvidenceFileId(selected.files?.[0]?.id ?? '');
     void loadPaymentObligations(selected.id);
     void loadDocumentHistory(selected.id);
+    void loadTxLifecycle(selected.id);
     if (blockchainStatusEnabled) {
       void loadBlockchainStatus(selected.id);
     } else {
       setBlockchainStatus(null);
     }
   }, [selected?.id, blockchainStatusEnabled]);
+
+  useEffect(() => {
+    if (!permissions.canBlockchainSync) {
+      setServiceWallets([]);
+      setSelectedServiceWalletId('');
+      return;
+    }
+    void loadServiceWallets();
+  }, [permissions.canBlockchainSync, user?.role]);
 
   async function loadPaymentObligations(registrationId: string) {
     try {
@@ -228,6 +286,98 @@ export function RegistrationReviewPage() {
     }
   }
 
+  async function loadServiceWallets() {
+    try {
+      const roleScope = user?.role && user.role !== 'ADMIN' ? user.role : '';
+      const data = await apiGet<ServiceWalletAuthorizationListResponse>(`/service-wallets?status=ACTIVE${roleScope ? `&roleScope=${roleScope}` : ''}`);
+      setServiceWallets(data.items);
+      if (data.items.length > 0) {
+        setSelectedServiceWalletId((current) => current || data.items[0].id);
+      } else {
+        setSelectedServiceWalletId('');
+      }
+    } catch (error) {
+      setServiceWallets([]);
+      setSelectedServiceWalletId('');
+      showToast('error', error instanceof Error ? error.message : 'Không tải được danh sách ví công vụ đang hiệu lực.');
+    }
+  }
+
+  async function loadTxLifecycle(registrationId: string) {
+    try {
+      const data = await apiGet<BlockchainTxLifecycleResponse>(`/registrations/${registrationId}/tx-lifecycle`);
+      setTxLifecycle(data.items);
+    } catch {
+      setTxLifecycle([]);
+    }
+  }
+
+  async function prepareBlockchainSignature() {
+    if (!selected) return null;
+    if (!selectedServiceWalletId) {
+      showToast('error', 'Vui lòng chọn ví công vụ trước khi ký xác nhận.');
+      return null;
+    }
+
+    const selectedWallet = serviceWallets.find((item) => item.id === selectedServiceWalletId);
+    if (!selectedWallet) {
+      showToast('error', 'Không tìm thấy cấu hình ví công vụ đã chọn.');
+      return null;
+    }
+
+    const signingText = [
+      'UrbanChain-VN Blockchain Sync Confirmation',
+      `RegistrationCode: ${selected.code}`,
+      `ServiceWalletAuthId: ${selectedWallet.id}`,
+      `WalletAddress: ${selectedWallet.walletAddress}`,
+      `ChainId: ${selectedWallet.chainId}`,
+      `IssuedAt: ${new Date().toISOString()}`
+    ].join('\n');
+
+    if (!(window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum) {
+      showToast('error', 'Không phát hiện ví trình duyệt. Hãy mở MetaMask (hoặc ví EVM tương thích).');
+      return null;
+    }
+
+    const ethereum = (window as { ethereum: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+
+    const accounts = (await ethereum.request({ method: 'eth_requestAccounts' })) as string[];
+    if (!accounts || accounts.length === 0) {
+      showToast('error', 'Không tìm thấy tài khoản ví đang kết nối.');
+      return null;
+    }
+    const connectedAddress = accounts[0];
+    if (connectedAddress.toLowerCase() !== selectedWallet.walletAddress.toLowerCase()) {
+      showToast('error', 'Ví đang kết nối không trùng với ví công vụ đã được cấp quyền. Vui lòng chuyển ví và thử lại.');
+      return null;
+    }
+
+    const chainHex = (await ethereum.request({ method: 'eth_chainId' })) as string;
+    const chainId = Number.parseInt(chainHex, 16);
+    if (chainId !== selectedWallet.chainId) {
+      showToast('error', `Sai mạng blockchain. Cần chainId ${selectedWallet.chainId}, hiện tại ${chainId}.`);
+      return null;
+    }
+
+    const signed = (await ethereum.request({
+      method: 'personal_sign',
+      params: [signingText, connectedAddress]
+    })) as string;
+
+    setSigningAddress(connectedAddress);
+    setSigningChainId(chainId);
+    setSigningMessage(signingText);
+    setSignature(signed);
+    setConfirmReady(true);
+    return {
+      walletAuthorizationId: selectedWallet.id,
+      signerWalletAddress: connectedAddress,
+      signerChainId: chainId,
+      signingMessage: signingText,
+      signature: signed
+    };
+  }
+
   function resolveLegalBasisCode() {
     const value = legalBasisCode.trim();
     if (value) return value;
@@ -250,11 +400,16 @@ export function RegistrationReviewPage() {
       setApprovalNumber('');
       setChainCid('');
       setChainHash('');
+      setConfirmReady(false);
+      setSigningMessage('');
+      setSigningAddress('');
+      setSignature('');
       setMissingItemsInput('');
       setSupplementDeadline('');
       await loadRegistrations();
       await loadPaymentObligations(selected.id);
       await loadDocumentHistory(selected.id);
+      await loadTxLifecycle(selected.id);
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Không thực hiện được thao tác.');
     } finally {
@@ -523,6 +678,60 @@ export function RegistrationReviewPage() {
             </div>
           )}
 
+          {blockchainStatusEnabled && (
+            <div className="row-gap">
+              <h3>Vòng đời giao dịch blockchain</h3>
+              {txLifecycle.length === 0 ? (
+                <div className="empty-state">Chưa có giao dịch blockchain cho hồ sơ này.</div>
+              ) : (
+                <div className="data-table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Thời điểm</th>
+                        <th>Ví ký</th>
+                        <th>Mạng</th>
+                        <th>Trạng thái</th>
+                        <th>Tx hash</th>
+                        <th>Lỗi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {txLifecycle.map((item) => (
+                        <tr key={item.id}>
+                          <td>{new Date(item.createdAt).toLocaleString('vi-VN')}</td>
+                          <td className="mono-text">{item.walletAddress}</td>
+                          <td>{item.network} / {item.chainId}</td>
+                          <td>
+                            <span className={`badge ${
+                              item.status === 'CONFIRMED'
+                                ? 'badge-success'
+                                : item.status === 'PENDING'
+                                  ? 'badge-warning'
+                                  : 'badge-danger'
+                            }`}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className="mono-text">
+                            {item.explorerUrl ? (
+                              <a href={item.explorerUrl} target="_blank" rel="noreferrer">
+                                {formatShortTxHash(item.txHash) ?? 'Mở explorer'}
+                              </a>
+                            ) : (
+                              formatShortTxHash(item.txHash) ?? 'N/A'
+                            )}
+                          </td>
+                          <td>{item.errorMessage ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="row-gap">
             <h3>Thao tác xử lý</h3>
             <label>
@@ -772,6 +981,24 @@ export function RegistrationReviewPage() {
             {permissions.canBlockchainSync && (
               <div className="form-grid">
                 <label>
+                  Ví công vụ (được cấp quyền)
+                  <select
+                    value={selectedServiceWalletId}
+                    onChange={(event) => {
+                      setSelectedServiceWalletId(event.target.value);
+                      setConfirmReady(false);
+                      setSignature('');
+                    }}
+                  >
+                    <option value="">Chọn ví công vụ</option>
+                    {serviceWallets.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.walletAddress} ({item.network} / {item.chainId})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
                   CID IPFS
                   <input value={chainCid} onChange={(event) => setChainCid(event.target.value)} placeholder="bafy..." />
                 </label>
@@ -782,24 +1009,53 @@ export function RegistrationReviewPage() {
                 <div className="action-row">
                   <button
                     type="button"
+                    className="btn btn-outline"
                     onClick={() => {
                       if (!isBlockchainSyncReady(chainCid, chainHash)) {
                         showToast('error', 'Vui lòng nhập đầy đủ CID và metadata hash.');
+                        return;
+                      }
+                      void prepareBlockchainSignature();
+                    }}
+                  >
+                    Xem giao dịch / Ký xác nhận
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isBlockchainSyncReady(chainCid, chainHash)) {
+                        showToast('error', 'Vui lòng nhập đầy đủ CID và metadata hash.');
+                        return;
+                      }
+                      if (!confirmReady || !signature || !signingMessage || !selectedServiceWalletId || !signingAddress) {
+                        showToast('error', 'Vui lòng thực hiện bước ký xác nhận trước khi gửi giao dịch.');
                         return;
                       }
                       void executeAction(
                         '/blockchain-sync',
                         {
                           cid: chainCid,
-                          metadataHash: chainHash
+                          metadataHash: chainHash,
+                          walletAuthorizationId: selectedServiceWalletId,
+                          signerWalletAddress: signingAddress,
+                          signerChainId: signingChainId,
+                          signingMessage,
+                          signature
                         },
                         'Đã đồng bộ bản ghi số.'
                       );
                     }}
                   >
-                    Đồng bộ blockchain
+                    Xác nhận và gửi giao dịch
                   </button>
                 </div>
+                {confirmReady && (
+                  <ul className="note-list">
+                    <li>Ví ký: <span className="mono-text">{signingAddress}</span></li>
+                    <li>Chain ID: {signingChainId}</li>
+                    <li>Nội dung đã ký: <span className="mono-text">{signingMessage}</span></li>
+                  </ul>
+                )}
               </div>
             )}
 

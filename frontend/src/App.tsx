@@ -19,6 +19,7 @@ import { LandManagementPage } from './pages/LandManagementPage';
 import { SearchLandPage } from './pages/SearchLandPage';
 import { RegistrationReviewPage } from './pages/RegistrationReviewPage';
 import { WalletManagementPage } from './pages/WalletManagementPage';
+import { ServiceWalletManagementPage } from './pages/ServiceWalletManagementPage';
 
 function hasRole(role: UserRole | undefined, roles: UserRole[]) {
   return Boolean(role && roles.includes(role));
@@ -36,6 +37,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/wallets', label: 'Ví blockchain', roles: CITIZEN_ROLES },
   { to: '/admin/users', label: 'Người dùng', roles: ADMIN_ONLY_ROLES },
   { to: '/admin/organizations', label: 'Đơn vị', roles: ADMIN_ONLY_ROLES },
+  { to: '/admin/service-wallets', label: 'Ví công vụ', roles: ADMIN_ONLY_ROLES },
   { to: '/lands', label: 'Thửa đất', roles: LAND_MANAGEMENT_ROLES },
   { to: '/registrations/review', label: 'Hồ sơ xử lý', roles: REGISTRATION_REVIEW_ROLES },
   { to: '/lands/search', label: 'Tra cứu thửa đất', roles: DASHBOARD_ROLES }
@@ -56,6 +58,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/wallets': 'Quản lý ví blockchain',
   '/admin/users': 'Quản lý người dùng',
   '/admin/organizations': 'Quản lý đơn vị',
+  '/admin/service-wallets': 'Quản trị ví công vụ',
   '/lands': 'Quản lý thửa đất',
   '/registrations/review': 'Xử lý hồ sơ đăng ký',
   '/lands/search': 'Tra cứu thửa đất',
@@ -132,6 +135,7 @@ export function App() {
           <Route path="/dashboard" element={<RequireAuth roles={DASHBOARD_ROLES}><AdminDashboardPage /></RequireAuth>} />
           <Route path="/admin/users" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><UserManagementPage /></RequireAuth>} />
           <Route path="/admin/organizations" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><OrganizationManagementPage /></RequireAuth>} />
+          <Route path="/admin/service-wallets" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><ServiceWalletManagementPage /></RequireAuth>} />
           <Route path="/lands" element={<RequireAuth roles={LAND_MANAGEMENT_ROLES}><LandManagementPage /></RequireAuth>} />
           <Route path="/registrations/review" element={<RequireAuth roles={REGISTRATION_REVIEW_ROLES}><RegistrationReviewPage /></RequireAuth>} />
           <Route path="/lands/search" element={<RequireAuth roles={DASHBOARD_ROLES}><SearchLandPage /></RequireAuth>} />
