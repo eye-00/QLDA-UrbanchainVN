@@ -33,8 +33,11 @@ const STATUS_PROGRESS_MAP: Record<string, number> = {
   DANG_THAM_DINH_VPDKDD: 3,
   CHO_THUE: 4,
   CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH: 4,
+  DA_HOAN_THANH_NGHIA_VU_TAI_CHINH: 4,
   CHO_KY_CAP: 5,
   DA_KY_CAP: 6,
+  DA_CAP_NHAT_HO_SO_DIA_CHINH: 6,
+  DA_GHI_BLOCKCHAIN: 6,
   DA_CAP: 6,
   DA_HOAN_THANH_NGHIA_VU_TAI_CHINH: 5,
   DA_CAP_NHAT_HO_SO_DIA_CHINH: 6,
@@ -135,6 +138,9 @@ export function getReviewStepsByStatus(status: string) {
 
 export function getReviewPermissions(role: UserRole | undefined) {
   const isAdmin = role === 'ADMIN';
+  const isTaxOfficer = role === 'TAX_OFFICER';
+  const isRegistryOfficer = role === 'LAND_REGISTRY_OFFICER';
+  const isApproval = role === 'APPROVAL_AUTHORITY';
   return {
     canAccept: role === 'RECEPTION_OFFICER' || isAdmin,
     canCommuneConfirm: role === 'COMMUNE_OFFICER' || isAdmin,

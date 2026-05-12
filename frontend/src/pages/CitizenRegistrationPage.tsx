@@ -14,6 +14,8 @@ import { loadCommuneOptionsByProvince, loadProvinceOptions, type CommuneOption, 
 type RegistrationItem = {
   id: string;
   code: string;
+  tokenId?: number | null;
+  txHash?: string | null;
   landInfo: {
     parcelNumber: string;
     mapSheetNumber: string;
@@ -45,6 +47,7 @@ type UploadDraft = {
 };
 
 const initialForm = {
+  procedureCode: 'DKDD_LANDAU_3380',
   fullName: 'Nguyễn Văn A',
   identityNumber: '0482xxxxxxx',
   mapSheetNumber: '05',
@@ -173,6 +176,7 @@ export function CitizenRegistrationPage() {
       }
 
       const payload = {
+        procedureCode: form.procedureCode,
         landInfo: {
           provinceCode: form.provinceCode,
           communeName: form.communeName,
@@ -204,7 +208,9 @@ export function CitizenRegistrationPage() {
   async function submitRegistration(registrationId: string) {
     setLoading(true);
     try {
-      await apiPost(`/registrations/${registrationId}/submit`, {});
+      await apiPost(`/registrations/${registrationId}/submit`, {
+        legalBasisCode: `QĐ3380-SUBMIT-${new Date().getFullYear()}`
+      });
       showToast('success', 'Đã gửi hồ sơ vào luồng tiếp nhận.');
       await loadRegistrations();
     } catch (error) {
@@ -416,6 +422,7 @@ export function CitizenRegistrationPage() {
                   <th>Chủ sử dụng</th>
                   <th>Thửa đất</th>
                   <th>Trạng thái</th>
+                  <th>Blockchain</th>
                   <th>Cập nhật gần nhất</th>
                   <th>Ghi chú gần nhất</th>
                   <th>Hành động</th>
@@ -436,6 +443,16 @@ export function CitizenRegistrationPage() {
                         <span className={`badge ${getRegistrationStatusBadgeClass(item.status)}`}>
                           {getRegistrationStatusLabel(item.status)}
                         </span>
+                      </td>
+                      <td>
+                        {item.txHash ? (
+                          <div className="row-gap-xs">
+                            <div className="mono-text">{item.txHash.slice(0, 14)}...{item.txHash.slice(-6)}</div>
+                            <div className="muted">Token #{item.tokenId ?? "N/A"}</div>
+                          </div>
+                        ) : (
+                          <span className="muted">Chưa ghi chain</span>
+                        )}
                       </td>
                       <td>{new Date(item.updatedAt).toLocaleString('vi-VN')}</td>
                       <td>

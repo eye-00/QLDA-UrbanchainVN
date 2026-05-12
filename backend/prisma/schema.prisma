@@ -46,8 +46,11 @@ enum RegistrationStatus {
   DANG_THAM_DINH_VPDKDD
   CHO_THUE
   CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH
+  DA_HOAN_THANH_NGHIA_VU_TAI_CHINH
   CHO_KY_CAP
   DA_KY_CAP
+  DA_CAP_NHAT_HO_SO_DIA_CHINH
+  DA_GHI_BLOCKCHAIN
   DA_CAP
   DA_HOAN_THANH_NGHIA_VU_TAI_CHINH
   DA_CAP_NHAT_HO_SO_DIA_CHINH
@@ -104,6 +107,20 @@ model User {
   wallets        WalletAccount[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+}
+
+model LegalProcedure {
+  id              String         @id @default(cuid())
+  procedureCode   String         @unique
+  sourceDecision  String
+  legalBasis      String
+  level           ProcedureLevel
+  authorityActors Json
+  requiresTaxStep Boolean        @default(false)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  registrations   Registration[]
 }
 
 model AuthSession {
@@ -173,11 +190,14 @@ model Registration {
   legalBasisCode String?
   submitSnapshotAt DateTime?
   noteHistory    Json?
+  submittedSnapshotLocked Boolean          @default(false)
+  cadastralUpdatedAt DateTime?
   status         RegistrationStatus @default(MOI_TAO)
   ipfsCid        String?
   documentHash   String?
   tokenId        Int?
   txHash         String?
+  procedure      LegalProcedure?    @relation(fields: [procedureCode], references: [procedureCode])
   applicant      User               @relation(fields: [applicantId], references: [id])
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt

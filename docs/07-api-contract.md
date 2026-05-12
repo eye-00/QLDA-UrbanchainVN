@@ -101,10 +101,14 @@ Authorization: Bearer <token>
 - `DANG_THAM_DINH_VPDKDD`
 - `CHO_THUE`
 - `CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH`
+- `DA_HOAN_THANH_NGHIA_VU_TAI_CHINH`
 - `CHO_KY_CAP`
 - `DA_KY_CAP`
+- `DA_CAP_NHAT_HO_SO_DIA_CHINH`
+- `DA_GHI_BLOCKCHAIN`
 - `DA_CAP`
 - `DA_TRA_KET_QUA`
+- `HUY_HO_SO`
 - `TU_CHOI`
 
 ## 3.2. Transfer status
@@ -500,7 +504,8 @@ Tạo hồ sơ đăng ký lần đầu.
 ### Request
 ```json
 {
-  "applicantId": "usr_001",
+  "procedureCode": "DKDD_LANDAU_3380",
+  "legalBasisCode": "QĐ3380-INIT-01",
   "landInfo": {
     "provinceCode": "48",
     "communeName": "Hoa Khanh",
@@ -538,6 +543,14 @@ Tạo hồ sơ đăng ký lần đầu.
 
 ## 8.2. POST /registrations/:registrationId/submit
 Nộp hồ sơ vào luồng xử lý.
+
+### Request
+```json
+{
+  "legalBasisCode": "QĐ3380-SUBMIT-01",
+  "note": "Người dân nộp hồ sơ"
+}
+```
 
 ### Response data
 ```json
@@ -581,6 +594,7 @@ Danh sách hồ sơ, hỗ trợ filter theo vai trò.
 ```json
 {
   "status": "CAN_BO_SUNG",
+  "legalBasisCode": "QĐ3380-STATUS-01",
   "reason": "Thieu giay to chung minh quyen su dung dat"
 }
 ```
@@ -598,9 +612,15 @@ UBND cấp xã xác nhận xử lý.
 ```json
 {
   "confirmed": true,
-  "notes": "Da xac nhan thong tin thuoc tham quyen"
+  "legalBasisCode": "QĐ3380-COMMUNE-01",
+  "notes": "Da xac nhan thong tin thuoc tham quyen",
+  "evidenceFileId": "fil_001"
 }
 ```
+
+### Validation rules
+- `notes` bat buoc, toi thieu 3 ky tu.
+- `evidenceFileId` bat buoc va phai thuoc cung ho so dang ky.
 
 ## 8.7. POST /registrations/:registrationId/tax-transfer
 Chuyển thông tin sang cơ quan thuế.
@@ -608,7 +628,9 @@ Chuyển thông tin sang cơ quan thuế.
 ### Request
 ```json
 {
+  "legalBasisCode": "QĐ3380-TAX-01",
   "taxReferenceNo": "TAX-REQ-001",
+  "amount": 350000,
   "notes": "Chuyen thong tin xac dinh nghia vu tai chinh"
 }
 ```
@@ -619,8 +641,11 @@ Phê duyệt/ký cấp kết quả.
 ### Request
 ```json
 {
+  "legalBasisCode": "QĐ3380-APPROVE-01",
   "approvalNumber": "QD-2026-001",
-  "approvalDate": "2026-01-15"
+  "approvalDate": "2026-01-15",
+  "note": "Ho so du dieu kien phe duyet",
+  "landCode": "LAND-2026-0001"
 }
 ```
 
@@ -634,14 +659,22 @@ Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
 ### Request
 ```json
 {
+  "legalBasisCode": "QĐ3380-BLOCKCHAIN-01",
   "cid": "bafy...",
-  "metadataHash": "0xabc123"
+  "metadataHash": "0xabc123",
+  "walletAuthorizationId": "swa_001",
+  "signerWalletAddress": "0xabc...def",
+  "signerChainId": 11155111,
+  "signingMessage": "UrbanChain-VN Blockchain Sync Confirmation\\n...",
+  "signature": "0x..."
 }
 ```
 
 ### Response data
 ```json
 {
+  "registrationId": "reg_001",
+  "tokenId": 1001,
   "txHash": "0x123456",
   "tokenId": 1001,
   "metadataHash": "0xabc123",
@@ -675,6 +708,166 @@ Lấy lịch sử thông báo kết quả xử lý hồ sơ theo RBAC/ownership.
 ### Notification rule
 - Mỗi thay đổi trạng thái hồ sơ phải ghi audit event `REGISTRATION_STATUS_UPDATED`.
 - Đồng thời phát sinh nhật ký thông báo `REGISTRATION_NOTIFICATION_SENT` để người dùng tra cứu lịch sử cập nhật.
+
+## 8.11. GET /registrations/:registrationId/document-versions
+Lấy danh sách phiên bản tài liệu của hồ sơ.
+
+## 8.12. POST /registrations/:registrationId/document-versions
+Tạo phiên bản tài liệu mới.
+
+### Request
+```json
+{
+  "documentType": "LAND_CERT_SUPPORT",
+  "storageStatus": "UPLOADED_IPFS",
+  "cid": "bafy...",
+  "hash": "0xabc123",
+  "note": "Bổ sung bản scan mới"
+}
+```
+
+## 8.13. GET /registrations/:registrationId/snapshots
+Lấy snapshot version tài liệu đã khóa tại thời điểm submit.
+
+## 8.14. GET /registrations/:registrationId/document-history
+Lấy timeline lịch sử hồ sơ từ document versions + submit snapshots + audit status.
+
+### Response data
+```json
+{
+  "items": [
+    {
+      "id": "evt_001",
+      "type": "DOCUMENT_VERSION",
+      "at": "2026-05-10T08:00:00.000Z",
+      "title": "Phiên bản tài liệu #2",
+      "detail": {
+        "status": "ACTIVE",
+        "documentType": "LAND_CERT_SUPPORT"
+      }
+    }
+  ],
+  "total": 1
+}
+```
+
+## 8.15. POST /registrations/:registrationId/request-supplement
+Yeu cau bo sung ho so kem checklist va han bo sung.
+
+### Request
+```json
+{
+  "legalBasisCode": "QĐ3380-SUP-01",
+  "note": "Can bo sung bo chung tu nghia vu tai chinh",
+  "missingItems": [
+    "Thieu ban scan giay to nguon goc dat",
+    "Thieu minh chung nghia vu tai chinh"
+  ],
+  "deadlineAt": "2026-05-20T09:00:00.000Z"
+}
+```
+
+### Validation rules
+- `missingItems` bat buoc, toi thieu 1 muc.
+- `deadlineAt` bat buoc va phai la thoi diem tuong lai.
+
+## 8.16. GET /registrations/:registrationId/payment-obligations
+Lấy danh sách nghĩa vụ tài chính của hồ sơ.
+
+## 8.17. POST /registrations/:registrationId/payment-obligations
+Tạo nghĩa vụ tài chính theo thủ tục pháp lý.
+
+## 8.18. PATCH /registrations/:registrationId/payment-obligations/:obligationId/status
+Xác nhận/cập nhật trạng thái nghĩa vụ tài chính (`PENDING|CONFIRMED|CANCELLED`).
+
+## 8.19. POST /registrations/:registrationId/cadastral-update
+Ghi nhận đã cập nhật hồ sơ địa chính off-chain trước bước blockchain-sync.
+
+### Legal guard bắt buộc
+- Mọi bước submit/chuyển trạng thái xử lý phải truyền `legalBasisCode`.
+- `blockchain-sync` chỉ được phép sau khi hồ sơ đạt điều kiện off-chain (`DA_CAP_NHAT_HO_SO_DIA_CHINH`).
+
+## 8.20. GET /registrations/:registrationId/blockchain-status
+Đối soát trạng thái on-chain/off-chain cho hồ sơ đăng ký.
+
+### Response data
+```json
+{
+  "registrationId": "reg_001",
+  "registrationCode": "REG-2026-0001",
+  "landCode": "LAND-2026-0001",
+  "offChain": {
+    "status": "DA_GHI_BLOCKCHAIN",
+    "tokenId": 1001,
+    "txHash": "0x123456"
+  },
+  "onChain": {
+    "mode": "rpc",
+    "contractAddress": "0xabc...",
+    "registrationTokenId": 1001,
+    "landTokenId": 1001
+  },
+  "inSync": true
+}
+```
+
+### RBAC
+- `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`, `ADMIN`, `AUDITOR`.
+
+## 8.21. GET /registrations/:registrationId/tx-lifecycle
+Lấy vòng đời giao dịch blockchain của hồ sơ (`PENDING|CONFIRMED|FAILED|REJECTED`).
+
+### Response data
+```json
+{
+  "items": [
+    {
+      "id": "txl_001",
+      "action": "BLOCKCHAIN_SYNC",
+      "network": "SEPOLIA",
+      "chainId": 11155111,
+      "walletAddress": "0xabc...def",
+      "txHash": "0x123456",
+      "explorerUrl": "https://sepolia.etherscan.io/tx/0x123456",
+      "status": "CONFIRMED",
+      "errorCode": null,
+      "errorMessage": null,
+      "createdAt": "2026-05-12T04:00:00.000Z",
+      "updatedAt": "2026-05-12T04:00:15.000Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### RBAC
+- `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`, `ADMIN`, `AUDITOR`.
+
+## 8.22. Service Wallet Governance APIs (Sprint 4)
+> Nhóm API quản trị ví công vụ, chỉ cho `ADMIN`.
+
+### GET /service-wallets
+Lấy danh sách quyền ví công vụ, hỗ trợ filter theo `status/network/roleScope/chainId`.
+
+### POST /service-wallets
+Cấp quyền ví công vụ từ ví đã `VERIFIED`.
+
+#### Request
+```json
+{
+  "walletId": "wal_001",
+  "roleScope": "APPROVAL_AUTHORITY",
+  "chainId": 11155111,
+  "effectiveTo": "2026-12-31T16:59:59.000Z",
+  "reason": "Phân công ký giao dịch hồ sơ đăng ký"
+}
+```
+
+### PATCH /service-wallets/:id/status
+Cập nhật trạng thái quyền ví công vụ: `ACTIVE|REVOKED|EXPIRED`.
+
+### GET /service-wallets/:id/audit
+Lấy audit trail của quyền ví công vụ.
 
 ---
 
@@ -934,7 +1127,8 @@ Nhật ký thay đổi phân quyền (`RBAC_*`).
 - `parcelNumber` bắt buộc
 - `mapSheetNumber` bắt buộc
 - `area > 0`
-- ít nhất 1 `attachedFileId`
+- `procedureCode` bắt buộc khi tạo hồ sơ
+- `legalBasisCode` bắt buộc cho submit và các bước chuyển trạng thái xử lý
 
 ## 14.3. Transfer
 - phải có `landId`
@@ -960,12 +1154,13 @@ Ví dụ:
 | Tiếp nhận hồ sơ | RECEPTION_OFFICER |
 | Xác nhận cấp xã | COMMUNE_OFFICER |
 | Thẩm định chuyên môn | LAND_REGISTRY_OFFICER |
+| Chuyển/ghi nhận nghĩa vụ tài chính | LAND_REGISTRY_OFFICER, TAX_OFFICER |
 | Ký/phê duyệt | APPROVAL_AUTHORITY |
 | Dashboard / reports | ADMIN, LAND_REGISTRY_OFFICER |
 | OCR result nội bộ | RECEPTION_OFFICER, COMMUNE_OFFICER, LAND_REGISTRY_OFFICER |
 | User/Organization management | ADMIN |
-| Audit APIs | ADMIN, LAND_REGISTRY_OFFICER |
-| Land parcel management Sprint 2 | RECEPTION_OFFICER, COMMUNE_OFFICER, LAND_REGISTRY_OFFICER, APPROVAL_AUTHORITY, ADMIN |
+| Audit APIs | ADMIN, LAND_REGISTRY_OFFICER, AUDITOR |
+| Land parcel management Sprint 2 | RECEPTION_OFFICER, COMMUNE_OFFICER, LAND_REGISTRY_OFFICER, APPROVAL_AUTHORITY, TAX_OFFICER, ADMIN |
 | Dashboard summary | Tất cả role đã xác thực (payload theo role) |
 
 ---

@@ -1,6 +1,6 @@
 # Remote Gate Evidence (Sprint 1-2-3)
 
-Cập nhật: 2026-04-29
+Cập nhật: 2026-05-10
 Repo: `eye-00/QLDA-UrbanchainVN` (public)
 
 ## 1) Required checks evidence (GitHub Actions)
@@ -84,3 +84,58 @@ Verify API:
 
 1. Duy trì branch protection + required checks như hiện tại cho Sprint 4+.
 2. Giữ cập nhật docs audit (`docs/12`, `docs/13`) sau mỗi PR thay đổi trạng thái US.
+
+## 6) Sprint 3 legal hardening chain evidence (2026-05-10)
+
+### PR #16 (Backend legal hardening)
+- PR: [#16](https://github.com/eye-00/QLDA-UrbanchainVN/pull/16)
+- Merge commit: `aa2b26a`
+- Kết quả checks:
+  - `backend-ci`: pass
+  - `frontend-ci`: skipped
+  - `contracts-ci`: skipped
+  - `docs-check`: skipped
+  - `changes`: pass
+
+### PR #17 (Frontend legal UX)
+- PR: [#17](https://github.com/eye-00/QLDA-UrbanchainVN/pull/17)
+- Merge commit: `92c5d94`
+- Kết quả checks:
+  - `frontend-ci`: pass
+  - `backend-ci`: skipped
+  - `contracts-ci`: skipped
+  - `docs-check`: skipped
+  - `changes`: pass
+
+### PR #18 (QA/docs closeout)
+- PR: [#18](https://github.com/eye-00/QLDA-UrbanchainVN/pull/18)
+- Merge commit: `288c65b`
+- Kết quả checks:
+  - `backend-ci`: pass
+  - `frontend-ci`: pass
+  - `contracts-ci`: skipped
+  - `docs-check`: pass
+  - `changes`: pass
+
+## 7) Sprint 4 PR chain evidence (ongoing)
+
+### PR #20 (S4 core blockchain)
+- PR: [#20](https://github.com/eye-00/QLDA-UrbanchainVN/pull/20)
+- Trạng thái: merged (`8f5a63b`)
+- Checks đã pass trước merge:
+  - `backend-ci`: pass
+  - `changes`: pass
+
+### PR #21 (S4 hardening)
+- PR: [#21](https://github.com/eye-00/QLDA-UrbanchainVN/pull/21)
+- Trạng thái: open (đang chờ review/check)
+- Scope: duplicate precheck + endpoint `GET /registrations/:id/blockchain-status`.
+
+### PR #22 (S4 frontend on-chain visibility)
+- PR: [#22](https://github.com/eye-00/QLDA-UrbanchainVN/pull/22)
+- Trạng thái: open (đang chờ review/check)
+- Scope: hiển thị tx/token cho citizen + panel đối soát cho officer.
+
+### PR #23 (S4 QA/docs closeout)
+- Trạng thái: sẽ mở sau khi commit docs + QA patch hiện tại.
+- Scope: test tích hợp `blockchain-status`, docs closeout Sprint 4.

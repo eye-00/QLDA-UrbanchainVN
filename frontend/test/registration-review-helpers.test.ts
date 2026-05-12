@@ -35,6 +35,7 @@ describe('registration review helpers', () => {
     expect(getReviewPermissions('TAX_OFFICER').canTaxTransfer).toBe(true);
     expect(getReviewPermissions('LAND_REGISTRY_OFFICER').canCadastralUpdate).toBe(true);
     expect(getReviewPermissions('APPROVAL_AUTHORITY').canBlockchainSync).toBe(true);
+    expect(getReviewPermissions('AUDITOR').canAccept).toBe(false);
     expect(getReviewPermissions('CITIZEN').canAccept).toBe(false);
     expect(getReviewPermissions('ADMIN').canApprove).toBe(true);
   });
@@ -46,6 +47,9 @@ describe('registration review helpers', () => {
     const approved = getReviewStepsByStatus('DA_CAP');
     expect(approved[6].state).toBe('current');
     expect(approved[0].state).toBe('done');
+
+    const blockchain = getReviewStepsByStatus('DA_GHI_BLOCKCHAIN');
+    expect(blockchain[6].state).toBe('current');
   });
 
   it('maps status to allowed actions', () => {

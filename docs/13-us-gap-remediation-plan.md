@@ -1,6 +1,6 @@
 # US Gap Remediation Plan - Sprint 1, Sprint 2, Sprint 3
 
-Cập nhật: 2026-04-29 00:10:00
+Cập nhật: 2026-05-10 16:15:00
 
 ## 1) Tổng quan kết quả audit
 
@@ -15,15 +15,19 @@ Cập nhật: 2026-04-29 00:10:00
 
 ## 2) Blocker phân loại
 
-### P0 - Remote verification cho commit mới
-- Đã hoàn tất verify remote gate cho PR closeout: [PR #4](https://github.com/eye-00/QLDA-UrbanchainVN/pull/4).
-- Required checks đã pass: `backend-ci`, `frontend-ci`, `docs-check` (và `contracts-ci` được skip theo path filter).
-- Merge commit trên `develop`: `e894775`.
-- Evidence: [docs/14-remote-gate-evidence.md](./14-remote-gate-evidence.md).
+### P0 - Remote verification cho Sprint 3 legal hardening
+- Da hoan tat chuoi PR:
+  - [PR #16](https://github.com/eye-00/QLDA-UrbanchainVN/pull/16) - merged (`aa2b26a`),
+  - [PR #17](https://github.com/eye-00/QLDA-UrbanchainVN/pull/17) - merged (`92c5d94`),
+  - [PR #18](https://github.com/eye-00/QLDA-UrbanchainVN/pull/18) - merged (`288c65b`).
+- Blocker hien tai: `None`.
 
-### P1 - Missing implementation/test evidence
-- **Đã đóng toàn bộ nhóm Missing cũ**: Sprint 2 (`US-091..096`), Sprint 3 (`US-193..204`).
-- Trạng thái hiện tại: `Done` sau khi đã có implementation + test + docs + remote gate evidence.
+### P1 - Legal acceptance alignment
+- Da dong bo evidence sau merge chain, cac nhom:
+  - `US-157..160`,
+  - `US-187..192`,
+  - `US-193..198`
+  da chuyen `Done`.
 
 ### P2 - Quality hardening
 - Không còn blocker đóng sprint.
@@ -31,17 +35,17 @@ Cập nhật: 2026-04-29 00:10:00
 
 ## 3) Kế hoạch xử lý theo thứ tự
 
-1. Đã mở và merge PR closeout [#4](https://github.com/eye-00/QLDA-UrbanchainVN/pull/4) vào `develop`.
-2. Đã pass regression local (`npm run lint`, `npm run build`, `npm test`) trước khi merge.
-3. Đã cập nhật `docs/12` để nâng US Sprint 2/3 lên `Done`.
+1. Da merge PR #16 vao `develop`.
+2. Da rebase/base-update va merge PR #17.
+3. Da base-update + merge PR #18, checks pass.
 
 ## 4) Action ownership để đóng gap
 
 | Công việc | Agent chính | Agent phối hợp | Output |
 |---|---|---|---|
-| Verify remote checks cho patch mới | AI_14 | AI_12, AI_13 | Done - checks pass trên PR #4 |
-| Regression Sprint 2/3 (integrity + notifications) | AI_12 | AI_07, AI_09 | Done - local test gate pass |
-| Đồng bộ closure docs | AI_15 | AI_03, AI_01 | Done - cập nhật docs/12, docs/13, docs/08 |
+| Verify remote checks cho patch mới | AI_14 | AI_12, AI_13 | Done - chain PR #16/#17/#18 pass |
+| Regression Sprint 3 legal hardening | AI_12 | AI_07, AI_09 | Done - checks pass o PR #16/#17/#18 |
+| Đồng bộ closure docs | AI_15 | AI_03, AI_01 | Done - docs closeout da cap nhat |
 
 ## 5) Điều kiện chốt Done cuối cùng
 - Không còn US `Missing`.

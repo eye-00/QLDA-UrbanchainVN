@@ -67,6 +67,42 @@ Ghi chu:
   - [PR #7](https://github.com/eye-00/QLDA-UrbanchainVN/pull/7) (merge commit `e8605bf`)
   - Required checks + branch protection + secret scanning/push protection: pass theo policy repo.
 
+## Bổ sung backlog ví blockchain (Sprint 1 Epic 13)
+
+- Backlog mới bổ sung nhóm `US-547..558` cho Sprint 1 (kết nối ví + xác minh chữ ký).
+- Trạng thái hiện tại: `Partial` (đã có implementation + local test, chờ remote gate PR để nâng `Done`).
+- Evidence local:
+  - [backend/src/modules/wallets/wallet.routes.ts](../backend/src/modules/wallets/wallet.routes.ts)
+  - [backend/test/sprint1-wallet.test.ts](../backend/test/sprint1-wallet.test.ts)
+  - [frontend/src/pages/WalletManagementPage.tsx](../frontend/src/pages/WalletManagementPage.tsx)
+  - [frontend/test/wallet-helpers.test.ts](../frontend/test/wallet-helpers.test.ts)
+  - [docs/07-api-contract.md](./07-api-contract.md)
+
+## Legal override update (2026-05-10)
+
+- Sprint 2 legal addendum `LEG-S2-001..005` đã được triển khai đầy đủ ở local với evidence code/test.
+- Trạng thái hiện tại:
+  - `Done (local evidence)` cho LEG-S2-001..005.
+  - `Partial (overall remote gate)` cho Sprint 2 legal-aligned cho tới khi pass required checks trên chuỗi PR (`backend-ci`, `frontend-ci`, `contracts-ci`, `docs-check`).
+- Evidence chính:
+  - [backend/test/sprint2-legal.test.ts](../backend/test/sprint2-legal.test.ts)
+  - [backend/src/modules/legal/legal.routes.ts](../backend/src/modules/legal/legal.routes.ts)
+  - [backend/src/modules/registrations/registration.routes.ts](../backend/src/modules/registrations/registration.routes.ts)
+  - [frontend/src/pages/RegistrationReviewPage.tsx](../frontend/src/pages/RegistrationReviewPage.tsx)
+  - [docs/08-definition-of-done.md](./08-definition-of-done.md)
+
+## Sprint 3 legal hardening override (2026-05-10, closeout)
+
+- Cac US lien quan nhom xu ly ho so can re-check do thay doi contract/action:
+  - `US-157..160` (xem chi tiet + thao tac can bo),
+  - `US-187..192` (yeu cau bo sung),
+  - `US-193..198` (cap nhat trang thai ho so).
+- Trang thai cuoi: `Done` sau khi merge chuoi PR:
+  - [PR #16](https://github.com/eye-00/QLDA-UrbanchainVN/pull/16) - backend legal hardening,
+  - [PR #17](https://github.com/eye-00/QLDA-UrbanchainVN/pull/17) - frontend legal UX,
+  - [PR #18](https://github.com/eye-00/QLDA-UrbanchainVN/pull/18) - QA/docs closeout.
+- Required checks da pass tren cac PR dich vao `develop`, cap nhat matrix Sprint 3 ve `Done`.
+
 ## Ma trận chi tiết từng US
 
 | US_ID | Sprint | Feature | Acceptance | Evidence_Code | Evidence_Test | Evidence_Docs | Status | Risk | Remote_Dependency |

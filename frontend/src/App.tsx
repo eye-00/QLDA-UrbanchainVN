@@ -40,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/wallets', label: 'Ví blockchain', roles: CITIZEN_ROLES },
   { to: '/admin/users', label: 'Người dùng', roles: ADMIN_ONLY_ROLES },
   { to: '/admin/organizations', label: 'Đơn vị', roles: ADMIN_ONLY_ROLES },
+  { to: '/admin/service-wallets', label: 'Ví công vụ', roles: ADMIN_ONLY_ROLES },
   { to: '/lands', label: 'Thửa đất', roles: LAND_MANAGEMENT_ROLES },
   { to: '/registrations/review', label: 'Hồ sơ xử lý', roles: REGISTRATION_REVIEW_ROLES },
   { to: '/lands/search', label: 'Tra cứu thửa đất', roles: DASHBOARD_ROLES }
