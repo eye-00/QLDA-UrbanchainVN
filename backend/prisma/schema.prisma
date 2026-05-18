@@ -86,12 +86,29 @@ enum DocumentVersionStatus {
 enum PaymentObligationType {
   INTAKE_FEE
   LAND_FINANCIAL_OBLIGATION
+  REGISTRATION_FEE
+  LATE_FEE
+  OTHER_LEGAL_FEE
 }
 
 enum PaymentObligationStatus {
   PENDING
   CONFIRMED
   CANCELLED
+}
+
+enum LandSourceType {
+  DEMO
+  IMPORTED
+  OFFICIAL_REFERENCE
+  UNKNOWN_NEEDS_REVIEW
+}
+
+enum ParcelGeometryStatus {
+  DRAFT
+  UNDER_REVIEW
+  OFFCHAIN_APPROVED
+  BOUNDARY_HASH_RECORDED
 }
 
 enum TransferStatus {
@@ -134,6 +151,10 @@ model User {
   submittedSnapshots RegistrationSubmitSnapshot[] @relation("SnapshotSubmittedBy")
   paymentObligationsCreated RegistrationPaymentObligation[] @relation("PaymentCreatedBy")
   paymentObligationsConfirmed RegistrationPaymentObligation[] @relation("PaymentConfirmedBy")
+  paymentObligationsVerified RegistrationPaymentObligation[] @relation("PaymentVerifiedBy")
+  landGeometryReviewed LandParcel[] @relation("LandGeometryReviewedBy")
+  landGeometryApproved LandParcel[] @relation("LandGeometryApprovedBy")
+  landBoundaryHashRecorded LandParcel[] @relation("LandBoundaryHashRecordedBy")
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -191,6 +212,21 @@ model LandParcel {
   address       String
   latitude      Decimal? @db.Decimal(10,7)
   longitude     Decimal? @db.Decimal(10,7)
+  sourceType    LandSourceType @default(DEMO)
+  geometry      Json?
+  geometryStatus ParcelGeometryStatus @default(DRAFT)
+  geometryReviewedById String?
+  geometryReviewedBy User? @relation("LandGeometryReviewedBy", fields: [geometryReviewedById], references: [id], onDelete: SetNull)
+  geometryReviewedAt DateTime?
+  geometryApprovedById String?
+  geometryApprovedBy User? @relation("LandGeometryApprovedBy", fields: [geometryApprovedById], references: [id], onDelete: SetNull)
+  geometryOffchainApprovedAt DateTime?
+  boundaryHashRecordedById String?
+  boundaryHashRecordedBy User? @relation("LandBoundaryHashRecordedBy", fields: [boundaryHashRecordedById], references: [id], onDelete: SetNull)
+  boundaryHashRecordedAt DateTime?
+  boundaryHashTxHash String?
+  boundaryHashCid String?
+  boundaryHashValue String?
   ownerUserId   String?
   owner         User?    @relation("ParcelOwner", fields: [ownerUserId], references: [id])
   createdAt     DateTime @default(now())
@@ -264,6 +300,7 @@ model FileAsset {
   registrationId String?
   registration   Registration? @relation(fields: [registrationId], references: [id])
   versions       RegistrationDocumentVersion[]
+  paymentReceiptObligations RegistrationPaymentObligation[] @relation("PaymentReceiptFile")
   createdAt      DateTime @default(now())
 }
 
@@ -392,11 +429,25 @@ model RegistrationPaymentObligation {
   status         PaymentObligationStatus @default(PENDING)
   legalBasisCode String
   referenceNo    String?
+  noticeRef      String?
+  noticeIssuedAt DateTime?
+  receiptRef     String?
+  receiptFileId  String?
+  receiptFile    FileAsset?              @relation("PaymentReceiptFile", fields: [receiptFileId], references: [id], onDelete: SetNull)
+  receiptSubmittedAt DateTime?
   amount         Decimal?                @db.Decimal(12,2)
   note           String?
   createdById    String
   confirmedById  String?
   confirmedAt    DateTime?
+  verifiedById   String?
+  verifiedBy     User?                   @relation("PaymentVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedAt     DateTime?
+  verifyNote     String?
+  evidenceTxHash String?
+  evidenceCid    String?
+  evidenceHash   String?
+  evidenceRecordedAt DateTime?
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
   registration   Registration            @relation(fields: [registrationId], references: [id], onDelete: Cascade)

@@ -171,9 +171,18 @@ const createDocumentVersionSchema = z.object({
 });
 
 const createPaymentObligationSchema = z.object({
-  type: z.enum(["INTAKE_FEE", "LAND_FINANCIAL_OBLIGATION"]),
+  type: z.enum([
+    "INTAKE_FEE",
+    "LAND_FINANCIAL_OBLIGATION",
+    "REGISTRATION_FEE",
+    "LATE_FEE",
+    "OTHER_LEGAL_FEE"
+  ]),
   legalBasisCode: legalBasisCodeSchema,
   referenceNo: z.string().min(3).optional(),
+  noticeRef: z.string().min(3).optional(),
+  receiptRef: z.string().min(3).optional(),
+  receiptFileId: z.string().min(3).optional(),
   amount: z.coerce.number().positive().optional(),
   note: z.string().min(3).optional()
 });
@@ -686,11 +695,23 @@ function toPaymentObligationItem(item: {
   status: PaymentObligationStatus;
   legalBasisCode: string;
   referenceNo: string | null;
+  noticeRef: string | null;
+  noticeIssuedAt: Date | null;
+  receiptRef: string | null;
+  receiptFileId: string | null;
+  receiptSubmittedAt: Date | null;
   amount: Prisma.Decimal | null;
   note: string | null;
   createdById: string;
   confirmedById: string | null;
   confirmedAt: Date | null;
+  verifiedById: string | null;
+  verifiedAt: Date | null;
+  verifyNote: string | null;
+  evidenceTxHash: string | null;
+  evidenceCid: string | null;
+  evidenceHash: string | null;
+  evidenceRecordedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -700,11 +721,23 @@ function toPaymentObligationItem(item: {
     status: item.status,
     legalBasisCode: item.legalBasisCode,
     referenceNo: item.referenceNo,
+    noticeRef: item.noticeRef,
+    noticeIssuedAt: item.noticeIssuedAt,
+    receiptRef: item.receiptRef,
+    receiptFileId: item.receiptFileId,
+    receiptSubmittedAt: item.receiptSubmittedAt,
     amount: item.amount ? Number(item.amount) : null,
     note: item.note,
     createdById: item.createdById,
     confirmedById: item.confirmedById,
     confirmedAt: item.confirmedAt,
+    verifiedById: item.verifiedById,
+    verifiedAt: item.verifiedAt,
+    verifyNote: item.verifyNote,
+    evidenceTxHash: item.evidenceTxHash,
+    evidenceCid: item.evidenceCid,
+    evidenceHash: item.evidenceHash,
+    evidenceRecordedAt: item.evidenceRecordedAt,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt
   };
@@ -1936,12 +1969,27 @@ registrationRouter.post(
       throw forbiddenError("Vai trò hiện tại không được tạo nghĩa vụ tài chính đất đai");
     }
 
+    if (parsed.data.receiptFileId) {
+      const receiptFile = await prisma.fileAsset.findUnique({
+        where: { id: parsed.data.receiptFileId },
+        select: { id: true, registrationId: true }
+      });
+      if (!receiptFile || receiptFile.registrationId !== existing.id) {
+        throw badRequestError("receiptFileId không thuộc hồ sơ đăng ký liên quan");
+      }
+    }
+
     const obligation = await prisma.registrationPaymentObligation.create({
       data: {
         registrationId: existing.id,
         type: parsed.data.type,
         legalBasisCode: parsed.data.legalBasisCode,
         referenceNo: parsed.data.referenceNo,
+        noticeRef: parsed.data.noticeRef ?? null,
+        receiptRef: parsed.data.receiptRef ?? null,
+        receiptFileId: parsed.data.receiptFileId ?? null,
+        ...(parsed.data.noticeRef ? { noticeIssuedAt: new Date() } : {}),
+        ...(parsed.data.receiptRef || parsed.data.receiptFileId ? { receiptSubmittedAt: new Date() } : {}),
         amount: parsed.data.amount ? new Prisma.Decimal(parsed.data.amount) : null,
         note: parsed.data.note ?? null,
         createdById: user.userId
