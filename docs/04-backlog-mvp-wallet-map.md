@@ -58,6 +58,7 @@ Theo bo tai lieu `docs/docs-legal-aligned`, trang thai closure sprint duoc cap n
 | Sprint 2 | Done                              | Done                            | Legal-aligned closeout da co evidence code/test/docs va remote technical gate.                   |
 | Sprint 3 | Done                              | Done                            | `LEG-S3-001..003` da co evidence code/test/docs; remote gate da xac nhan tren chuoi PR Sprint 3. |
 | Sprint 4 | In Progress                       | Done                            | Da dong `LEG-S4-001` + `US-565..576` (service-wallet governance, signing flow 2 buoc, tx lifecycle, RPC fail-hard). |
+| Sprint 5 | Not Started                       | Partial                         | PR-S5-01 da dong backend legal core (`LEG-S5-001/002`), con thieu FE integration + closeout gate. |
 
 ### Legal gap table (owner + remediation)
 
@@ -65,7 +66,8 @@ Theo bo tai lieu `docs/docs-legal-aligned`, trang thai closure sprint duoc cap n
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------ | ------------------------------- |
 | Legal procedure registry + authority matrix | Da co registry, authority actors va route validation cho Sprint 2                                                            | `LEG-S2-001`               | AI_04 Backend API                    | Closed                          |
 | Document versioning + submit snapshot       | Da khoa version tai lieu va tao snapshot tai submit                                                                          | `LEG-S2-002`, `LEG-S2-004` | AI_06 DB & IPFS + AI_04 Backend API  | Closed                          |
-| Payment model off-chain                     | Da tach `INTAKE_FEE` va `LAND_FINANCIAL_OBLIGATION` cho Sprint 2                                                             | `LEG-S2-003`, `LEG-S5-001` | AI_04 Backend API                    | Sprint 2 closed / Sprint 5 open |
+| Payment model off-chain                     | Da tach fee model Sprint 2 va mo rong top-level payment legal flow Sprint 5 (`notice/receipt/verify/record evidence`)       | `LEG-S2-003`, `LEG-S5-001` | AI_04 Backend API                    | Sprint 2 closed / Sprint 5 partial |
+| Map legal source and geometry state         | Da bo sung map backend `/api/v1/map/*` voi `sourceType` + state flow `DRAFT -> UNDER_REVIEW -> OFFCHAIN_APPROVED -> BOUNDARY_HASH_RECORDED` | `LEG-S5-002`               | AI_04 Backend API + AI_08 Frontend | Sprint 5 partial |
 | Transition legal guard                      | Da bat buoc `legalBasisCode`, actor/status validation o transition Sprint 2 va supplement payload legal-aligned cho Sprint 3 | `LEG-S2-005`, `LEG-S3-002` | AI_15 Compliance + AI_04 Backend API | Closed                          |
 | Blockchain precondition guard               | Da khoa gate "chi ghi blockchain sau cap nhat ho so dia chinh hop le" o service-layer; lane RPC fail-hard da bat buoc       | `LEG-S4-001`, `LEG-S7-001` | AI_04 + AI_02 + AI_15                | Sprint 4 closed / Sprint 7 open |
 

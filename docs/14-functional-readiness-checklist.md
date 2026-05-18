@@ -66,6 +66,8 @@ Nguồn chuẩn: `docs/docs-legal-aligned/04-backlog-mvp.current-wallet-map-doc-
 | `LEG-S2-005` Transition legal guard                  | Transition nhạy cảm bắt buộc legal basis/reason + actor/status hợp lệ              | ✅ Đạt (local technical) |
 | `LEG-S3-001..003` Commune/Supplement/Version history | Đủ luồng legal-aligned ở UI + BE + audit                                           | ✅ Đạt                   |
 | `LEG-S4-001` Blockchain precondition                 | Chỉ ghi blockchain sau `DA_CAP_NHAT_HO_SO_DIA_CHINH`                               | ✅ Done (local + test + docs) |
+| `LEG-S5-001` Payment obligation off-chain            | Có top-level flow `create -> notice -> receipt -> verify -> record evidence`        | ⚠️ Một phần (BE done, FE wiring pending) |
+| `LEG-S5-002` Map legal source/state                  | Có đủ 7 endpoint `/api/v1/map/*`, sourceType và geometry state flow legal-aligned   | ⚠️ Một phần (BE done, FE wiring pending) |
 
 ## Ma trận closeout Sprint 2 (legal-aligned)
 
@@ -83,3 +85,4 @@ Nguồn chuẩn: `docs/docs-legal-aligned/04-backlog-mvp.current-wallet-map-doc-
 - Sprint 2: ✅ `Done` (LEG-S2-001..005 đã có evidence code/test/docs; technical gate và remote checks đã có bằng chứng)
 - Sprint 3: ✅ `Done`
 - Sprint 4: ✅ `Done` (`LEG-S4-001` + `US-565..576` da co evidence code/test/docs; RPC fail-hard lane da duoc verify)
+- Sprint 5: ⚠️ `Partial` (PR-S5-01 da dong backend core cho `LEG-S5-001/002`, con thieu FE integration + closeout gate)

@@ -1355,6 +1355,39 @@ OTHER_LEGAL_FEE
 
 Rule: MoMo Test/QR test là mô phỏng. Không mô tả `paidByBlockchain=true` cho thuế/phí thật.
 
+### Payment obligation fields (runtime Sprint 5)
+
+```text
+id
+registrationId
+type
+status (PENDING|CONFIRMED|CANCELLED)
+legalBasisCode
+referenceNo
+noticeRef
+noticeIssuedAt
+receiptRef
+receiptFileId
+receiptSubmittedAt
+amount
+note
+verifiedById
+verifiedAt
+verifyNote
+evidenceTxHash
+evidenceCid
+evidenceHash
+evidenceRecordedAt
+```
+
+### Operational note (compatibility)
+
+- Nested endpoints dưới registration vẫn giữ để tương thích ngược:
+  - `GET /api/v1/registrations/:registrationId/payment-obligations`
+  - `POST /api/v1/registrations/:registrationId/payment-obligations`
+  - `PATCH /api/v1/registrations/:registrationId/payment-obligations/:obligationId/status`
+- Top-level endpoints ở Sprint 5 là lớp mở rộng legal flow (`notice -> receipt -> verify -> record evidence`).
+
 ## 6. Map parcel endpoints
 
 ```http
@@ -1375,6 +1408,23 @@ IMPORTED
 OFFICIAL_REFERENCE
 UNKNOWN_NEEDS_REVIEW
 ```
+
+### Geometry status enum (runtime Sprint 5)
+
+```text
+DRAFT
+UNDER_REVIEW
+OFFCHAIN_APPROVED
+BOUNDARY_HASH_RECORDED
+```
+
+### Map state flow rule
+
+- `POST /geometry` -> `geometryStatus = DRAFT`
+- `POST /review` -> `UNDER_REVIEW` (hoặc trả về `DRAFT` nếu review yêu cầu cập nhật lại)
+- `POST /approve-offchain` chỉ hợp lệ từ `UNDER_REVIEW`
+- `POST /record-boundary-hash` chỉ hợp lệ từ `OFFCHAIN_APPROVED`
+- Không cho sửa geometry sau khi đã `BOUNDARY_HASH_RECORDED`.
 
 ## 7. Workflow transition endpoint rule
 
