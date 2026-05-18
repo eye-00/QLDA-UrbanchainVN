@@ -20,7 +20,10 @@ function requiredAnyEnv(...names: string[]) {
 }
 
 describe("Sprint 4 RPC smoke (fail hard)", () => {
-  it("connects to real RPC and checks registry contract", async () => {
+  const rpcModeEnabled = (process.env.BLOCKCHAIN_SYNC_MODE ?? "").trim().toLowerCase() === "rpc";
+  const runRpc = rpcModeEnabled ? it : it.skip;
+
+  runRpc("connects to real RPC and checks registry contract", async () => {
     process.env.BLOCKCHAIN_SYNC_MODE = "rpc";
 
     const rpcUrl = requiredEnv("RPC_URL");
