@@ -40,6 +40,7 @@ describe("Sprint 5 legal core", () => {
     const citizenToken = await login("citizen@urbanchain.vn");
     const taxToken = await login("tax@urbanchain.vn");
     const registryToken = await login("registry@urbanchain.vn");
+    const adminToken = await login("admin@urbanchain.vn");
 
     const suffix = Date.now().toString();
     const createdRegistration = await api("/api/v1/registrations", {
@@ -67,6 +68,24 @@ describe("Sprint 5 legal core", () => {
     });
     expect(createdRegistration.response.status).toBe(201);
     const registrationId = createdRegistration.body.data.registrationId as string;
+    const registrationCode = createdRegistration.body.data.registrationCode as string;
+
+    const statusPath = `/api/v1/registrations/${registrationId}/status`;
+    for (const status of ["CHO_TIEP_NHAN", "DA_TIEP_NHAN", "DA_XAC_NHAN_CAP_XA", "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH"] as const) {
+      const moved = await api(statusPath, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          status,
+          legalBasisCode: "151/2025-ND-CP|3380/QD-BNNMT",
+          reason: status === "CAN_BO_SUNG" ? "Kiểm thử bổ sung" : undefined
+        })
+      });
+      expect(moved.response.status).toBe(200);
+    }
 
     const citizenCreate = await api("/api/v1/payment-obligations", {
       method: "POST",
@@ -158,6 +177,14 @@ describe("Sprint 5 legal core", () => {
     expect(verifiedReceipt.response.status).toBe(200);
     expect(verifiedReceipt.body.data.status).toBe("CONFIRMED");
 
+    const refreshedRegistration = await api(`/api/v1/registrations/${registrationCode}`, {
+      headers: {
+        Authorization: `Bearer ${registryToken}`
+      }
+    });
+    expect(refreshedRegistration.response.status).toBe(200);
+    expect(refreshedRegistration.body.data.status).toBe("DA_HOAN_THANH_NGHIA_VU_TAI_CHINH");
+
     const recordEvidence = await api(`/api/v1/payment-obligations/${obligationId}/record-on-chain`, {
       method: "POST",
       headers: {
@@ -173,6 +200,58 @@ describe("Sprint 5 legal core", () => {
     });
     expect(recordEvidence.response.status).toBe(200);
     expect(recordEvidence.body.data.evidenceTxHash).toContain(`0x${suffix}`);
+
+    const foreignReg = await api("/api/v1/registrations", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${citizenToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        procedureCode: "DKDD_LANDAU_3380",
+        landInfo: {
+          provinceCode: "48",
+          communeName: "Hòa Khánh",
+          parcelNumber: `S5-PAY-F-${suffix}`,
+          mapSheetNumber: "45",
+          area: 40.1,
+          landUsePurpose: "ODT",
+          address: "Số 45 Đường Sprint 5"
+        },
+        ownerInfo: {
+          ownerType: "INDIVIDUAL",
+          fullName: "Cross File Owner"
+        }
+      })
+    });
+    expect(foreignReg.response.status).toBe(201);
+    const foreignRegistrationId = foreignReg.body.data.registrationId as string;
+
+    const foreignUpload = new FormData();
+    foreignUpload.set("documentType", "PAYMENT_RECEIPT");
+    foreignUpload.set("ownerType", "REGISTRATION");
+    foreignUpload.set("registrationId", foreignRegistrationId);
+    foreignUpload.set("file", new Blob(["foreign"], { type: "application/pdf" }), "foreign.pdf");
+    const foreignFile = await api("/api/v1/files/upload", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${citizenToken}` },
+      body: foreignUpload
+    });
+    expect(foreignFile.response.status).toBe(201);
+
+    const nestedCrossReceipt = await api(`/api/v1/registrations/${registrationId}/payment-obligations`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${taxToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        type: "REGISTRATION_FEE",
+        legalBasisCode: "151/2025-ND-CP|3380/QD-BNNMT",
+        receiptFileId: foreignFile.body.data.id
+      })
+    });
+    expect(nestedCrossReceipt.response.status).toBe(400);
   });
 
   it("supports map legal source and geometry state flow", async () => {
@@ -254,6 +333,49 @@ describe("Sprint 5 legal core", () => {
     });
     expect(approved.response.status).toBe(200);
     expect(approved.body.data.geometryStatus).toBe("OFFCHAIN_APPROVED");
+
+    const needsUpdate = await api(`/api/v1/map/parcels/${landId}/review`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${registryToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        decision: "NEEDS_UPDATE",
+        note: "Yêu cầu chỉnh sửa lại geometry"
+      })
+    });
+    expect(needsUpdate.response.status).toBe(200);
+    expect(needsUpdate.body.data.geometryStatus).toBe("DRAFT");
+    expect(needsUpdate.body.data.geometryApprovedById).toBeNull();
+    expect(needsUpdate.body.data.geometryOffchainApprovedAt).toBeNull();
+
+    const reviewedAgain = await api(`/api/v1/map/parcels/${landId}/review`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${registryToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        decision: "REVIEWED",
+        note: "Đã rà soát lại sau khi chỉnh sửa"
+      })
+    });
+    expect(reviewedAgain.response.status).toBe(200);
+    expect(reviewedAgain.body.data.geometryStatus).toBe("UNDER_REVIEW");
+
+    const approvedAgain = await api(`/api/v1/map/parcels/${landId}/approve-offchain`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${registryToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        note: "Phê duyệt lại sau chỉnh sửa"
+      })
+    });
+    expect(approvedAgain.response.status).toBe(200);
+    expect(approvedAgain.body.data.geometryStatus).toBe("OFFCHAIN_APPROVED");
 
     const recorded = await api(`/api/v1/map/parcels/${landId}/record-boundary-hash`, {
       method: "POST",

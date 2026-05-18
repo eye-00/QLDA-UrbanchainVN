@@ -212,7 +212,18 @@ mapRouter.post(
         sourceType: parsed.data.sourceType ?? land.sourceType,
         geometryStatus: nextStatus,
         geometryReviewedAt: new Date(),
-        geometryReviewedById: actor.userId
+        geometryReviewedById: actor.userId,
+        ...(nextStatus === "DRAFT"
+          ? {
+              geometryApprovedById: null,
+              geometryOffchainApprovedAt: null,
+              boundaryHashRecordedById: null,
+              boundaryHashRecordedAt: null,
+              boundaryHashTxHash: null,
+              boundaryHashCid: null,
+              boundaryHashValue: null
+            }
+          : {})
       }
     });
 

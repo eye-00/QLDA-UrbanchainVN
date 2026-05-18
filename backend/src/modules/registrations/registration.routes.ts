@@ -1969,6 +1969,16 @@ registrationRouter.post(
       throw forbiddenError("Vai trò hiện tại không được tạo nghĩa vụ tài chính đất đai");
     }
 
+    if (parsed.data.receiptFileId) {
+      const receiptFile = await prisma.fileAsset.findUnique({
+        where: { id: parsed.data.receiptFileId },
+        select: { id: true, registrationId: true }
+      });
+      if (!receiptFile || receiptFile.registrationId !== existing.id) {
+        throw badRequestError("receiptFileId không thuộc hồ sơ đăng ký liên quan");
+      }
+    }
+
     const obligation = await prisma.registrationPaymentObligation.create({
       data: {
         registrationId: existing.id,

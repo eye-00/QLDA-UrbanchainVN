@@ -1,4 +1,4 @@
-import { PaymentObligationStatus, PaymentObligationType, Prisma } from "@prisma/client";
+import { PaymentObligationStatus, PaymentObligationType, Prisma, RegistrationStatus } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
@@ -70,6 +70,15 @@ function isCitizenRole(role: string) {
 function readAuthorityActors(value: Prisma.JsonValue): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string");
+}
+
+function parseNoteHistory(value: Prisma.JsonValue | null) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function appendNoteHistory(value: Prisma.JsonValue | null, note: string) {
+  return [...parseNoteHistory(value), note];
 }
 
 function toPaymentObligationItem(item: {
@@ -155,6 +164,46 @@ async function findObligationOrThrow(id: string) {
   });
   if (!item) throw notFoundError("Không tìm thấy nghĩa vụ tài chính");
   return item;
+}
+
+async function advanceRegistrationAfterPaymentConfirm(
+  registrationId: string,
+  actor: AuthenticatedRequest["user"],
+  legalBasisCode: string,
+  note: string
+) {
+  const registration = await prisma.registration.findUnique({
+    where: { id: registrationId },
+    select: { id: true, status: true, noteHistory: true }
+  });
+  if (!registration) return;
+  if (registration.status !== "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH") return;
+
+  const nextStatus: RegistrationStatus = "DA_HOAN_THANH_NGHIA_VU_TAI_CHINH";
+  const updated = await prisma.registration.update({
+    where: { id: registration.id },
+    data: {
+      status: nextStatus,
+      legalBasisCode,
+      noteHistory: appendNoteHistory(
+        registration.noteHistory,
+        note || "Đã hoàn thành nghĩa vụ tài chính qua top-level payment flow"
+      )
+    }
+  });
+
+  await writeAuditLog({
+    actorId: actor.userId,
+    action: "REGISTRATION_STATUS_UPDATED",
+    entityType: "REGISTRATION",
+    entityId: updated.id,
+    payload: {
+      previousStatus: registration.status,
+      status: nextStatus,
+      legalBasisCode,
+      note
+    }
+  });
 }
 
 export const paymentObligationRouter = Router();
@@ -349,6 +398,15 @@ paymentObligationRouter.post(
         legalBasisCode: updated.legalBasisCode
       }
     });
+
+    if (nextStatus === "CONFIRMED") {
+      await advanceRegistrationAfterPaymentConfirm(
+        updated.registrationId,
+        actor,
+        parsed.data.legalBasisCode,
+        parsed.data.verifyNote ?? "Đã hoàn thành nghĩa vụ tài chính"
+      );
+    }
 
     return ok(res, toPaymentObligationItem(updated), "Đã xác minh biên nhận nghĩa vụ tài chính");
   })
