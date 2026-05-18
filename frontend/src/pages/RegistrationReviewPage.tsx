@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiGet } from '../lib/api';
 import { useToast } from '../ui/ToastContext';
@@ -81,7 +81,7 @@ export function RegistrationReviewPage() {
 
   const queryString = useMemo(() => buildRegistrationReviewQuery(filters), [filters]);
 
-  async function loadRegistrations() {
+  const loadRegistrations = useCallback(async () => {
     setLoading(true);
     try {
       const path = queryString ? `/registrations?${queryString}` : '/registrations?pageSize=50';
@@ -92,11 +92,11 @@ export function RegistrationReviewPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [queryString, showToast]);
 
   useEffect(() => {
     void loadRegistrations();
-  }, []);
+  }, [loadRegistrations]);
 
   return (
     <section className="toolbar-row">

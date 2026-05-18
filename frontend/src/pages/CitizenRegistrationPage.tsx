@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiGet, apiPost } from '../lib/api';
 import {
@@ -9,7 +9,14 @@ import {
 } from '../lib/files';
 import { useToast } from '../ui/ToastContext';
 import { getRegistrationStatusBadgeClass, getRegistrationStatusLabel } from '../ui/registrationStatus';
+import { getDocumentTypeLabel, getFileStorageStatusLabel } from '../ui/domainLabels';
 import { loadCommuneOptionsByProvince, loadProvinceOptions, type CommuneOption, type ProvinceOption } from '../lib/vnAddress';
+import { canOpenBlockchainSign } from './registrationBlockchainHelpers';
+import {
+  buildCreateRegistrationPayload,
+  buildSubmitRegistrationPayload,
+  DEFAULT_REGISTRATION_PROCEDURE_CODE
+} from './registrationSubmissionHelpers';
 
 type RegistrationItem = {
   id: string;
@@ -25,6 +32,7 @@ type RegistrationItem = {
     fullName: string;
   };
   status: string;
+  cadastralUpdatedAt?: string | null;
   notes: string[];
   updatedAt: string;
 };
@@ -47,7 +55,7 @@ type UploadDraft = {
 };
 
 const initialForm = {
-  procedureCode: 'DKDD_LANDAU_3380',
+  procedureCode: DEFAULT_REGISTRATION_PROCEDURE_CODE,
   fullName: 'Nguyễn Văn A',
   identityNumber: '0482xxxxxxx',
   mapSheetNumber: '05',
@@ -86,21 +94,21 @@ export function CitizenRegistrationPage() {
   const [uploadingDraftId, setUploadingDraftId] = useState<string | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<UploadedFileItem[]>([]);
 
-  async function loadRegistrations() {
+  const loadRegistrations = useCallback(async () => {
     try {
       const data = await apiGet<RegistrationListResponse>('/registrations');
       setItems(data.items);
     } catch {
       showToast('error', 'Không tải được danh sách hồ sơ đăng ký.');
     }
-  }
+  }, [showToast]);
 
-  function switchToManualLocation(messageText: string) {
+  const switchToManualLocation = useCallback((messageText: string) => {
     setLocationMode('manual');
     setLocationNotice(messageText);
-  }
+  }, []);
 
-  async function loadLocationCatalog() {
+  const loadLocationCatalog = useCallback(async () => {
     if (locationMode !== 'api') return;
     try {
       const provinces = await loadProvinceOptions();
@@ -108,7 +116,7 @@ export function CitizenRegistrationPage() {
     } catch {
       switchToManualLocation('Không tải được danh mục địa giới. Hệ thống chuyển sang nhập tay.');
     }
-  }
+  }, [locationMode, switchToManualLocation]);
 
   async function onProvinceChange(provinceCode: string) {
     setForm({ ...form, provinceCode, communeName: '' });
@@ -126,7 +134,7 @@ export function CitizenRegistrationPage() {
 
   useEffect(() => {
     void Promise.all([loadRegistrations(), loadLocationCatalog()]);
-  }, []);
+  }, [loadLocationCatalog, loadRegistrations]);
 
   function updateUploadDraft(draftId: string, patch: Partial<UploadDraft>) {
     setUploadDrafts((prev) => prev.map((item) => (item.id === draftId ? { ...item, ...patch } : item)));
@@ -175,24 +183,7 @@ export function CitizenRegistrationPage() {
         showToast('error', 'Bạn chưa đính kèm tài liệu. Vẫn có thể tạo hồ sơ và bổ sung sau.');
       }
 
-      const payload = {
-        procedureCode: form.procedureCode,
-        landInfo: {
-          provinceCode: form.provinceCode,
-          communeName: form.communeName,
-          parcelNumber: form.parcelNumber,
-          mapSheetNumber: form.mapSheetNumber,
-          area: Number(form.area),
-          landUsePurpose: form.landUsePurpose,
-          address: form.address
-        },
-        ownerInfo: {
-          ownerType: 'INDIVIDUAL',
-          fullName: form.fullName,
-          identityNumber: form.identityNumber
-        },
-        fileIds: attachedFiles.map((item) => item.id)
-      };
+      const payload = buildCreateRegistrationPayload(form, attachedFiles);
       const data = await apiPost<CreateRegistrationResponse>('/registrations', payload);
       showToast('success', `Đã tạo hồ sơ ${data.registrationCode} (${getRegistrationStatusLabel(data.status)})`);
       setAttachedFiles([]);
@@ -208,9 +199,7 @@ export function CitizenRegistrationPage() {
   async function submitRegistration(registrationId: string) {
     setLoading(true);
     try {
-      await apiPost(`/registrations/${registrationId}/submit`, {
-        legalBasisCode: `QĐ3380-SUBMIT-${new Date().getFullYear()}`
-      });
+      await apiPost(`/registrations/${registrationId}/submit`, buildSubmitRegistrationPayload());
       showToast('success', 'Đã gửi hồ sơ vào luồng tiếp nhận.');
       await loadRegistrations();
     } catch (error) {
@@ -384,8 +373,8 @@ export function CitizenRegistrationPage() {
                 {attachedFiles.map((file) => (
                   <tr key={file.id}>
                     <td>{file.originalName}</td>
-                    <td>{file.documentType}</td>
-                    <td>{file.storageStatus}</td>
+                    <td>{getDocumentTypeLabel(file.documentType)}</td>
+                    <td>{getFileStorageStatusLabel(file.storageStatus)}</td>
                     <td className="muted">{shortValue(file.cid)}</td>
                     <td className="muted">{shortValue(file.hash)}</td>
                     <td>
@@ -431,6 +420,7 @@ export function CitizenRegistrationPage() {
               <tbody>
                 {items.map((item) => {
                   const canSubmit = item.status === 'MOI_TAO' || item.status === 'CAN_BO_SUNG';
+                  const canSignBlockchain = canOpenBlockchainSign(item.status, item.cadastralUpdatedAt ?? null);
                   return (
                     <tr key={item.id}>
                       <td>{item.code}</td>
@@ -475,6 +465,11 @@ export function CitizenRegistrationPage() {
                           ) : (
                             <span className="muted">Đã gửi</span>
                           )}
+                          {canSignBlockchain ? (
+                            <Link to={`/registrations/${item.id}/blockchain-sign`} className="btn-link btn-link-outline">
+                              Ký & gửi blockchain
+                            </Link>
+                          ) : null}
                         </div>
                       </td>
                     </tr>

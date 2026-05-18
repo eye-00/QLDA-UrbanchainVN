@@ -23,6 +23,8 @@ import { SearchLandPage } from './pages/SearchLandPage';
 import { RegistrationReviewPage } from './pages/RegistrationReviewPage';
 import { RegistrationReviewDetailPage } from './pages/RegistrationReviewDetailPage';
 import { WalletManagementPage } from './pages/WalletManagementPage';
+import { RegistrationBlockchainSignPage } from './pages/RegistrationBlockchainSignPage';
+import { ServiceWalletManagementPage } from './pages/ServiceWalletManagementPage';
 
 function hasRole(role: UserRole | undefined, roles: UserRole[]) {
   return Boolean(role && roles.includes(role));
@@ -67,6 +69,8 @@ const PAGE_LABELS: Record<string, string> = {
   '/lands/edit': 'Cập nhật thửa đất',
   '/registrations/review': 'Xử lý hồ sơ đăng ký',
   '/registrations/review/detail': 'Chi tiết xử lý hồ sơ',
+  '/registrations/review/blockchain-sign': 'Ký và gửi blockchain',
+  '/registrations/blockchain-sign': 'Ký và gửi blockchain',
   '/lands/search': 'Tra cứu thửa đất',
   '/forbidden': 'Không có quyền truy cập'
 };
@@ -84,6 +88,8 @@ function getCurrentPageLabel(pathname: string) {
   if (pathname.startsWith('/admin/users/') && pathname.endsWith('/edit')) return PAGE_LABELS['/admin/users/edit'];
   if (pathname.startsWith('/admin/organizations/') && pathname.endsWith('/edit')) return PAGE_LABELS['/admin/organizations/edit'];
   if (pathname.startsWith('/lands/') && pathname.endsWith('/edit')) return PAGE_LABELS['/lands/edit'];
+  if (pathname.startsWith('/registrations/') && pathname.endsWith('/blockchain-sign')) return PAGE_LABELS['/registrations/blockchain-sign'];
+  if (pathname.startsWith('/registrations/review/') && pathname.endsWith('/blockchain-sign')) return PAGE_LABELS['/registrations/review/blockchain-sign'];
   if (pathname.startsWith('/registrations/review/')) return PAGE_LABELS['/registrations/review/detail'];
   return PAGE_LABELS[pathname] ?? 'UrbanChain-VN';
 }
@@ -160,10 +166,13 @@ export function App() {
           <Route path="/admin/users/:id/edit" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><UserEditPage /></RequireAuth>} />
           <Route path="/admin/organizations" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><OrganizationManagementPage /></RequireAuth>} />
           <Route path="/admin/organizations/:id/edit" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><OrganizationEditPage /></RequireAuth>} />
+          <Route path="/admin/service-wallets" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><ServiceWalletManagementPage /></RequireAuth>} />
           <Route path="/lands" element={<RequireAuth roles={LAND_MANAGEMENT_ROLES}><LandManagementPage /></RequireAuth>} />
           <Route path="/lands/:id/edit" element={<RequireAuth roles={LAND_MANAGEMENT_ROLES}><LandEditPage /></RequireAuth>} />
           <Route path="/registrations/review" element={<RequireAuth roles={REGISTRATION_REVIEW_ROLES}><RegistrationReviewPage /></RequireAuth>} />
           <Route path="/registrations/review/:id" element={<RequireAuth roles={REGISTRATION_REVIEW_ROLES}><RegistrationReviewDetailPage /></RequireAuth>} />
+          <Route path="/registrations/review/:id/blockchain-sign" element={<RequireAuth roles={REGISTRATION_REVIEW_ROLES}><RegistrationBlockchainSignPage /></RequireAuth>} />
+          <Route path="/registrations/:id/blockchain-sign" element={<RequireAuth roles={CITIZEN_ROLES}><RegistrationBlockchainSignPage /></RequireAuth>} />
           <Route path="/lands/search" element={<RequireAuth roles={DASHBOARD_ROLES}><SearchLandPage /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

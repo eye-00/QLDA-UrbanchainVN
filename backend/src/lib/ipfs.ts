@@ -19,6 +19,8 @@ function computeHexHash(buffer: Buffer) {
 }
 
 function getUploadMode() {
+  // Keep tests deterministic even when local .env is set to real providers.
+  if (process.env.NODE_ENV === "test") return "mock";
   return (process.env.IPFS_UPLOAD_MODE ?? "mock").toLowerCase();
 }
 

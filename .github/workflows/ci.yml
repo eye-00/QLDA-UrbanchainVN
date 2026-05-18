@@ -63,6 +63,7 @@ jobs:
       DATABASE_URL: mysql://urbanchain:urbanchain@127.0.0.1:3307/urbanchain
       JWT_SECRET: ci-secret
       NODE_ENV: test
+      BLOCKCHAIN_SYNC_MODE: mock
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -93,6 +94,14 @@ jobs:
 
       - name: Test backend
         run: npm --workspace backend run test
+
+      - name: Test backend RPC smoke (fail hard)
+        env:
+          BLOCKCHAIN_SYNC_MODE: rpc
+          BLOCKCHAIN_CHAIN_ID: ${{ secrets.S4_BLOCKCHAIN_CHAIN_ID || secrets.BLOCKCHAIN_CHAIN_ID || '11155111' }}
+          RPC_URL: ${{ secrets.S4_RPC_URL || secrets.RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com' }}
+          CONTRACT_ADDRESS: ${{ secrets.S4_CONTRACT_ADDRESS || secrets.CONTRACT_ADDRESS || '0xe8484D306d27fD4d2028FFaC85268d3de28cEcA2' }}
+        run: npm --workspace backend run test:rpc
 
   frontend-ci:
     runs-on: ubuntu-latest

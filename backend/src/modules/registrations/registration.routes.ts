@@ -40,6 +40,11 @@ const registrationStatusSchema = z.enum([
 ]);
 
 const legalBasisCodeSchema = z.string().min(3).max(191);
+const DEFAULT_REGISTRATION_PROCEDURE_CODE = (
+  process.env.DEFAULT_REGISTRATION_PROCEDURE_CODE ?? "DKDD_LANDAU_3380"
+)
+  .trim()
+  .toUpperCase();
 
 const createRegistrationSchema = z.object({
   landInfo: z.object({
@@ -57,7 +62,7 @@ const createRegistrationSchema = z.object({
     identityNumber: z.string().optional(),
     address: z.string().optional()
   }),
-  procedureCode: z.string().min(3).max(64),
+  procedureCode: z.string().min(3).max(64).optional(),
   legalBasisCode: legalBasisCodeSchema.optional(),
   attachedFileIds: z.array(z.string()).optional(),
   fileIds: z.array(z.string()).optional()
@@ -119,11 +124,14 @@ const cadastralUpdateSchema = z.object({
   note: z.string().min(3).optional()
 });
 
+const blockchainSyncModeSchema = z.enum(["OFFICER_SERVICE_WALLET", "CITIZEN_DIRECT_SIGN"]);
+
 const blockchainSyncSchema = z.object({
   legalBasisCode: legalBasisCodeSchema,
+  syncMode: blockchainSyncModeSchema.optional(),
   cid: z.string().min(3),
   metadataHash: z.string().min(3),
-  walletAuthorizationId: z.string().min(1),
+  walletAuthorizationId: z.string().min(1).optional(),
   signerWalletAddress: z.string().min(1),
   signerChainId: z.coerce.number().int().positive(),
   signingMessage: z.string().min(3),
@@ -282,6 +290,23 @@ function hashSignature(signature: string) {
   return ethers.keccak256(ethers.toUtf8Bytes(signature));
 }
 
+function resolveBlockchainSyncMode(
+  actorRole: UserRole,
+  requestedMode: z.infer<typeof blockchainSyncModeSchema> | undefined
+) {
+  const roleDefault = isCitizenRole(actorRole) ? "CITIZEN_DIRECT_SIGN" : "OFFICER_SERVICE_WALLET";
+  const syncMode = requestedMode ?? roleDefault;
+
+  if (syncMode === "CITIZEN_DIRECT_SIGN" && !isCitizenRole(actorRole)) {
+    throw forbiddenError("OWNERSHIP_DENIED: Chỉ công dân/doanh nghiệp được dùng chế độ CITIZEN_DIRECT_SIGN");
+  }
+  if (syncMode === "OFFICER_SERVICE_WALLET" && isCitizenRole(actorRole)) {
+    throw forbiddenError("walletAuthMissing: Công dân/doanh nghiệp không được dùng chế độ OFFICER_SERVICE_WALLET");
+  }
+
+  return syncMode;
+}
+
 async function ensureServiceWalletAuthorizationForSync(
   actor: AuthenticatedRequest["user"],
   input: {
@@ -354,6 +379,62 @@ async function ensureServiceWalletAuthorizationForSync(
     expectedNetwork,
     expectedChainId,
     normalizedSignerAddress
+  };
+}
+
+async function ensureCitizenWalletAuthorizationForSync(
+  actor: AuthenticatedRequest["user"],
+  registrationApplicantId: string,
+  input: {
+    signerWalletAddress: string;
+    signerChainId: number;
+  }
+) {
+  const expectedNetwork = resolveExpectedBlockchainNetwork();
+  const expectedChainId = resolveExpectedBlockchainChainId();
+
+  if (actor.userId !== registrationApplicantId) {
+    throw forbiddenError("OWNERSHIP_DENIED: Bạn không sở hữu hồ sơ đăng ký này");
+  }
+
+  if (input.signerChainId !== expectedChainId) {
+    throw forbiddenError(
+      `WRONG_NETWORK: signerChainId không hợp lệ. current=${input.signerChainId} expected=${expectedChainId}`
+    );
+  }
+
+  const normalizedSignerAddress = ethers.getAddress(input.signerWalletAddress.trim());
+  const defaultWallet = await prisma.walletAccount.findFirst({
+    where: {
+      userId: actor.userId,
+      status: "VERIFIED",
+      isDefault: true,
+      network: expectedNetwork
+    },
+    select: {
+      id: true,
+      address: true,
+      network: true
+    }
+  });
+
+  if (!defaultWallet) {
+    throw forbiddenError("WALLET_MISMATCH: Chưa có ví mặc định đã xác minh trên mạng blockchain hiện tại");
+  }
+
+  if (defaultWallet.network !== expectedNetwork) {
+    throw forbiddenError("WRONG_NETWORK: Ví mặc định không đúng network hệ thống");
+  }
+
+  if (ethers.getAddress(defaultWallet.address) !== normalizedSignerAddress) {
+    throw forbiddenError("WALLET_MISMATCH: Ví ký không trùng với ví mặc định đã xác minh");
+  }
+
+  return {
+    expectedNetwork,
+    expectedChainId,
+    normalizedSignerAddress,
+    defaultWallet
   };
 }
 
@@ -810,9 +891,15 @@ registrationRouter.post(
     if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
-    const procedureCode = parsed.data.procedureCode.trim().toUpperCase();
+    const requestedProcedureCode = parsed.data.procedureCode?.trim().toUpperCase();
+    const procedureCode = requestedProcedureCode || DEFAULT_REGISTRATION_PROCEDURE_CODE;
     const procedure = await prisma.legalProcedure.findUnique({ where: { procedureCode } });
     if (!procedure || !procedure.isActive) {
+      if (!requestedProcedureCode) {
+        throw badRequestError(
+          `Thiếu procedureCode và thủ tục mặc định ${DEFAULT_REGISTRATION_PROCEDURE_CODE} không hợp lệ hoặc đã ngừng áp dụng`
+        );
+      }
       throw badRequestError("procedureCode không hợp lệ hoặc đã ngừng áp dụng");
     }
 
@@ -1331,9 +1418,62 @@ registrationRouter.post(
   })
 );
 
+registrationRouter.get(
+  "/:id/blockchain-sync/candidates",
+  requireRoles(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY"]),
+  asyncHandler(async (req, res) => {
+    const user = (req as AuthenticatedRequest).user;
+    const existing = await findRegistrationByParam(String(req.params.id));
+    if (!existing) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
+
+    const expectedNetwork = resolveExpectedBlockchainNetwork();
+    const expectedChainId = resolveExpectedBlockchainChainId();
+    const now = new Date();
+
+    const items = await prisma.serviceWalletAuthorization.findMany({
+      where: {
+        userId: user.userId,
+        roleScope: user.role,
+        status: "ACTIVE",
+        network: expectedNetwork,
+        chainId: expectedChainId,
+        OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }]
+      },
+      include: {
+        wallet: {
+          select: {
+            address: true,
+            status: true,
+            network: true
+          }
+        }
+      },
+      orderBy: { updatedAt: "desc" }
+    });
+
+    return ok(
+      res,
+      {
+        items: items.map((item) => ({
+          authorizationId: item.id,
+          walletAddress: item.wallet.address,
+          walletStatus: item.wallet.status,
+          network: item.network,
+          chainId: item.chainId,
+          roleScope: item.roleScope,
+          effectiveTo: item.effectiveTo,
+          status: item.status
+        })),
+        total: items.length
+      },
+      "Đã tải danh sách ví công vụ sẵn sàng ký blockchain"
+    );
+  })
+);
+
 registrationRouter.post(
   "/:id/blockchain-sync",
-  requireRoles(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY"]),
+  requireRoles(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "CITIZEN", "BUSINESS"]),
   asyncHandler(async (req, res) => {
     const parsed = blockchainSyncSchema.safeParse(req.body ?? {});
     if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
@@ -1349,7 +1489,9 @@ registrationRouter.post(
       existing.status !== "DA_CAP_NHAT_HO_SO_DIA_CHINH" &&
       !(existing.status === "DA_CAP" && existing.cadastralUpdatedAt)
     ) {
-      throw conflictError("Chỉ được đồng bộ blockchain sau khi cập nhật hồ sơ địa chính off-chain hợp lệ");
+      throw conflictError(
+        `STATUS_NOT_READY: Chỉ được đồng bộ blockchain sau khi cập nhật hồ sơ địa chính off-chain hợp lệ. currentStatus=${existing.status}`
+      );
     }
 
     await ensureProcedureAndAuthority(existing, user.role);
@@ -1372,12 +1514,31 @@ registrationRouter.post(
       throw forbiddenError("walletAuthMissing: Chữ ký không khớp signerWalletAddress");
     }
 
-    const { authorization, expectedNetwork, expectedChainId, normalizedSignerAddress } =
-      await ensureServiceWalletAuthorizationForSync(user, {
+    const syncMode = resolveBlockchainSyncMode(user.role, parsed.data.syncMode);
+    const expectedNetwork = resolveExpectedBlockchainNetwork();
+    const expectedChainId = resolveExpectedBlockchainChainId();
+    let normalizedSignerAddress = parsedSignerAddress;
+    let authorization: Awaited<ReturnType<typeof ensureServiceWalletAuthorizationForSync>>["authorization"] | null =
+      null;
+
+    if (syncMode === "OFFICER_SERVICE_WALLET") {
+      if (!parsed.data.walletAuthorizationId) {
+        throw badRequestError("walletAuthMissing: walletAuthorizationId là bắt buộc cho OFFICER_SERVICE_WALLET");
+      }
+      const verified = await ensureServiceWalletAuthorizationForSync(user, {
         walletAuthorizationId: parsed.data.walletAuthorizationId,
         signerWalletAddress: parsed.data.signerWalletAddress,
         signerChainId: parsed.data.signerChainId
       });
+      authorization = verified.authorization;
+      normalizedSignerAddress = verified.normalizedSignerAddress;
+    } else {
+      const verified = await ensureCitizenWalletAuthorizationForSync(user, existing.applicantId, {
+        signerWalletAddress: parsed.data.signerWalletAddress,
+        signerChainId: parsed.data.signerChainId
+      });
+      normalizedSignerAddress = verified.normalizedSignerAddress;
+    }
 
     const ownerWallet = await prisma.walletAccount.findFirst({
       where: {
@@ -1403,7 +1564,8 @@ registrationRouter.post(
         walletAddress: normalizedSignerAddress,
         status: "PENDING",
         payload: {
-          walletAuthorizationId: authorization.id,
+          syncMode,
+          walletAuthorizationId: authorization?.id ?? null,
           legalBasisCode: parsed.data.legalBasisCode,
           signerWalletAddress: normalizedSignerAddress,
           signerChainId: parsed.data.signerChainId,
@@ -1449,7 +1611,8 @@ registrationRouter.post(
         entityId: existing.id,
         payload: {
           txLifecycleId: txLifecycle.id,
-          walletAuthorizationId: authorization.id,
+          syncMode,
+          walletAuthorizationId: authorization?.id ?? null,
           signerWalletAddress: normalizedSignerAddress,
           network: expectedNetwork,
           chainId: expectedChainId,
@@ -1492,7 +1655,8 @@ registrationRouter.post(
       entityId: existing.id,
       payload: {
         txLifecycleId: txLifecycle.id,
-        walletAuthorizationId: authorization.id,
+        syncMode,
+        walletAuthorizationId: authorization?.id ?? null,
         signerWalletAddress: normalizedSignerAddress,
         network: expectedNetwork,
         chainId: expectedChainId
@@ -1541,7 +1705,8 @@ registrationRouter.post(
         ownerWalletAddress: ownerWallet?.address ?? null,
         signerWalletAddress: normalizedSignerAddress,
         signerChainId: expectedChainId,
-        serviceWalletAuthorizationId: authorization.id,
+        syncMode,
+        serviceWalletAuthorizationId: authorization?.id ?? null,
         txLifecycleId: txLifecycle.id,
         onChainPrecheck: {
           mode: onChainLookup.mode,
@@ -1559,8 +1724,11 @@ registrationRouter.post(
         registrationId: updated.id,
         tokenId: updated.tokenId,
         txHash: updated.txHash,
+        status: "CONFIRMED",
+        syncMode,
         chainId: expectedChainId,
         contractAddress: onChainLookup.contractAddress,
+        explorerUrl,
         cid: updated.ipfsCid,
         metadataHash: updated.documentHash
       },
