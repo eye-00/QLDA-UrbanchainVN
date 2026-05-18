@@ -11,14 +11,6 @@ function requiredEnv(name: string) {
   return value;
 }
 
-function requiredAnyEnv(...names: string[]) {
-  for (const name of names) {
-    const value = process.env[name]?.trim();
-    if (value) return value;
-  }
-  throw new Error(`Missing required env: one of [${names.join(", ")}]`);
-}
-
 describe("Sprint 4 RPC smoke (fail hard)", () => {
   const rpcModeEnabled = (process.env.BLOCKCHAIN_SYNC_MODE ?? "").trim().toLowerCase() === "rpc";
   const runRpc = rpcModeEnabled ? it : it.skip;
@@ -28,7 +20,6 @@ describe("Sprint 4 RPC smoke (fail hard)", () => {
 
     const rpcUrl = requiredEnv("RPC_URL");
     const contractAddress = requiredEnv("CONTRACT_ADDRESS");
-    process.env.CHAIN_SIGNER_PRIVATE_KEY = requiredAnyEnv("CHAIN_SIGNER_PRIVATE_KEY", "PRIVATE_KEY");
     const expectedChainId = Number(process.env.BLOCKCHAIN_CHAIN_ID?.trim() || "11155111");
     if (!Number.isFinite(expectedChainId) || expectedChainId <= 0) {
       throw new Error("BLOCKCHAIN_CHAIN_ID must be a positive integer");

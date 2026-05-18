@@ -98,10 +98,9 @@ jobs:
       - name: Test backend RPC smoke (fail hard)
         env:
           BLOCKCHAIN_SYNC_MODE: rpc
-          BLOCKCHAIN_CHAIN_ID: ${{ secrets.S4_BLOCKCHAIN_CHAIN_ID || secrets.BLOCKCHAIN_CHAIN_ID }}
-          RPC_URL: ${{ secrets.S4_RPC_URL || secrets.RPC_URL }}
-          CONTRACT_ADDRESS: ${{ secrets.S4_CONTRACT_ADDRESS || secrets.CONTRACT_ADDRESS }}
-          CHAIN_SIGNER_PRIVATE_KEY: ${{ secrets.S4_CHAIN_SIGNER_PRIVATE_KEY || secrets.CHAIN_SIGNER_PRIVATE_KEY || secrets.PRIVATE_KEY }}
+          BLOCKCHAIN_CHAIN_ID: ${{ secrets.S4_BLOCKCHAIN_CHAIN_ID || secrets.BLOCKCHAIN_CHAIN_ID || '11155111' }}
+          RPC_URL: ${{ secrets.S4_RPC_URL || secrets.RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com' }}
+          CONTRACT_ADDRESS: ${{ secrets.S4_CONTRACT_ADDRESS || secrets.CONTRACT_ADDRESS || '0xe8484D306d27fD4d2028FFaC85268d3de28cEcA2' }}
         run: npm --workspace backend run test:rpc
 
   frontend-ci:

@@ -83,6 +83,15 @@ function resolveRpcConfig() {
   return { rpcUrl, contractAddress, signerPrivateKey };
 }
 
+function resolveRpcReadConfig() {
+  const rpcUrl = process.env.RPC_URL?.trim();
+  const contractAddress = process.env.CONTRACT_ADDRESS?.trim();
+  if (!rpcUrl) throw new Error("RPC_URL is required when BLOCKCHAIN_SYNC_MODE=rpc");
+  if (!contractAddress) throw new Error("CONTRACT_ADDRESS is required when BLOCKCHAIN_SYNC_MODE=rpc");
+  if (!ethers.isAddress(contractAddress)) throw new Error("CONTRACT_ADDRESS is invalid");
+  return { rpcUrl, contractAddress };
+}
+
 export async function mintRegistrationRecord(payload: RegistrationChainPayload): Promise<ChainMintResult> {
   const mode = resolveMode();
   if (mode === "mock") {
@@ -142,10 +151,9 @@ export async function lookupRegistrationOnChain(
     };
   }
 
-  const { rpcUrl, contractAddress, signerPrivateKey } = resolveRpcConfig();
+  const { rpcUrl, contractAddress } = resolveRpcReadConfig();
   const provider = new ethers.JsonRpcProvider(rpcUrl);
-  const signer = new ethers.Wallet(signerPrivateKey, provider);
-  const contract = new ethers.Contract(contractAddress, CONTRACT_ABI, signer);
+  const contract = new ethers.Contract(contractAddress, CONTRACT_ABI, provider);
 
   const [registrationTokenId, landTokenId] = await Promise.all([
     contract.tokenIdByRegistrationCode(registrationCode) as Promise<bigint>,
