@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../lib/api';
 import { useToast } from '../ui/ToastContext';
+import { getServiceWalletRoleScopeLabel } from '../ui/domainLabels';
 
 type ServiceWalletItem = {
   id: string;
@@ -9,7 +10,7 @@ type ServiceWalletItem = {
   network: 'SEPOLIA' | 'HARDHAT' | 'GANACHE';
   chainId: number;
   status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
-  roleScope: 'LAND_REGISTRY_OFFICER' | 'APPROVAL_AUTHORITY' | 'ADMIN';
+  roleScope: 'LAND_REGISTRY_OFFICER' | 'APPROVAL_AUTHORITY';
   user: {
     id: string;
     fullName: string;
@@ -44,9 +45,18 @@ type StatusFilter = 'ALL' | 'ACTIVE' | 'REVOKED' | 'EXPIRED';
 
 const ROLE_SCOPE_OPTIONS: Array<{ value: ServiceWalletItem['roleScope']; label: string }> = [
   { value: 'LAND_REGISTRY_OFFICER', label: 'Cán bộ VPĐKĐĐ' },
-  { value: 'APPROVAL_AUTHORITY', label: 'Cơ quan phê duyệt' },
-  { value: 'ADMIN', label: 'Quản trị hệ thống' }
+  { value: 'APPROVAL_AUTHORITY', label: 'Cơ quan phê duyệt' }
 ];
+
+function getRoleScopeLabel(roleScope: ServiceWalletItem['roleScope']) {
+  return getServiceWalletRoleScopeLabel(roleScope);
+}
+
+function getAuthorizationStatusLabel(status: ServiceWalletItem['status']) {
+  if (status === 'ACTIVE') return 'Đang hiệu lực';
+  if (status === 'REVOKED') return 'Đã thu hồi';
+  return 'Hết hiệu lực';
+}
 
 export function ServiceWalletManagementPage() {
   const { showToast } = useToast();
@@ -61,42 +71,42 @@ export function ServiceWalletManagementPage() {
     reason: ''
   });
 
-  async function loadAuthorizations() {
+  const loadAuthorizations = useCallback(async () => {
     setLoading(true);
     try {
       const query = statusFilter === 'ALL' ? '' : `?status=${statusFilter}`;
       const data = await apiGet<ServiceWalletListResponse>(`/service-wallets${query}`);
       setItems(data.items);
-      if (!form.walletId && data.items.length > 0) {
-        setForm((current) => ({ ...current, walletId: data.items[0].walletId }));
-      }
+      setForm((current) =>
+        current.walletId || data.items.length === 0 ? current : { ...current, walletId: data.items[0].walletId }
+      );
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Không tải được danh sách ví công vụ.');
     } finally {
       setLoading(false);
     }
-  }
+  }, [showToast, statusFilter]);
 
-  async function loadWalletCatalog() {
+  const loadWalletCatalog = useCallback(async () => {
     try {
       const data = await apiGet<WalletListResponse>('/wallets/me');
       const verified = data.items.filter((item) => item.status === 'VERIFIED');
       setWallets(verified);
-      if (!form.walletId && verified.length > 0) {
-        setForm((current) => ({ ...current, walletId: verified[0].id }));
-      }
+      setForm((current) =>
+        current.walletId || verified.length === 0 ? current : { ...current, walletId: verified[0].id }
+      );
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Không tải được danh mục ví đã xác minh.');
     }
-  }
+  }, [showToast]);
 
   useEffect(() => {
     void Promise.all([loadAuthorizations(), loadWalletCatalog()]);
-  }, []);
+  }, [loadAuthorizations, loadWalletCatalog]);
 
   useEffect(() => {
     void loadAuthorizations();
-  }, [statusFilter]);
+  }, [loadAuthorizations]);
 
   async function onCreateAuthorization(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -216,7 +226,7 @@ export function ServiceWalletManagementPage() {
               <thead>
                 <tr>
                   <th>Ví</th>
-                  <th>Role scope</th>
+                  <th>Vai trò áp dụng</th>
                   <th>Network / Chain</th>
                   <th>Người sở hữu</th>
                   <th>Trạng thái</th>
@@ -228,7 +238,7 @@ export function ServiceWalletManagementPage() {
                 {items.map((item) => (
                   <tr key={item.id}>
                     <td className="mono-text">{item.walletAddress}</td>
-                    <td>{item.roleScope}</td>
+                    <td>{getRoleScopeLabel(item.roleScope)}</td>
                     <td>{item.network} / {item.chainId}</td>
                     <td>
                       <div>{item.user.fullName}</div>
@@ -236,7 +246,7 @@ export function ServiceWalletManagementPage() {
                     </td>
                     <td>
                       <span className={`badge ${item.status === 'ACTIVE' ? 'badge-success' : item.status === 'REVOKED' ? 'badge-danger' : 'badge-warning'}`}>
-                        {item.status}
+                        {getAuthorizationStatusLabel(item.status)}
                       </span>
                     </td>
                     <td>

@@ -224,12 +224,17 @@ Mot backlog item duoc xem la Done khi:
 
 ## Trang thai sprint hien hanh (Legal Baseline)
 
+Cap nhat closeout Sprint 4 (2026-05-18):
+- Da verify local full gate tren worktree sach: `db:generate`, `db:migrate`, `db:seed`, `lint`, `build`, `test`.
+- Da bo sung lane RPC fail-hard: `npm --workspace backend run test:rpc` (yeu cau RPC that, fail cung khi thieu env/RPC loi).
+- LEG-S4-001 + nhom `US-565..576` da co evidence code/test/docs.
+
 | Sprint   | Trang thai hien hanh | Ghi chu                                                                   |
 | -------- | -------------------- | ------------------------------------------------------------------------- |
 | Sprint 1 | Done                 | Da dat full gate + wallet `US-547..558`.                                  |
 | Sprint 2 | Done                 | LEG-S2-001..005 da dong bang evidence code/test/docs va remote gate.      |
 | Sprint 3 | Done                 | `LEG-S3-001..003` da co evidence code/test/docs va remote gate.           |
-| Sprint 4 | Partial              | Con legal blocker `LEG-S4-001` va governance closeout nhom `US-565..576`. |
+| Sprint 4 | Done                 | `LEG-S4-001` + `US-565..576` da dong gate (governance + signing flow + tx lifecycle + RPC fail-hard). |
 
 ---
 

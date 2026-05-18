@@ -1,16 +1,26 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ApiRequestError, apiGet, apiPost } from '../lib/api';
+import { ApiRequestError, apiGet, apiPatch, apiPost } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { getFileDownload, getFileIntegrity, getFileMetadata, shortValue, type UploadedFileItem } from '../lib/files';
 import { useToast } from '../ui/ToastContext';
 import { getRegistrationStatusBadgeClass, getRegistrationStatusLabel } from '../ui/registrationStatus';
 import {
+  getDocumentTypeLabel,
+  getFileStorageStatusLabel,
+  getPaymentObligationStatusLabel,
+  getPaymentObligationTypeLabel
+} from '../ui/domainLabels';
+import {
+  buildCommuneConfirmPayload,
+  buildSupplementRequestPayload,
   getReviewPermissions,
   getReviewStepsByStatus,
   isActionAllowedForStatus,
-  isBlockchainSyncReady,
+  isCommuneConfirmReady,
+  isFutureDateTime,
   isTaxTransferReady,
+  parseMissingItems,
   requiresActionNote,
   toBlockchainDisplayValue,
   type ReviewActionKey
@@ -64,15 +74,15 @@ export function RegistrationReviewDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [actionNote, setActionNote] = useState('');
-  const [procedureCode, setProcedureCode] = useState('1.013978');
   const [legalBasisCode, setLegalBasisCode] = useState('151/2025-ND-CP|3380/QD-BNNMT');
-  const [evidenceText, setEvidenceText] = useState('');
+  const [selectedEvidenceFileId, setSelectedEvidenceFileId] = useState('');
+  const [supplementMissingItems, setSupplementMissingItems] = useState('');
+  const [supplementDeadlineAt, setSupplementDeadlineAt] = useState('');
   const [taxReferenceNo, setTaxReferenceNo] = useState('');
   const [approvalNumber, setApprovalNumber] = useState('');
-  const [chainCid, setChainCid] = useState('');
-  const [chainHash, setChainHash] = useState('');
   const [selectedFileMetadata, setSelectedFileMetadata] = useState<UploadedFileItem | null>(null);
   const [fileActionLoadingId, setFileActionLoadingId] = useState<string | null>(null);
+  const [paymentUpdatingId, setPaymentUpdatingId] = useState<string | null>(null);
 
   const permissions = useMemo(() => getReviewPermissions(user?.role), [user?.role]);
   const reviewSteps = useMemo(() => (item ? getReviewStepsByStatus(item.status) : []), [item]);
@@ -81,7 +91,7 @@ export function RegistrationReviewDetailPage() {
     navigate('/registrations/review');
   }
 
-  async function loadRegistrationDetail() {
+  const loadRegistrationDetail = useCallback(async () => {
     if (!id) {
       setLoadError('Không tìm thấy mã hồ sơ.');
       setLoading(false);
@@ -91,17 +101,21 @@ export function RegistrationReviewDetailPage() {
     try {
       const data = await apiGet<RegistrationItem>(`/registrations/${id}`);
       setItem(data);
+      setSelectedEvidenceFileId((current) => {
+        if (current && data.files.some((file) => file.id === current)) return current;
+        return data.files[0]?.id ?? '';
+      });
       setLoadError('');
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Không tải được chi tiết hồ sơ.');
     } finally {
       setLoading(false);
     }
-  }
+  }, [id]);
 
   useEffect(() => {
     void loadRegistrationDetail();
-  }, [id]);
+  }, [loadRegistrationDetail]);
 
   function getActionDisplayName(action: ReviewActionKey) {
     const labels: Record<ReviewActionKey, string> = {
@@ -137,11 +151,10 @@ export function RegistrationReviewDetailPage() {
       await apiPost(`/registrations/${item.id}${path}`, body);
       showToast('success', successMessage);
       setActionNote('');
-      setEvidenceText('');
+      setSupplementMissingItems('');
+      setSupplementDeadlineAt('');
       setTaxReferenceNo('');
       setApprovalNumber('');
-      setChainCid('');
-      setChainHash('');
       await loadRegistrationDetail();
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Không thực hiện được thao tác.');
@@ -150,27 +163,51 @@ export function RegistrationReviewDetailPage() {
     }
   }
 
-  function parseEvidenceIds() {
-    return evidenceText
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-
-  function withLegalPayload(body: Record<string, unknown>, fallbackReason: string) {
-    return {
-      ...body,
-      procedureCode,
-      legalBasisCode,
-      reason: actionNote.trim() || fallbackReason,
-      evidenceIds: parseEvidenceIds()
-    };
+  function withLegalPayload(body: Record<string, unknown>) {
+    return { ...body, legalBasisCode };
   }
 
   function requireNoteFor(actionLabel: string) {
     if (requiresActionNote('supplement', actionNote)) return true;
     showToast('error', `Vui lòng nhập ghi chú để ${actionLabel.toLowerCase()}.`);
     return false;
+  }
+
+  function getCommuneConfirmPayload(confirmed: boolean) {
+    if (!item) return null;
+    if (item.files.length === 0) {
+      showToast('error', 'Hồ sơ chưa có tệp đính kèm, không thể xác nhận cấp xã.');
+      return null;
+    }
+    if (!isCommuneConfirmReady(actionNote, selectedEvidenceFileId)) {
+      showToast('error', 'Vui lòng nhập ghi chú tối thiểu 3 ký tự và chọn tệp chứng cứ.');
+      return null;
+    }
+    return buildCommuneConfirmPayload({
+      confirmed,
+      legalBasisCode,
+      note: actionNote,
+      evidenceFileId: selectedEvidenceFileId
+    });
+  }
+
+  function getSupplementRequestPayload() {
+    if (!requireNoteFor('yêu cầu bổ sung')) return null;
+    const parsedMissingItems = parseMissingItems(supplementMissingItems);
+    if (parsedMissingItems.length === 0) {
+      showToast('error', 'Vui lòng nhập ít nhất 1 mục thiếu hồ sơ.');
+      return null;
+    }
+    if (!isFutureDateTime(supplementDeadlineAt)) {
+      showToast('error', 'Vui lòng chọn hạn bổ sung hợp lệ trong tương lai.');
+      return null;
+    }
+    return buildSupplementRequestPayload({
+      legalBasisCode,
+      note: actionNote,
+      missingItemsInput: supplementMissingItems,
+      deadlineAt: new Date(supplementDeadlineAt).toISOString()
+    });
   }
 
   async function handleViewFileMetadata(fileId: string) {
@@ -223,6 +260,24 @@ export function RegistrationReviewDetailPage() {
     }
   }
 
+  async function handleConfirmPaymentObligation(obligationId: string) {
+    if (!item) return;
+    setPaymentUpdatingId(obligationId);
+    try {
+      await apiPatch(`/registrations/${item.id}/payment-obligations/${obligationId}/status`, {
+        status: 'CONFIRMED',
+        legalBasisCode,
+        note: actionNote.trim() || 'Cán bộ thuế xác nhận hoàn thành nghĩa vụ tài chính'
+      });
+      showToast('success', 'Đã xác nhận hoàn thành nghĩa vụ tài chính.');
+      await loadRegistrationDetail();
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Không xác nhận được nghĩa vụ tài chính.');
+    } finally {
+      setPaymentUpdatingId(null);
+    }
+  }
+
   if (loading) {
     return (
       <section className="card">
@@ -253,11 +308,15 @@ export function RegistrationReviewDetailPage() {
   const canCommuneConfirm =
     permissions.canCommuneConfirm && isActionAllowedForStatus('communeConfirm', item.status);
   const canTaxTransfer = permissions.canTaxTransfer && isActionAllowedForStatus('taxTransfer', item.status);
+  const canConfirmPaymentObligation = permissions.canConfirmPaymentObligation;
   const canApprove = permissions.canApprove && isActionAllowedForStatus('approve', item.status);
   const canCadastralUpdate =
     permissions.canCadastralUpdate && isActionAllowedForStatus('cadastralUpdate', item.status);
   const canBlockchainSync =
     permissions.canBlockchainSync && isActionAllowedForStatus('blockchainSync', item.status);
+  const pendingPaymentObligations =
+    item.paymentObligations?.filter((obligation) => obligation.status === 'PENDING') ?? [];
+  const communeActionDisabled = submitting || item.files.length === 0;
 
   return (
     <section className="toolbar-row">
@@ -334,16 +393,31 @@ export function RegistrationReviewDetailPage() {
                     <th>Số tiền</th>
                     <th>Mã tham chiếu</th>
                     <th>Hoàn thành</th>
+                    <th>Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
                   {item.paymentObligations.map((obligation) => (
                     <tr key={obligation.id}>
-                      <td>{obligation.type === 'INTAKE_FEE' ? 'Lệ phí tiếp nhận' : 'Nghĩa vụ tài chính đất đai'}</td>
-                      <td>{obligation.status}</td>
+                      <td>{getPaymentObligationTypeLabel(obligation.type)}</td>
+                      <td>{getPaymentObligationStatusLabel(obligation.status)}</td>
                       <td>{obligation.amount ? obligation.amount.toLocaleString('vi-VN') : 'Chưa xác định'}</td>
                       <td>{obligation.referenceNo ?? 'Chưa có'}</td>
                       <td>{obligation.fulfilledAt ? new Date(obligation.fulfilledAt).toLocaleString('vi-VN') : 'Chưa hoàn thành'}</td>
+                      <td>
+                        {canConfirmPaymentObligation && obligation.status === 'PENDING' ? (
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            disabled={paymentUpdatingId === obligation.id || submitting}
+                            onClick={() => void handleConfirmPaymentObligation(obligation.id)}
+                          >
+                            {paymentUpdatingId === obligation.id ? 'Đang xác nhận...' : 'Xác nhận hoàn thành'}
+                          </button>
+                        ) : (
+                          <span className="muted">Không có</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -373,8 +447,8 @@ export function RegistrationReviewDetailPage() {
                   {item.files.map((file) => (
                     <tr key={file.id}>
                       <td>{file.originalName}</td>
-                      <td>{file.documentType}</td>
-                      <td>{file.storageStatus}</td>
+                      <td>{getDocumentTypeLabel(file.documentType)}</td>
+                      <td>{getFileStorageStatusLabel(file.storageStatus)}</td>
                       <td className="muted">{shortValue(file.cid)}</td>
                       <td className="muted">{shortValue(file.hash)}</td>
                       <td>
@@ -417,8 +491,8 @@ export function RegistrationReviewDetailPage() {
               <strong>Metadata tệp đang xem:</strong>
               <div>ID: {selectedFileMetadata.id}</div>
               <div>Tên tệp: {selectedFileMetadata.originalName}</div>
-              <div>Loại giấy tờ: {selectedFileMetadata.documentType}</div>
-              <div>Trạng thái: {selectedFileMetadata.storageStatus}</div>
+              <div>Loại giấy tờ: {getDocumentTypeLabel(selectedFileMetadata.documentType)}</div>
+              <div>Trạng thái: {getFileStorageStatusLabel(selectedFileMetadata.storageStatus)}</div>
               <div>CID: {selectedFileMetadata.cid ?? 'Chưa có'}</div>
               <div>Hash: {selectedFileMetadata.hash ?? 'Chưa có'}</div>
             </div>
@@ -429,16 +503,8 @@ export function RegistrationReviewDetailPage() {
           <h3>Thao tác xử lý</h3>
           <div className="form-grid">
             <label>
-              Mã thủ tục
-              <input value={procedureCode} onChange={(event) => setProcedureCode(event.target.value)} placeholder="1.013978" />
-            </label>
-            <label>
               Căn cứ pháp lý
               <input value={legalBasisCode} onChange={(event) => setLegalBasisCode(event.target.value)} placeholder="151/2025-ND-CP|3380/QD-BNNMT" />
-            </label>
-            <label className="field-span-2">
-              Mã chứng cứ (ngăn cách bởi dấu phẩy)
-              <input value={evidenceText} onChange={(event) => setEvidenceText(event.target.value)} placeholder="EV-001, EV-002" />
             </label>
           </div>
           <label>
@@ -450,6 +516,28 @@ export function RegistrationReviewDetailPage() {
             />
           </label>
 
+          {canRequestSupplement && (
+            <div className="form-grid">
+              <label className="field-span-2">
+                Danh mục cần bổ sung (mỗi dòng 1 mục)
+                <textarea
+                  value={supplementMissingItems}
+                  onChange={(event) => setSupplementMissingItems(event.target.value)}
+                  placeholder={'Thiếu bản scan giấy tờ nguồn gốc đất\nThiếu minh chứng nghĩa vụ tài chính'}
+                  rows={3}
+                />
+              </label>
+              <label>
+                Hạn bổ sung
+                <input
+                  type="datetime-local"
+                  value={supplementDeadlineAt}
+                  onChange={(event) => setSupplementDeadlineAt(event.target.value)}
+                />
+              </label>
+            </div>
+          )}
+
           <div className="action-row">
             {canAccept && (
               <button
@@ -459,7 +547,7 @@ export function RegistrationReviewDetailPage() {
                   void executeAction(
                     'accept',
                     '/accept',
-                    withLegalPayload({}, 'Bộ phận một cửa đã tiếp nhận hồ sơ'),
+                    withLegalPayload({ note: actionNote.trim() || 'Bộ phận một cửa đã tiếp nhận hồ sơ' }),
                     'Đã tiếp nhận hồ sơ.'
                   )
                 }
@@ -473,11 +561,12 @@ export function RegistrationReviewDetailPage() {
                 className="btn btn-outline"
                 disabled={submitting}
                 onClick={() => {
-                  if (!requireNoteFor('yêu cầu bổ sung')) return;
+                  const payload = getSupplementRequestPayload();
+                  if (!payload) return;
                   void executeAction(
                     'requestSupplement',
                     '/request-supplement',
-                    withLegalPayload({ note: actionNote }, actionNote),
+                    payload,
                     'Đã yêu cầu bổ sung hồ sơ.'
                   );
                 }}
@@ -495,7 +584,7 @@ export function RegistrationReviewDetailPage() {
                   void executeAction(
                     'reject',
                     '/reject',
-                    withLegalPayload({ note: actionNote }, actionNote),
+                    withLegalPayload({ note: actionNote }),
                     'Đã từ chối hồ sơ.'
                   );
                 }}
@@ -506,42 +595,52 @@ export function RegistrationReviewDetailPage() {
           </div>
 
           {canCommuneConfirm && (
-            <div className="action-row">
+            <div className="row-gap">
+              <label>
+                Tệp chứng cứ cấp xã
+                <select
+                  value={selectedEvidenceFileId}
+                  onChange={(event) => setSelectedEvidenceFileId(event.target.value)}
+                  disabled={communeActionDisabled}
+                >
+                  {item.files.length === 0 ? (
+                    <option value="">Chưa có tệp để chọn</option>
+                  ) : null}
+                  {item.files.map((file) => (
+                    <option key={file.id} value={file.id}>
+                      {file.originalName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {item.files.length === 0 && (
+                <div className="notice">Hồ sơ chưa có tệp đính kèm. Vui lòng yêu cầu bổ sung trước khi xác nhận cấp xã.</div>
+              )}
+              <div className="action-row">
               <button
                 type="button"
-                disabled={submitting}
-                onClick={() =>
-                  void executeAction(
-                    'communeConfirm',
-                    '/commune-confirm',
-                    withLegalPayload(
-                      { confirmed: true, notes: actionNote || undefined },
-                      actionNote || 'UBND cấp xã xác nhận thông tin hồ sơ'
-                    ),
-                    'Đã xác nhận cấp xã.'
-                  )
-                }
+                disabled={communeActionDisabled}
+                onClick={() => {
+                  const payload = getCommuneConfirmPayload(true);
+                  if (!payload) return;
+                  void executeAction('communeConfirm', '/commune-confirm', payload, 'Đã xác nhận cấp xã.');
+                }}
               >
                 Xác nhận cấp xã
               </button>
               <button
                 type="button"
                 className="btn btn-outline"
-                disabled={submitting}
-                onClick={() =>
-                  void executeAction(
-                    'communeConfirm',
-                    '/commune-confirm',
-                    withLegalPayload(
-                      { confirmed: false, notes: actionNote || undefined },
-                      actionNote || 'UBND cấp xã yêu cầu bổ sung hồ sơ'
-                    ),
-                    'Đã trả hồ sơ bổ sung từ cấp xã.'
-                  )
-                }
+                disabled={communeActionDisabled}
+                onClick={() => {
+                  const payload = getCommuneConfirmPayload(false);
+                  if (!payload) return;
+                  void executeAction('communeConfirm', '/commune-confirm', payload, 'Đã trả hồ sơ bổ sung từ cấp xã.');
+                }}
               >
                 Trả bổ sung
               </button>
+            </div>
             </div>
           )}
 
@@ -569,7 +668,6 @@ export function RegistrationReviewDetailPage() {
                       '/tax-transfer',
                       withLegalPayload(
                         { taxReferenceNo, notes: actionNote || undefined },
-                        actionNote || 'Chuyển hồ sơ xác định nghĩa vụ tài chính'
                       ),
                       'Đã chuyển thông tin nghĩa vụ tài chính.'
                     );
@@ -578,6 +676,12 @@ export function RegistrationReviewDetailPage() {
                   Chuyển thuế
                 </button>
               </div>
+            </div>
+          )}
+
+          {canConfirmPaymentObligation && pendingPaymentObligations.length > 0 && (
+            <div className="notice">
+              Có {pendingPaymentObligations.length} nghĩa vụ tài chính đang chờ xác nhận ở bảng "Nghĩa vụ tài chính".
             </div>
           )}
 
@@ -604,8 +708,7 @@ export function RegistrationReviewDetailPage() {
                           approvalNumber: approvalNumber || undefined,
                           approvalDate: new Date().toISOString().slice(0, 10),
                           note: actionNote || undefined
-                        },
-                        actionNote || 'Đã phê duyệt/ký cấp hồ sơ'
+                        }
                       ),
                       'Đã phê duyệt hồ sơ.'
                     )
@@ -626,7 +729,7 @@ export function RegistrationReviewDetailPage() {
                   void executeAction(
                     'cadastralUpdate',
                     '/cadastral-update',
-                    withLegalPayload({}, actionNote || 'Đã cập nhật hồ sơ địa chính/CSDL đất đai'),
+                    withLegalPayload({ note: actionNote || 'Đã cập nhật hồ sơ địa chính/CSDL đất đai' }),
                     'Đã cập nhật hồ sơ địa chính.'
                   )
                 }
@@ -637,39 +740,17 @@ export function RegistrationReviewDetailPage() {
           )}
 
           {canBlockchainSync && (
-            <div className="form-grid">
-              <label>
-                CID IPFS
-                <input value={chainCid} onChange={(event) => setChainCid(event.target.value)} placeholder="bafy..." />
-              </label>
-              <label>
-                Metadata hash
-                <input value={chainHash} onChange={(event) => setChainHash(event.target.value)} placeholder="0x..." />
-              </label>
+            <div className="row-gap">
+              <div className="notice">
+                Luồng ký blockchain được tách màn riêng để thao tác liền mạch và giảm lỗi khi xử lý hồ sơ.
+              </div>
               <div className="action-row">
                 <button
                   type="button"
                   disabled={submitting}
-                  onClick={() => {
-                    if (!isBlockchainSyncReady(chainCid, chainHash)) {
-                      showToast('error', 'Vui lòng nhập đầy đủ CID và metadata hash.');
-                      return;
-                    }
-                    void executeAction(
-                      'blockchainSync',
-                      '/blockchain-sync',
-                      withLegalPayload(
-                        {
-                          cid: chainCid,
-                          metadataHash: chainHash
-                        },
-                        actionNote || 'Đã ghi hash/CID metadata hồ sơ lên blockchain'
-                      ),
-                      'Đã đồng bộ bản ghi số.'
-                    );
-                  }}
+                  onClick={() => navigate(`/registrations/review/${item.id}/blockchain-sign`)}
                 >
-                  Đồng bộ blockchain
+                  Mở màn ký blockchain
                 </button>
               </div>
             </div>

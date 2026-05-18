@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { apiGet } from '../lib/api';
 import { ROLE_LABELS, UserRole } from '../auth/roles';
 import { useToast } from '../ui/ToastContext';
@@ -80,7 +80,7 @@ export function AdminDashboardPage() {
   const [data, setData] = useState<SummaryResponse | null>(null);
   const { showToast } = useToast();
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const summary = await apiGet<SummaryResponse>('/dashboard/summary');
@@ -90,11 +90,11 @@ export function AdminDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [showToast]);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   return (
     <section>

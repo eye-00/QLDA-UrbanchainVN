@@ -1,8 +1,10 @@
 import { Router } from "express";
 import multer from "multer";
+import { readFile, unlink } from "node:fs/promises";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
 import { asyncHandler, badRequestError, forbiddenError, notFoundError } from "../../lib/errors.js";
+import { uploadToIpfs } from "../../lib/ipfs.js";
 import { created, ok } from "../../lib/response.js";
 import { prisma } from "../../lib/prisma.js";
 import { demoStore } from "../../lib/store/demo-store.js";
@@ -54,9 +56,25 @@ fileRouter.post(
   asyncHandler(async (req, res) => {
     const parsed = uploadSchema.safeParse(req.body ?? {});
     if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!req.file) throw badRequestError("Thiếu tệp đính kèm");
 
     const user = (req as AuthenticatedRequest).user;
     const originalName = req.file?.originalname ?? req.body.originalName ?? "document.bin";
+    let ipfsUpload: Awaited<ReturnType<typeof uploadToIpfs>>;
+
+    try {
+      const buffer = await readFile(req.file.path);
+      ipfsUpload = await uploadToIpfs({
+        buffer,
+        fileName: originalName,
+        contentType: req.file.mimetype
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Upload thất bại";
+      throw badRequestError(`Không tải được tệp lên IPFS: ${reason}`);
+    } finally {
+      await unlink(req.file.path).catch(() => undefined);
+    }
 
     if (parsed.data.registrationId) {
       const registration = await prisma.registration.findUnique({ where: { id: parsed.data.registrationId } });
@@ -70,8 +88,8 @@ fileRouter.post(
         documentType: parsed.data.documentType,
         originalName,
         storageStatus: "UPLOADED_IPFS",
-        cid: `bafy-upload-${Date.now()}`,
-        hash: `0x${Date.now().toString(16)}file`,
+        cid: ipfsUpload.cid,
+        hash: ipfsUpload.hash,
         registrationId: parsed.data.registrationId
       }
     });
@@ -131,7 +149,8 @@ fileRouter.post(
         documentType: createdFile.documentType,
         storageStatus: createdFile.storageStatus,
         cid: createdFile.cid,
-        hash: createdFile.hash
+        hash: createdFile.hash,
+        provider: ipfsUpload.provider
       },
       "Đã tải tệp và lưu metadata IPFS thành công"
     );

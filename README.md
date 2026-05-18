@@ -45,6 +45,37 @@ prompts/     Prompts for 15 AI agents
 
 If Docker Desktop is not running, start it before `npm run infra:up`.
 
+## Windows PowerShell stable commands
+
+Neu PowerShell hien tai resolve `npm` sai (vi du tro vao roaming profile va bao `npm-cli.js` khong ton tai), dung wrapper cua repo:
+
+```powershell
+.\scripts\npmw.ps1 run lint
+.\scripts\npmw.ps1 run db:seed
+.\scripts\npmw.ps1 --workspace backend run test
+```
+
+Wrapper nay luon goi `npm.cmd` thay vi `npm.ps1`, giup tranh loi PATH/prefix trong PowerShell.
+
+## Dev bootstrap helpers
+
+Repo co script chuan hoa startup de giam loi chay sai workdir hoac thieu env:
+
+```powershell
+.\scripts\dev.ps1 check-env
+.\scripts\dev.ps1 quickstart
+.\scripts\dev.ps1 dev:backend
+.\scripts\dev.ps1 dev:frontend
+```
+
+Ghi chu:
+- `check-env`: xac nhan ton tai `backend/.env`, `frontend/.env`, `contracts/.env`
+- `quickstart`: `infra:up` -> `db:generate` -> `db:migrate` -> `db:seed`
+- Neu muon bo qua seed trong quickstart:
+  ```powershell
+  .\scripts\dev.ps1 quickstart -SkipSeed
+  ```
+
 ## Sprint 4 runtime modes (IPFS + Blockchain)
 Backend hỗ trợ 2 chế độ cho luồng ghi nhận blockchain:
 
@@ -55,11 +86,17 @@ Biến môi trường chính (backend):
 - `IPFS_UPLOAD_MODE`: `mock` | `local` | `pinata`
 - `IPFS_API_URL`: endpoint IPFS API (ví dụ `http://localhost:5001`)
 - `PINATA_JWT`: token Pinata khi dùng `pinata`
-- `BLOCKCHAIN_MODE`: `mock` | `rpc`
+- `BLOCKCHAIN_SYNC_MODE`: `mock` | `rpc`
 - `RPC_URL`: RPC endpoint (localhost/sepolia)
 - `CONTRACT_ADDRESS`: địa chỉ `UrbanLandRegistry`
-- `BACKEND_WALLET_PRIVATE_KEY`: private key ví backend để gọi contract
+- `CHAIN_SIGNER_PRIVATE_KEY`: private key ví backend để gọi contract (`PRIVATE_KEY` vẫn được hỗ trợ fallback)
+- `BLOCKCHAIN_CHAIN_ID`: chain id kỳ vọng (ví dụ `11155111` cho Sepolia)
+- `BLOCKCHAIN_NETWORK`: nhãn mạng runtime (`SEPOLIA`/...)
 - `BLOCKCHAIN_DEFAULT_TOKEN_OWNER`: ví owner token mặc định (optional)
+
+RPC fail-hard smoke (Sprint 4 gate):
+- `.\scripts\npmw.ps1 --workspace backend run test:rpc`
+- Test này bắt buộc dùng RPC thật; thiếu env hoặc RPC lỗi sẽ fail cứng.
 
 ## Quality commands
 - `npm run lint`

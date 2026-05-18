@@ -81,6 +81,54 @@ async function buildBlockchainSyncSignaturePayload(
   };
 }
 
+async function connectAndVerifyWalletForUser(token: string, wallet: ethers.Wallet) {
+  const connect = await api("/api/v1/wallets/connect", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      address: wallet.address,
+      network: "SEPOLIA"
+    })
+  });
+  expect(connect.response.status).toBe(201);
+  const walletId = connect.body.data.id as string;
+
+  const challenge = await api(`/api/v1/wallets/${walletId}/challenge`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({})
+  });
+  expect(challenge.response.status).toBe(200);
+  const message = challenge.body.data.message as string;
+  const signature = await wallet.signMessage(message);
+
+  const verify = await api(`/api/v1/wallets/${walletId}/verify`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ signature })
+  });
+  expect(verify.response.status).toBe(200);
+
+  const setDefault = await api(`/api/v1/wallets/${walletId}/default`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({})
+  });
+  expect(setDefault.response.status).toBe(200);
+}
+
 beforeAll(async () => {
   server = createApp().listen(0);
   await new Promise<void>((resolve) => server.once("listening", resolve));
@@ -142,6 +190,40 @@ describe("Sprint 3 registration core workflow", () => {
     });
     expect(submitted.response.status).toBe(200);
     expect(submitted.body.data.status).toBe("CHO_TIEP_NHAN");
+  });
+
+  it("citizen can create registration without procedureCode using backend default", async () => {
+    const citizenToken = await login("citizen@urbanchain.vn");
+    const suffix = Date.now().toString();
+
+    const created = await api("/api/v1/registrations", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${citizenToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        landInfo: {
+          provinceCode: "48",
+          communeName: "Hòa Khánh",
+          parcelNumber: `DEF-${suffix}`,
+          mapSheetNumber: "09",
+          area: 66.6,
+          landUsePurpose: "ODT",
+          address: "Số 9 Đường Fallback"
+        },
+        ownerInfo: {
+          ownerType: "INDIVIDUAL",
+          fullName: "Nguyễn Văn Fallback",
+          identityNumber: "0482fallback",
+          address: "Đà Nẵng"
+        },
+        fileIds: []
+      })
+    });
+
+    expect(created.response.status).toBe(201);
+    expect(created.body.data.registration.procedureCode).toBe("DKDD_LANDAU_3380");
   });
 
   it("officer can move registration across review flow endpoints", async () => {
@@ -675,6 +757,21 @@ describe("Sprint 3 registration core workflow", () => {
     expect(precheckStatus.body.data.onChain.registrationTokenId).toBeNull();
     expect(precheckStatus.body.data.offChain.txHash).toBeNull();
 
+    const missingWalletAuthorization = await api(`/api/v1/registrations/${registrationId}/blockchain-sync`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${approvalToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-S4-BLOCKCHAIN-MISSING-WALLET-AUTH",
+        cid: `bafy-s4-missing-auth-${suffix}`,
+        metadataHash: `0xmissing${suffix}`,
+        ...(await buildBlockchainSyncSignaturePayload("APPROVAL_AUTHORITY", created.body.data.registrationCode as string))
+      })
+    });
+    expect(missingWalletAuthorization.response.status).toBe(400);
+
     const sync = await api(`/api/v1/registrations/${registrationId}/blockchain-sync`, {
       method: "POST",
       headers: {
@@ -718,6 +815,320 @@ describe("Sprint 3 registration core workflow", () => {
     });
     expect(duplicateSync.response.status).toBe(409);
   });
+
+  it("supports citizen direct sign mode and blocks wallet mismatch or ownership violations", async () => {
+    process.env.BLOCKCHAIN_SYNC_MODE = "mock";
+    const suffix = Date.now().toString();
+    const citizenToken = await login("citizen@urbanchain.vn");
+    const adminToken = await login("admin@urbanchain.vn");
+
+    const citizenWallet = ethers.Wallet.createRandom();
+    await connectAndVerifyWalletForUser(citizenToken, citizenWallet);
+
+    const created = await api("/api/v1/registrations", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${citizenToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        procedureCode: "DKDD_LANDAU_3380",
+        landInfo: {
+          provinceCode: "48",
+          communeName: "Hòa Khánh",
+          parcelNumber: `CITIZEN-SIGN-${suffix}`,
+          mapSheetNumber: "55",
+          area: 90,
+          landUsePurpose: "ODT",
+          address: "Số 5 Đường Demo"
+        },
+        ownerInfo: {
+          ownerType: "INDIVIDUAL",
+          fullName: "Nguyễn Văn Citizen Sign"
+        }
+      })
+    });
+    expect(created.response.status).toBe(201);
+    const registrationId = created.body.data.registrationId as string;
+    const registrationCode = created.body.data.registrationCode as string;
+
+    const submitted = await api(`/api/v1/registrations/${registrationId}/submit`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${citizenToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ legalBasisCode: "QĐ3380-S4-CITIZEN-SUBMIT" })
+    });
+    expect(submitted.response.status).toBe(200);
+
+    const toAccepted = await api(`/api/v1/registrations/${registrationId}/status`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        status: "DA_TIEP_NHAN",
+        legalBasisCode: "QĐ3380-S4-CITIZEN-ACCEPT"
+      })
+    });
+    expect(toAccepted.response.status).toBe(200);
+
+    const toCommune = await api(`/api/v1/registrations/${registrationId}/status`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        status: "DA_XAC_NHAN_CAP_XA",
+        legalBasisCode: "QĐ3380-S4-CITIZEN-COMMUNE"
+      })
+    });
+    expect(toCommune.response.status).toBe(200);
+
+    const toAppraisal = await api(`/api/v1/registrations/${registrationId}/status`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        status: "DANG_THAM_DINH_VPDKDD",
+        legalBasisCode: "QĐ3380-S4-CITIZEN-APPRAISAL"
+      })
+    });
+    expect(toAppraisal.response.status).toBe(200);
+
+    const toTaxPending = await api(`/api/v1/registrations/${registrationId}/status`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        status: "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH",
+        legalBasisCode: "QĐ3380-S4-CITIZEN-TAX-PENDING"
+      })
+    });
+    expect(toTaxPending.response.status).toBe(200);
+
+    const toTaxDone = await api(`/api/v1/registrations/${registrationId}/status`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        status: "DA_HOAN_THANH_NGHIA_VU_TAI_CHINH",
+        legalBasisCode: "QĐ3380-S4-CITIZEN-TAX-DONE"
+      })
+    });
+    expect(toTaxDone.response.status).toBe(200);
+
+    const toApprovalQueue = await api(`/api/v1/registrations/${registrationId}/status`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        status: "CHO_KY_CAP",
+        legalBasisCode: "QĐ3380-S4-CITIZEN-TO-APPROVAL"
+      })
+    });
+    expect(toApprovalQueue.response.status).toBe(200);
+
+    const toSigned = await api(`/api/v1/registrations/${registrationId}/status`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        status: "DA_KY_CAP",
+        legalBasisCode: "QĐ3380-S4-CITIZEN-SIGNED"
+      })
+    });
+    expect(toSigned.response.status).toBe(200);
+
+    const cadastralUpdated = await api(`/api/v1/registrations/${registrationId}/cadastral-update`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-S4-CITIZEN-CADASTRAL",
+        note: "Cập nhật địa chính trước khi ký blockchain"
+      })
+    });
+    expect(cadastralUpdated.response.status).toBe(200);
+
+    const signingMessage = [
+      "UrbanChain-VN Blockchain Sync Confirmation",
+      `RegistrationCode: ${registrationCode}`,
+      "Mode: CITIZEN_DIRECT_SIGN",
+      `Signer: ${citizenWallet.address}`
+    ].join("\n");
+    const signature = await citizenWallet.signMessage(signingMessage);
+
+    const citizenSync = await api(`/api/v1/registrations/${registrationId}/blockchain-sync`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${citizenToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-S4-CITIZEN-SYNC",
+        syncMode: "CITIZEN_DIRECT_SIGN",
+        cid: `bafy-citizen-${suffix}`,
+        metadataHash: `0xcitizen${suffix}`,
+        signerWalletAddress: citizenWallet.address,
+        signerChainId: Number(process.env.BLOCKCHAIN_CHAIN_ID ?? "11155111"),
+        signingMessage,
+        signature
+      })
+    });
+    expect(citizenSync.response.status).toBe(200);
+    expect(citizenSync.body.data.syncMode).toBe("CITIZEN_DIRECT_SIGN");
+    expect(citizenSync.body.data.status).toBe("CONFIRMED");
+
+    const mismatchCreated = await api("/api/v1/registrations", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${citizenToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        procedureCode: "DKDD_LANDAU_3380",
+        landInfo: {
+          provinceCode: "48",
+          communeName: "Hòa Khánh",
+          parcelNumber: `CITIZEN-MISMATCH-${suffix}`,
+          mapSheetNumber: "56",
+          area: 91,
+          landUsePurpose: "ODT",
+          address: "Số 5A Đường Demo"
+        },
+        ownerInfo: {
+          ownerType: "INDIVIDUAL",
+          fullName: "Nguyễn Văn Citizen Mismatch"
+        }
+      })
+    });
+    expect(mismatchCreated.response.status).toBe(201);
+    const mismatchRegistrationId = mismatchCreated.body.data.registrationId as string;
+    const mismatchRegistrationCode = mismatchCreated.body.data.registrationCode as string;
+
+    const mismatchSubmit = await api(`/api/v1/registrations/${mismatchRegistrationId}/submit`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${citizenToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ legalBasisCode: "QĐ3380-S4-CITIZEN-MISMATCH-SUBMIT" })
+    });
+    expect(mismatchSubmit.response.status).toBe(200);
+
+    for (const transition of [
+      { status: "DA_TIEP_NHAN", legal: "QĐ3380-S4-CITIZEN-MISMATCH-ACCEPT" },
+      { status: "DA_XAC_NHAN_CAP_XA", legal: "QĐ3380-S4-CITIZEN-MISMATCH-COMMUNE" },
+      { status: "DANG_THAM_DINH_VPDKDD", legal: "QĐ3380-S4-CITIZEN-MISMATCH-APPRAISAL" },
+      { status: "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH", legal: "QĐ3380-S4-CITIZEN-MISMATCH-TAX-PENDING" },
+      { status: "DA_HOAN_THANH_NGHIA_VU_TAI_CHINH", legal: "QĐ3380-S4-CITIZEN-MISMATCH-TAX-DONE" },
+      { status: "CHO_KY_CAP", legal: "QĐ3380-S4-CITIZEN-MISMATCH-TO-APPROVAL" },
+      { status: "DA_KY_CAP", legal: "QĐ3380-S4-CITIZEN-MISMATCH-SIGNED" }
+    ]) {
+      const moved = await api(`/api/v1/registrations/${mismatchRegistrationId}/status`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          status: transition.status,
+          legalBasisCode: transition.legal
+        })
+      });
+      expect(moved.response.status).toBe(200);
+    }
+
+    const mismatchCadastral = await api(`/api/v1/registrations/${mismatchRegistrationId}/cadastral-update`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-S4-CITIZEN-MISMATCH-CADASTRAL",
+        note: "Cập nhật địa chính trước khi ký blockchain"
+      })
+    });
+    expect(mismatchCadastral.response.status).toBe(200);
+
+    const wrongWallet = ethers.Wallet.createRandom();
+    const wrongMessage = [
+      "UrbanChain-VN Blockchain Sync Confirmation",
+      `RegistrationCode: ${mismatchRegistrationCode}`,
+      "Mode: CITIZEN_DIRECT_SIGN",
+      `Signer: ${wrongWallet.address}`
+    ].join("\n");
+    const wrongSignature = await wrongWallet.signMessage(wrongMessage);
+
+    const otherCitizenEmail = `s4.scope.${suffix}@urbanchain.vn`;
+    const registerOtherCitizen = await api("/api/v1/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fullName: "Scope Citizen S4",
+        email: otherCitizenEmail,
+        password: "StrongPassword@123",
+        role: "CITIZEN"
+      })
+    });
+    expect(registerOtherCitizen.response.status).toBe(201);
+    const otherCitizenToken = await login(otherCitizenEmail);
+
+    const ownershipDeniedSync = await api(`/api/v1/registrations/${mismatchRegistrationId}/blockchain-sync`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${otherCitizenToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-S4-CITIZEN-OWNERSHIP-DENIED",
+        syncMode: "CITIZEN_DIRECT_SIGN",
+        cid: `bafy-citizen-owner-${suffix}`,
+        metadataHash: `0xcitizenowner${suffix}`,
+        signerWalletAddress: wrongWallet.address,
+        signerChainId: Number(process.env.BLOCKCHAIN_CHAIN_ID ?? "11155111"),
+        signingMessage: wrongMessage,
+        signature: wrongSignature
+      })
+    });
+    expect(ownershipDeniedSync.response.status).toBe(403);
+
+    const mismatchSync = await api(`/api/v1/registrations/${mismatchRegistrationId}/blockchain-sync`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${citizenToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        legalBasisCode: "QĐ3380-S4-CITIZEN-MISMATCH-SYNC",
+        syncMode: "CITIZEN_DIRECT_SIGN",
+        cid: `bafy-citizen-mismatch-${suffix}`,
+        metadataHash: `0xcitizenmismatch${suffix}`,
+        signerWalletAddress: wrongWallet.address,
+        signerChainId: Number(process.env.BLOCKCHAIN_CHAIN_ID ?? "11155111"),
+        signingMessage: wrongMessage,
+        signature: wrongSignature
+      })
+    });
+    expect(mismatchSync.response.status).toBe(403);
+  }, 60_000);
 
   it("citizen cannot read another citizen registration", async () => {
     const suffix = Date.now().toString();

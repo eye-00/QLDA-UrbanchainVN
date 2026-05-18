@@ -1,5 +1,11 @@
 import { BlockchainNetwork, Prisma, PrismaClient, WalletStatus } from "@prisma/client";
 import { randomBytes, scryptSync } from "node:crypto";
+import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const backendEnvPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".env");
+dotenv.config({ path: backendEnvPath });
 
 const prisma = new PrismaClient();
 

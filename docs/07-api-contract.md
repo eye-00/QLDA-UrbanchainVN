@@ -650,8 +650,8 @@ Phê duyệt/ký cấp kết quả.
 ```
 
 ### Sprint 4 behavior
-- Khi `BLOCKCHAIN_MODE=rpc`: backend gọi smart contract `UrbanLandRegistry.registerLand`, lưu `txHash`, `tokenId`, `landCode`.
-- Khi `BLOCKCHAIN_MODE=mock`: backend vẫn trả `txHash`/`tokenId` mock để giữ luồng demo.
+- Khi `BLOCKCHAIN_SYNC_MODE=rpc`: backend gọi smart contract `UrbanLandRegistry.registerLand`, lưu `txHash`, `tokenId`, `landCode`.
+- Khi `BLOCKCHAIN_SYNC_MODE=mock`: backend vẫn trả `txHash`/`tokenId` mock để giữ luồng demo.
 
 ## 8.9. POST /registrations/:registrationId/blockchain-sync
 Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
@@ -660,6 +660,7 @@ Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
 ```json
 {
   "legalBasisCode": "QĐ3380-BLOCKCHAIN-01",
+  "syncMode": "OFFICER_SERVICE_WALLET",
   "cid": "bafy...",
   "metadataHash": "0xabc123",
   "walletAuthorizationId": "swa_001",
@@ -686,10 +687,48 @@ Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
 - Chỉ cho phép đồng bộ blockchain khi hồ sơ đã cập nhật địa chính off-chain (`DA_CAP_NHAT_HO_SO_DIA_CHINH`).
 - Nếu gọi sai trạng thái hiện tại, API trả `409` với error envelope chuẩn.
 - Không cho phép bypass bằng `PATCH /registrations/:id/status -> DA_GHI_BLOCKCHAIN`; phải đi qua endpoint này để ghi nhận tx lifecycle/audit.
+- `syncMode=OFFICER_SERVICE_WALLET`:
+  - Bắt buộc `walletAuthorizationId`.
+  - Ví ký phải khớp quyền ví công vụ đang `ACTIVE`, còn hiệu lực, đúng `network/chainId/roleScope`.
+- `syncMode=CITIZEN_DIRECT_SIGN`:
+  - Chỉ cho `CITIZEN|BUSINESS`.
+  - Hồ sơ phải thuộc `applicantId` của người gọi.
+  - Ví ký phải trùng ví mặc định đã `VERIFIED` trên đúng network.
 
 ### RBAC
-- `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`.
+- `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`, `CITIZEN`, `BUSINESS` (theo `syncMode`).
 - `ADMIN` chỉ quản trị ví công vụ, không thực thi thao tác blockchain-sync.
+
+### Error code contract (để FE map ổn định)
+- `STATUS_NOT_READY`
+- `walletAuthMissing`
+- `OWNERSHIP_DENIED`
+- `WRONG_NETWORK`
+- `WALLET_MISMATCH`
+
+## 8.9.1. GET /registrations/:registrationId/blockchain-sync/candidates
+Trả danh sách ví công vụ khả dụng cho actor hiện tại (dùng cho officer signing mode).
+
+### RBAC
+- `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`, `ADMIN`.
+
+### Response data
+```json
+{
+  "items": [
+    {
+      "authorizationId": "swa_001",
+      "walletAddress": "0xabc...def",
+      "network": "SEPOLIA",
+      "chainId": 11155111,
+      "roleScope": "APPROVAL_AUTHORITY",
+      "effectiveTo": "2026-12-31T16:59:59.000Z",
+      "status": "ACTIVE"
+    }
+  ],
+  "total": 1
+}
+```
 
 ## 8.10. GET /registrations/:registrationId/notifications
 Lấy lịch sử thông báo kết quả xử lý hồ sơ theo RBAC/ownership.

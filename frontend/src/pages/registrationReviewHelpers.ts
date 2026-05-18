@@ -23,6 +23,20 @@ export type ReviewStep = {
   state: ReviewStepState;
 };
 
+export type CommuneConfirmPayload = {
+  confirmed: boolean;
+  legalBasisCode: string;
+  notes: string;
+  evidenceFileId: string;
+};
+
+export type SupplementRequestPayload = {
+  legalBasisCode: string;
+  note: string;
+  missingItems: string[];
+  deadlineAt: string;
+};
+
 const STATUS_PROGRESS_MAP: Record<string, number> = {
   MOI_TAO: 0,
   CHO_TIEP_NHAN: 1,
@@ -79,7 +93,7 @@ const ACTION_STATUS_MATRIX: Record<ReviewActionKey, readonly string[]> = {
   accept: ['CHO_TIEP_NHAN', 'CAN_BO_SUNG'],
   requestSupplement: PROCESSING_STATUSES,
   reject: PROCESSING_STATUSES,
-  communeConfirm: ['CHO_XAC_NHAN_CAP_XA'],
+  communeConfirm: ['DA_TIEP_NHAN', 'CHO_XAC_NHAN_CAP_XA'],
   taxTransfer: ['DA_XAC_NHAN_CAP_XA', 'DANG_THAM_DINH_VPDKDD'],
   approve: ['CHO_KY_CAP', 'CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH', 'DA_HOAN_THANH_NGHIA_VU_TAI_CHINH'],
   cadastralUpdate: ['DA_KY_CAP', 'DA_CAP'],
@@ -104,6 +118,52 @@ export function isTaxTransferReady(taxReferenceNo: string) {
 
 export function isBlockchainSyncReady(cid: string, metadataHash: string) {
   return Boolean(cid.trim() && metadataHash.trim());
+}
+
+export function isCommuneConfirmReady(note: string, evidenceFileId: string) {
+  return note.trim().length >= 3 && evidenceFileId.trim().length >= 3;
+}
+
+export function parseMissingItems(input: string) {
+  return input
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+export function isFutureDateTime(deadlineAt: string, now = new Date()) {
+  if (!deadlineAt.trim()) return false;
+  const deadline = new Date(deadlineAt);
+  if (Number.isNaN(deadline.getTime())) return false;
+  return deadline.getTime() > now.getTime();
+}
+
+export function buildCommuneConfirmPayload(input: {
+  confirmed: boolean;
+  legalBasisCode: string;
+  note: string;
+  evidenceFileId: string;
+}): CommuneConfirmPayload {
+  return {
+    confirmed: input.confirmed,
+    legalBasisCode: input.legalBasisCode.trim(),
+    notes: input.note.trim(),
+    evidenceFileId: input.evidenceFileId.trim()
+  };
+}
+
+export function buildSupplementRequestPayload(input: {
+  legalBasisCode: string;
+  note: string;
+  missingItemsInput: string;
+  deadlineAt: string;
+}): SupplementRequestPayload {
+  return {
+    legalBasisCode: input.legalBasisCode.trim(),
+    note: input.note.trim(),
+    missingItems: parseMissingItems(input.missingItemsInput),
+    deadlineAt: input.deadlineAt
+  };
 }
 
 export function isActionAllowedForStatus(action: ReviewActionKey, status: string) {
@@ -138,7 +198,8 @@ export function getReviewPermissions(role: UserRole | undefined) {
   return {
     canAccept: role === 'RECEPTION_OFFICER' || isAdmin,
     canCommuneConfirm: role === 'COMMUNE_OFFICER' || isAdmin,
-    canTaxTransfer: role === 'LAND_REGISTRY_OFFICER' || role === 'TAX_OFFICER' || isAdmin,
+    canTaxTransfer: role === 'LAND_REGISTRY_OFFICER' || isAdmin,
+    canConfirmPaymentObligation: role === 'TAX_OFFICER' || isAdmin,
     canApprove: role === 'APPROVAL_AUTHORITY' || isAdmin,
     canReject: role === 'LAND_REGISTRY_OFFICER' || role === 'TAX_OFFICER' || role === 'APPROVAL_AUTHORITY' || isAdmin,
     canRequestSupplement:
@@ -148,6 +209,6 @@ export function getReviewPermissions(role: UserRole | undefined) {
       role === 'TAX_OFFICER' ||
       isAdmin,
     canCadastralUpdate: role === 'LAND_REGISTRY_OFFICER' || isAdmin,
-    canBlockchainSync: role === 'LAND_REGISTRY_OFFICER' || role === 'APPROVAL_AUTHORITY' || isAdmin
+    canBlockchainSync: role === 'LAND_REGISTRY_OFFICER' || role === 'APPROVAL_AUTHORITY'
   };
 }

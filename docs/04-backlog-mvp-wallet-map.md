@@ -57,7 +57,7 @@ Theo bo tai lieu `docs/docs-legal-aligned`, trang thai closure sprint duoc cap n
 | Sprint 1 | Done                              | Done                            | Da dat full gate va wallet `US-547..558` da merge + smoke test.                                  |
 | Sprint 2 | Done                              | Done                            | Legal-aligned closeout da co evidence code/test/docs va remote technical gate.                   |
 | Sprint 3 | Done                              | Done                            | `LEG-S3-001..003` da co evidence code/test/docs; remote gate da xac nhan tren chuoi PR Sprint 3. |
-| Sprint 4 | In Progress                       | Partial                         | Chua dat legal gate `LEG-S4-001` (precondition off-chain hop le truoc ghi chain).                |
+| Sprint 4 | In Progress                       | Done                            | Da dong `LEG-S4-001` + `US-565..576` (service-wallet governance, signing flow 2 buoc, tx lifecycle, RPC fail-hard). |
 
 ### Legal gap table (owner + remediation)
 
@@ -67,7 +67,7 @@ Theo bo tai lieu `docs/docs-legal-aligned`, trang thai closure sprint duoc cap n
 | Document versioning + submit snapshot       | Da khoa version tai lieu va tao snapshot tai submit                                                                          | `LEG-S2-002`, `LEG-S2-004` | AI_06 DB & IPFS + AI_04 Backend API  | Closed                          |
 | Payment model off-chain                     | Da tach `INTAKE_FEE` va `LAND_FINANCIAL_OBLIGATION` cho Sprint 2                                                             | `LEG-S2-003`, `LEG-S5-001` | AI_04 Backend API                    | Sprint 2 closed / Sprint 5 open |
 | Transition legal guard                      | Da bat buoc `legalBasisCode`, actor/status validation o transition Sprint 2 va supplement payload legal-aligned cho Sprint 3 | `LEG-S2-005`, `LEG-S3-002` | AI_15 Compliance + AI_04 Backend API | Closed                          |
-| Blockchain precondition guard               | Chua khoa gate "chi ghi blockchain sau cap nhat ho so dia chinh hop le"                                                      | `LEG-S4-001`, `LEG-S7-001` | AI_04 + AI_02 + AI_15                | P0                              |
+| Blockchain precondition guard               | Da khoa gate "chi ghi blockchain sau cap nhat ho so dia chinh hop le" o service-layer; lane RPC fail-hard da bat buoc       | `LEG-S4-001`, `LEG-S7-001` | AI_04 + AI_02 + AI_15                | Sprint 4 closed / Sprint 7 open |
 
 > Ghi chu: Cac closure snapshot cu ben duoi giu lai de truy vet lich su; khi xung dot, uu tien ket luan theo section legal rebaseline nay.
 
@@ -83,7 +83,8 @@ Cap nhat bang chung gate ky thuat moi nhat tren `develop`:
   - `npm run db:seed`
   - `npm run lint`
   - `npm run build`
-  - `npm test` (contracts `7/7`, backend `40/40`, frontend `47/47`).
+  - `npm test` (contracts `7/7`, backend `41/41`, frontend `47/47`).
+  - `npm --workspace backend run test:rpc` (RPC that, fail cung khi thieu env/RPC loi).
 
 Ghi chú thao tác môi trường:
 
@@ -93,7 +94,7 @@ Luu y:
 
 - Cap nhat nay xac nhan da go blocker ky thuat compile/test.
 - Ket hop voi legal evidence closeout, Sprint 2 duoc nang lai `Done`.
-- Sprint 4 van giu `Partial` cho den khi dong legal gates con mo.
+- Sprint 4 da dong `Done` khi full gate (code + test + docs + RPC fail-hard) dat.
 
 ## 2.3. Sprint 3 legal closeout update (2026-05-17)
 

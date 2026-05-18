@@ -60,14 +60,14 @@ Ghi chu:
 Tac dong len ma tran:
 
 - Cac muc `Partial` do blocker compile/test va remote checks cho dot fix ky thuat da duoc go.
-- Trang thai tong Sprint 2 va Sprint 3 da duoc nang `Done`; legal blockers con mo hien chi nam o Sprint 4+.
+- Trang thai tong Sprint 2 va Sprint 3 da duoc nang `Done`; `LEG-S4-001` da duoc dong trong dot closeout Sprint 4.
 
 Legal blockers dang mo (owner phoi hop):
 
 | Legal gap                                                  | Anh huong sprint | Owner chinh                                   | Ma backlog legal           |
 | ---------------------------------------------------------- | ---------------- | --------------------------------------------- | -------------------------- |
 | Payment obligation model off-chain (mo rong sau Sprint 2)  | Sprint 5         | AI_04 Backend API                             | `LEG-S5-001`               |
-| Blockchain precondition guard sau cap nhat ho so dia chinh | Sprint 4+        | AI_04 Backend API + AI_02 Blockchain Core Dev | `LEG-S4-001`, `LEG-S7-001` |
+| Blockchain precondition guard sau cap nhat ho so dia chinh | Sprint 7 (hardening) | AI_04 Backend API + AI_02 Blockchain Core Dev | `LEG-S7-001` |
 
 Ghi chu:
 

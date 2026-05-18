@@ -27,7 +27,9 @@ export function createApp() {
   app.use(cors());
   app.use(helmet());
   app.use(express.json());
-  app.use(morgan("dev"));
+  if (process.env.NODE_ENV !== "test") {
+    app.use(morgan("dev"));
+  }
 
   app.get("/api/v1/health", (_req, res) => res.json({ success: true, message: "ok" }));
   app.use("/api/v1/auth", authRouter);
