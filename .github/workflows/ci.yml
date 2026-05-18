@@ -63,11 +63,7 @@ jobs:
       DATABASE_URL: mysql://urbanchain:urbanchain@127.0.0.1:3307/urbanchain
       JWT_SECRET: ci-secret
       NODE_ENV: test
-      BLOCKCHAIN_SYNC_MODE: rpc
-      BLOCKCHAIN_CHAIN_ID: ${{ secrets.S4_BLOCKCHAIN_CHAIN_ID }}
-      RPC_URL: ${{ secrets.S4_RPC_URL }}
-      CONTRACT_ADDRESS: ${{ secrets.S4_CONTRACT_ADDRESS }}
-      CHAIN_SIGNER_PRIVATE_KEY: ${{ secrets.S4_CHAIN_SIGNER_PRIVATE_KEY }}
+      BLOCKCHAIN_SYNC_MODE: mock
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -100,6 +96,12 @@ jobs:
         run: npm --workspace backend run test
 
       - name: Test backend RPC smoke (fail hard)
+        env:
+          BLOCKCHAIN_SYNC_MODE: rpc
+          BLOCKCHAIN_CHAIN_ID: ${{ secrets.S4_BLOCKCHAIN_CHAIN_ID || secrets.BLOCKCHAIN_CHAIN_ID }}
+          RPC_URL: ${{ secrets.S4_RPC_URL || secrets.RPC_URL }}
+          CONTRACT_ADDRESS: ${{ secrets.S4_CONTRACT_ADDRESS || secrets.CONTRACT_ADDRESS }}
+          CHAIN_SIGNER_PRIVATE_KEY: ${{ secrets.S4_CHAIN_SIGNER_PRIVATE_KEY || secrets.CHAIN_SIGNER_PRIVATE_KEY || secrets.PRIVATE_KEY }}
         run: npm --workspace backend run test:rpc
 
   frontend-ci:
