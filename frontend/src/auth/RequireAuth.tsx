@@ -7,7 +7,7 @@ export function RequireAuth({ roles, children }: { roles?: UserRole[]; children:
   const { user, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) return <p>Đang kiểm tra phiên đăng nhập...</p>;
+  if (loading) return <div className="empty-state">Đang kiểm tra phiên đăng nhập...</div>;
   if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
   if (roles && !roles.includes(user.role)) return <Navigate to="/forbidden" replace />;
 

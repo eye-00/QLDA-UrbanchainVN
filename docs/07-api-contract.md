@@ -13,6 +13,19 @@ Nguyên tắc:
 - blockchain chỉ trả metadata/hash/transaction cần thiết;
 - trạng thái hồ sơ phải dùng enum thống nhất.
 
+## 1.1. Legal Source Reference
+
+- Nguồn pháp lý chuẩn: [00-legal-basis-register.md](./00-legal-basis-register.md)
+- Ma trận traceability: [docs-legal-aligned/16-legal-requirement-traceability.md](./docs-legal-aligned/16-legal-requirement-traceability.md)
+
+Rule bắt buộc cho endpoint transition nhạy cảm:
+- Có `procedureCode`.
+- Có `legalBasisCode`.
+- Có `actorRole`.
+- Có `reason`.
+- Có `evidence` hoặc `evidenceIds`.
+- nếu có khác biệt giữa mô tả cũ và legal patch, ưu tiên baseline `docs/docs-legal-aligned`.
+
 ---
 
 ## 2. Quy ước kỹ thuật
@@ -69,7 +82,9 @@ Authorization: Bearer <token>
 - `RECEPTION_OFFICER`
 - `COMMUNE_OFFICER`
 - `LAND_REGISTRY_OFFICER`
+- `TAX_OFFICER`
 - `APPROVAL_AUTHORITY`
+- `AUDITOR`
 - `ADMIN`
 
 ---
@@ -86,10 +101,14 @@ Authorization: Bearer <token>
 - `DANG_THAM_DINH_VPDKDD`
 - `CHO_THUE`
 - `CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH`
+- `DA_HOAN_THANH_NGHIA_VU_TAI_CHINH`
 - `CHO_KY_CAP`
 - `DA_KY_CAP`
+- `DA_CAP_NHAT_HO_SO_DIA_CHINH`
+- `DA_GHI_BLOCKCHAIN`
 - `DA_CAP`
 - `DA_TRA_KET_QUA`
+- `HUY_HO_SO`
 - `TU_CHOI`
 
 ## 3.2. Transfer status
@@ -137,6 +156,9 @@ Tạo tài khoản người dùng.
   "status": "ACTIVE"
 }
 ```
+### Quy tắc bắt buộc
+- Public register chỉ cho `CITIZEN` hoặc `BUSINESS`.
+- Request cố gắng tạo role nội bộ (`ADMIN`, officer roles) phải trả `403`.
 
 ## 4.2. POST /auth/login
 Đăng nhập hệ thống.
@@ -162,14 +184,263 @@ Tạo tài khoản người dùng.
 }
 ```
 
-## 4.3. GET /auth/me
+## 4.3. POST /auth/refresh
+Làm mới phiên đăng nhập bằng refresh token.
+
+### Request
+```json
+{
+  "refreshToken": "refresh-token"
+}
+```
+
+### Response data
+```json
+{
+  "accessToken": "jwt-token",
+  "refreshToken": "refresh-token-rotated",
+  "user": {
+    "userId": "usr_001",
+    "fullName": "Nguyen Van A",
+    "role": "CITIZEN"
+  }
+}
+```
+
+## 4.4. POST /auth/logout
+Thu hồi session hiện tại (hoặc toàn bộ session của user nếu không truyền `refreshToken`).
+
+### Request
+```json
+{
+  "refreshToken": "refresh-token-rotated"
+}
+```
+
+## 4.5. POST /auth/password/reset-request
+Yêu cầu tạo reset token.
+
+### Request
+```json
+{
+  "email": "a@example.com"
+}
+```
+
+## 4.6. POST /auth/password/reset-confirm
+Xác nhận đổi mật khẩu bằng reset token.
+
+### Request
+```json
+{
+  "email": "a@example.com",
+  "token": "reset-token",
+  "newPassword": "NewStrongPassword@123"
+}
+```
+
+## 4.7. POST /auth/change-password
+Đổi mật khẩu khi user đã đăng nhập.
+
+### Request
+```json
+{
+  "currentPassword": "StrongPassword@123",
+  "newPassword": "NewStrongPassword@123"
+}
+```
+
+## 4.8. GET /auth/me
 Lấy hồ sơ người dùng hiện tại.
+
+## 4.9. Quy tắc đăng nhập tài khoản bị khoá
+- User có `status = LOCKED` không được đăng nhập.
+- API trả mã `400` với error envelope chuẩn.
+- Hệ thống hỗ trợ auto-lock theo số lần đăng nhập sai vượt ngưỡng.
+
+## 4.10. Wallet APIs (Sprint 1 Epic 13)
+
+> Nhóm API chỉ cho `CITIZEN` và `BUSINESS`, dùng để liên kết và xác minh quyền sở hữu ví.
+
+### POST /wallets/connect
+Liên kết ví EVM với tài khoản hiện tại (chưa xác minh).
+
+#### Request
+```json
+{
+  "address": "0x1234567890123456789012345678901234567890",
+  "network": "SEPOLIA"
+}
+```
+
+#### Quy tắc
+- Validate địa chỉ EVM hợp lệ.
+- Unique `(network,address)` toàn hệ thống.
+- Không lưu private key/seed phrase.
+- Trạng thái khởi tạo: `PENDING_VERIFICATION`.
+
+### POST /wallets/:id/challenge
+Tạo challenge ký xác minh (nonce one-time, có hạn dùng).
+
+#### Response data
+```json
+{
+  "walletId": "wal_001",
+  "challengeId": "wch_001",
+  "message": "UrbanChain-VN Wallet Verification\n...",
+  "nonce": "f8a0...",
+  "expiresAt": "2026-05-06T03:35:00.000Z"
+}
+```
+
+### POST /wallets/:id/verify
+Xác minh chữ ký theo EIP-191 bằng `ethers.verifyMessage`.
+
+#### Request
+```json
+{
+  "signature": "0x..."
+}
+```
+
+#### Quy tắc
+- Chỉ xác minh trên challenge chưa dùng và chưa hết hạn.
+- Chữ ký sai hoặc challenge hết hạn trả lỗi `400`.
+- Xác minh thành công cập nhật trạng thái ví `VERIFIED`.
+
+### GET /wallets/me
+Lấy danh sách ví thuộc user hiện tại.
+
+### PATCH /wallets/:id/default
+Đặt ví mặc định (chỉ cho ví `VERIFIED`).
+
+#### Quy tắc
+- Mỗi user chỉ có 1 ví mặc định trên mỗi network tại một thời điểm.
+- Ví không thuộc user hiện tại trả `403`.
+
+### Wallet status
+- `PENDING_VERIFICATION`
+- `VERIFIED`
+- `INACTIVE`
+
+### Wallet audit actions
+- `WALLET_CONNECTED`
+- `WALLET_CHALLENGE_CREATED`
+- `WALLET_VERIFIED`
+- `WALLET_DEFAULT_CHANGED`
+- `WALLET_VERIFY_FAILED`
 
 ---
 
-## 5. File APIs
+## 5. User & Organization APIs (Sprint 2)
 
-## 5.1. POST /files/upload
+> Nhóm API này chỉ dành cho vai trò `ADMIN`.
+
+## 5.1. GET /users
+Danh sách user có hỗ trợ tìm kiếm/lọc.
+
+### Query params
+- `keyword`
+- `role`
+- `organizationId`
+- `status`
+- `page`
+- `pageSize`
+
+## 5.2. POST /users
+Tạo user bởi admin.
+
+### Request
+```json
+{
+  "fullName": "Can bo tiep nhan moi",
+  "email": "new-officer@urbanchain.vn",
+  "password": "StrongPassword@123",
+  "role": "RECEPTION_OFFICER",
+  "organizationId": "org_001"
+}
+```
+
+## 5.3. PATCH /users/:id
+Cập nhật thông tin user.
+
+## 5.4. PATCH /users/:id/status
+Khoá/mở khoá user.
+
+### Request
+```json
+{
+  "status": "LOCKED"
+}
+```
+
+## 5.5. GET /organizations
+Danh sách đơn vị xử lý.
+
+### Query params
+- `keyword`
+- `includeInactive`
+
+## 5.6. POST /organizations
+Tạo đơn vị.
+
+## 5.7. PATCH /organizations/:id
+Cập nhật đơn vị.
+
+## 5.8. DELETE /organizations/:id
+Xoá mềm đơn vị (`isActive = false`).
+
+---
+
+## 6. Land Parcel APIs (Sprint 2)
+
+> Vai trò truy cập: officer/admin (`RECEPTION_OFFICER`, `COMMUNE_OFFICER`, `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`, `ADMIN`).
+
+## 6.1. GET /lands
+Danh sách thửa đất với bộ lọc.
+
+### Query params
+- `keyword`
+- `provinceCode`
+- `communeName`
+- `ownerUserId`
+- `landUsePurpose`
+- `page`
+- `pageSize`
+
+## 6.2. POST /lands
+Tạo thửa đất.
+
+## 6.3. PATCH /lands/:id
+Cập nhật thửa đất.
+
+## 6.4. GET /lands/:id
+Lấy chi tiết thửa đất.
+
+## 6.5. GET /lands/search
+Endpoint tương thích luồng cũ, nhận query `q`.
+
+## 6.6. Quy tắc chống trùng thửa (`US-031`)
+- Unique key: `parcelCode + provinceCode + communeName`.
+- Khi trùng, API trả `409 Conflict` với error envelope chuẩn.
+
+## 6.7. Sprint 2 contract verification snapshot (2026-04-28)
+- Base path giữ nguyên: `/api/v1`.
+- Response envelope giữ chuẩn:
+  - success: `{ success: true, message, data }`
+  - error: `{ success: false, message, errors }`
+- Endpoint nhóm Sprint 2 đã map với implementation:
+  - `/users`, `/users/:id`, `/users/:id/status`
+  - `/organizations`, `/organizations/:id`
+  - `/lands`, `/lands/:id`, `/lands/search`
+  - `/dashboard/summary`
+- `409 Conflict` cho duplicate parcel được giữ ổn định theo `US-031`.
+
+---
+
+## 7. File APIs
+
+## 7.1. POST /files/upload
 Upload tài liệu hồ sơ.
 
 ### Request
@@ -178,38 +449,65 @@ Upload tài liệu hồ sơ.
 - `documentType`
 - `ownerType`
 - `ownerId`
+- `registrationId` (optional)
+
+### Response data
+```json
+{
+  "id": "fil_001",
+  "documentType": "PROOF_OF_LAND_USE",
+  "storageStatus": "UPLOADED_IPFS",
+  "cid": "bafy...",
+  "hash": "0xabc123",
+  "provider": "mock"
+}
+```
+
+`provider` cho biết backend đang upload qua `mock`, `local` hoặc `pinata`.
+
+### Khuyến nghị luồng FE
+- Luồng chuẩn cho màn công dân: **upload trước** qua `/files/upload`, nhận `fileId`, sau đó gọi `POST /registrations` với `fileIds`.
+- `documentType` do UI chọn từ catalog nghiệp vụ; backend hiện chưa ép enum cứng theo loại giấy tờ.
+
+## 7.2. GET /files/:fileId
+Lấy metadata file.
+
+## 7.3. GET /files/:fileId/download
+Tải file từ gateway hoặc signed URL.
+
+## 7.4. GET /files/:fileId/integrity
+Kiểm tra tính toàn vẹn metadata tệp (`cid`, `hash`, `storageStatus`).
 
 ### Response data
 ```json
 {
   "fileId": "fil_001",
-  "documentType": "PROOF_OF_LAND_USE",
-  "storageStatus": "UPLOADED_IPFS",
   "cid": "bafy...",
-  "hash": "0xabc123"
+  "hash": "0xabc123",
+  "storageStatus": "UPLOADED_IPFS",
+  "checks": {
+    "hasCid": true,
+    "hasHash": true,
+    "storageStatusValid": true
+  },
+  "isValid": true
 }
 ```
 
-## 5.2. GET /files/:fileId
-Lấy metadata file.
-
-## 5.3. GET /files/:fileId/download
-Tải file từ gateway hoặc signed URL.
-
 ---
 
-## 6. Registration APIs – Đăng ký đất đai lần đầu
+## 8. Registration APIs – Đăng ký đất đai lần đầu
 
-## 6.1. POST /registrations
+## 8.1. POST /registrations
 Tạo hồ sơ đăng ký lần đầu.
 
 ### Request
 ```json
 {
-  "applicantId": "usr_001",
+  "procedureCode": "DKDD_LANDAU_3380",
+  "legalBasisCode": "QĐ3380-INIT-01",
   "landInfo": {
     "provinceCode": "48",
-    "districtName": "Lien Chieu",
     "communeName": "Hoa Khanh",
     "parcelNumber": "123",
     "mapSheetNumber": "05",
@@ -218,6 +516,7 @@ Tạo hồ sơ đăng ký lần đầu.
     "address": "54 Nguyen Luong Bang"
   },
   "ownerInfo": {
+    "ownerType": "INDIVIDUAL",
     "fullName": "Nguyen Van A",
     "identityNumber": "0482xxxxxxxx",
     "address": "Da Nang"
@@ -225,6 +524,13 @@ Tạo hồ sơ đăng ký lần đầu.
   "attachedFileIds": ["fil_001", "fil_002"]
 }
 ```
+
+> Compatibility note: backend hien cho phep ca `attachedFileIds` va `fileIds` de tuong thich nguoc UI.
+
+### Business rules (attach file)
+- Với `CITIZEN`/`BUSINESS`, chỉ được đính kèm file thuộc quyền sở hữu của chính user hoặc file đã gắn registration của chính user.
+- Nếu `fileIds` chứa file không tồn tại -> trả `400`.
+- Nếu `fileIds` chứa file không thuộc quyền -> trả `403`.
 
 ### Response data
 ```json
@@ -235,8 +541,16 @@ Tạo hồ sơ đăng ký lần đầu.
 }
 ```
 
-## 6.2. POST /registrations/:registrationId/submit
+## 8.2. POST /registrations/:registrationId/submit
 Nộp hồ sơ vào luồng xử lý.
+
+### Request
+```json
+{
+  "legalBasisCode": "QĐ3380-SUBMIT-01",
+  "note": "Người dân nộp hồ sơ"
+}
+```
 
 ### Response data
 ```json
@@ -246,7 +560,7 @@ Nộp hồ sơ vào luồng xử lý.
 }
 ```
 
-## 6.3. GET /registrations/:registrationId
+## 8.3. GET /registrations/:registrationId
 Lấy chi tiết hồ sơ đăng ký.
 
 ### Response data tối thiểu
@@ -263,7 +577,7 @@ Lấy chi tiết hồ sơ đăng ký.
 }
 ```
 
-## 6.4. GET /registrations
+## 8.4. GET /registrations
 Danh sách hồ sơ, hỗ trợ filter theo vai trò.
 
 ### Query params gợi ý
@@ -273,13 +587,14 @@ Danh sách hồ sơ, hỗ trợ filter theo vai trò.
 - `pageSize`
 - `assignedRole`
 
-## 6.5. PATCH /registrations/:registrationId/status
+## 8.5. PATCH /registrations/:registrationId/status
 Đổi trạng thái hồ sơ theo workflow.
 
 ### Request
 ```json
 {
   "status": "CAN_BO_SUNG",
+  "legalBasisCode": "QĐ3380-STATUS-01",
   "reason": "Thieu giay to chung minh quyen su dung dat"
 }
 ```
@@ -288,64 +603,325 @@ Danh sách hồ sơ, hỗ trợ filter theo vai trò.
 - Chỉ role phù hợp mới được đổi sang trạng thái tương ứng.
 - Mọi thay đổi trạng thái phải lưu audit trail.
 - `reason` là bắt buộc với các trạng thái từ chối hoặc yêu cầu bổ sung.
+- Khi chuyển trạng thái sai workflow (`currentStatus` -> `nextStatus` không hợp lệ), API trả `409` với error envelope chuẩn.
 
-## 6.6. POST /registrations/:registrationId/commune-confirm
+## 8.6. POST /registrations/:registrationId/commune-confirm
 UBND cấp xã xác nhận xử lý.
 
 ### Request
 ```json
 {
   "confirmed": true,
-  "notes": "Da xac nhan thong tin thuoc tham quyen"
+  "legalBasisCode": "QĐ3380-COMMUNE-01",
+  "notes": "Da xac nhan thong tin thuoc tham quyen",
+  "evidenceFileId": "fil_001"
 }
 ```
 
-## 6.7. POST /registrations/:registrationId/tax-transfer
+### Validation rules
+- `notes` bat buoc, toi thieu 3 ky tu.
+- `evidenceFileId` bat buoc va phai thuoc cung ho so dang ky.
+
+## 8.7. POST /registrations/:registrationId/tax-transfer
 Chuyển thông tin sang cơ quan thuế.
 
 ### Request
 ```json
 {
+  "legalBasisCode": "QĐ3380-TAX-01",
   "taxReferenceNo": "TAX-REQ-001",
+  "amount": 350000,
   "notes": "Chuyen thong tin xac dinh nghia vu tai chinh"
 }
 ```
 
-## 6.8. POST /registrations/:registrationId/approve
+## 8.8. POST /registrations/:registrationId/approve
 Phê duyệt/ký cấp kết quả.
 
 ### Request
 ```json
 {
+  "legalBasisCode": "QĐ3380-APPROVE-01",
   "approvalNumber": "QD-2026-001",
-  "approvalDate": "2026-01-15"
+  "approvalDate": "2026-01-15",
+  "note": "Ho so du dieu kien phe duyet",
+  "landCode": "LAND-2026-0001"
 }
 ```
 
-## 6.9. POST /registrations/:registrationId/blockchain-sync
+### Sprint 4 behavior
+- Khi `BLOCKCHAIN_SYNC_MODE=rpc`: backend gọi smart contract `UrbanLandRegistry.registerLand`, lưu `txHash`, `tokenId`, `landCode`.
+- Khi `BLOCKCHAIN_SYNC_MODE=mock`: backend vẫn trả `txHash`/`tokenId` mock để giữ luồng demo.
+
+## 8.9. POST /registrations/:registrationId/blockchain-sync
 Ghi nhận bản ghi số sau khi hồ sơ đã hợp lệ.
 
 ### Request
 ```json
 {
+  "legalBasisCode": "QĐ3380-BLOCKCHAIN-01",
+  "syncMode": "OFFICER_SERVICE_WALLET",
   "cid": "bafy...",
-  "metadataHash": "0xabc123"
+  "metadataHash": "0xabc123",
+  "walletAuthorizationId": "swa_001",
+  "signerWalletAddress": "0xabc...def",
+  "signerChainId": 11155111,
+  "signingMessage": "UrbanChain-VN Blockchain Sync Confirmation\\n...",
+  "signature": "0x..."
 }
 ```
 
 ### Response data
 ```json
 {
+  "registrationId": "reg_001",
+  "tokenId": 1001,
   "txHash": "0x123456",
-  "tokenId": "1001"
+  "tokenId": 1001,
+  "metadataHash": "0xabc123",
+  "blockchainMode": "mock"
 }
 ```
 
+### Business rules
+- Chỉ cho phép đồng bộ blockchain khi hồ sơ đã cập nhật địa chính off-chain (`DA_CAP_NHAT_HO_SO_DIA_CHINH`).
+- Nếu gọi sai trạng thái hiện tại, API trả `409` với error envelope chuẩn.
+- Không cho phép bypass bằng `PATCH /registrations/:id/status -> DA_GHI_BLOCKCHAIN`; phải đi qua endpoint này để ghi nhận tx lifecycle/audit.
+- `syncMode=OFFICER_SERVICE_WALLET`:
+  - Bắt buộc `walletAuthorizationId`.
+  - Ví ký phải khớp quyền ví công vụ đang `ACTIVE`, còn hiệu lực, đúng `network/chainId/roleScope`.
+- `syncMode=CITIZEN_DIRECT_SIGN`:
+  - Chỉ cho `CITIZEN|BUSINESS`.
+  - Hồ sơ phải thuộc `applicantId` của người gọi.
+  - Ví ký phải trùng ví mặc định đã `VERIFIED` trên đúng network.
+
+### RBAC
+- `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`, `CITIZEN`, `BUSINESS` (theo `syncMode`).
+- `ADMIN` chỉ quản trị ví công vụ, không thực thi thao tác blockchain-sync.
+
+### Error code contract (để FE map ổn định)
+- `STATUS_NOT_READY`
+- `walletAuthMissing`
+- `OWNERSHIP_DENIED`
+- `WRONG_NETWORK`
+- `WALLET_MISMATCH`
+
+## 8.9.1. GET /registrations/:registrationId/blockchain-sync/candidates
+Trả danh sách ví công vụ khả dụng cho actor hiện tại (dùng cho officer signing mode).
+
+### RBAC
+- `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`, `ADMIN`.
+
+### Response data
+```json
+{
+  "items": [
+    {
+      "authorizationId": "swa_001",
+      "walletAddress": "0xabc...def",
+      "network": "SEPOLIA",
+      "chainId": 11155111,
+      "roleScope": "APPROVAL_AUTHORITY",
+      "effectiveTo": "2026-12-31T16:59:59.000Z",
+      "status": "ACTIVE"
+    }
+  ],
+  "total": 1
+}
+```
+
+## 8.10. GET /registrations/:registrationId/notifications
+Lấy lịch sử thông báo kết quả xử lý hồ sơ theo RBAC/ownership.
+
+### Response data
+```json
+{
+  "items": [
+    {
+      "id": "log_001",
+      "status": "CAN_BO_SUNG",
+      "note": "Thiếu bản scan giấy tờ nguồn gốc đất",
+      "message": "Hồ sơ đã được cập nhật sang trạng thái CAN_BO_SUNG: Thiếu bản scan giấy tờ nguồn gốc đất",
+      "createdAt": "2026-04-28T12:00:00.000Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### Notification rule
+- Mỗi thay đổi trạng thái hồ sơ phải ghi audit event `REGISTRATION_STATUS_UPDATED`.
+- Đồng thời phát sinh nhật ký thông báo `REGISTRATION_NOTIFICATION_SENT` để người dùng tra cứu lịch sử cập nhật.
+
+## 8.11. GET /registrations/:registrationId/document-versions
+Lấy danh sách phiên bản tài liệu của hồ sơ.
+
+## 8.12. POST /registrations/:registrationId/document-versions
+Tạo phiên bản tài liệu mới.
+
+### Request
+```json
+{
+  "documentType": "LAND_CERT_SUPPORT",
+  "storageStatus": "UPLOADED_IPFS",
+  "cid": "bafy...",
+  "hash": "0xabc123",
+  "note": "Bổ sung bản scan mới"
+}
+```
+
+## 8.13. GET /registrations/:registrationId/snapshots
+Lấy snapshot version tài liệu đã khóa tại thời điểm submit.
+
+## 8.14. GET /registrations/:registrationId/document-history
+Lấy timeline lịch sử hồ sơ từ document versions + submit snapshots + audit status.
+
+### Response data
+```json
+{
+  "items": [
+    {
+      "id": "evt_001",
+      "type": "DOCUMENT_VERSION",
+      "at": "2026-05-10T08:00:00.000Z",
+      "title": "Phiên bản tài liệu #2",
+      "detail": {
+        "status": "ACTIVE",
+        "documentType": "LAND_CERT_SUPPORT"
+      }
+    }
+  ],
+  "total": 1
+}
+```
+
+## 8.15. POST /registrations/:registrationId/request-supplement
+Yeu cau bo sung ho so kem checklist va han bo sung.
+
+### Request
+```json
+{
+  "legalBasisCode": "QĐ3380-SUP-01",
+  "note": "Can bo sung bo chung tu nghia vu tai chinh",
+  "missingItems": [
+    "Thieu ban scan giay to nguon goc dat",
+    "Thieu minh chung nghia vu tai chinh"
+  ],
+  "deadlineAt": "2026-05-20T09:00:00.000Z"
+}
+```
+
+### Validation rules
+- `missingItems` bat buoc, toi thieu 1 muc.
+- `deadlineAt` bat buoc va phai la thoi diem tuong lai.
+
+## 8.16. GET /registrations/:registrationId/payment-obligations
+Lấy danh sách nghĩa vụ tài chính của hồ sơ.
+
+## 8.17. POST /registrations/:registrationId/payment-obligations
+Tạo nghĩa vụ tài chính theo thủ tục pháp lý.
+
+## 8.18. PATCH /registrations/:registrationId/payment-obligations/:obligationId/status
+Xác nhận/cập nhật trạng thái nghĩa vụ tài chính (`PENDING|CONFIRMED|CANCELLED`).
+
+## 8.19. POST /registrations/:registrationId/cadastral-update
+Ghi nhận đã cập nhật hồ sơ địa chính off-chain trước bước blockchain-sync.
+
+### Legal guard bắt buộc
+- Mọi bước submit/chuyển trạng thái xử lý phải truyền `legalBasisCode`.
+- `blockchain-sync` chỉ được phép sau khi hồ sơ đạt điều kiện off-chain (`DA_CAP_NHAT_HO_SO_DIA_CHINH`).
+
+## 8.20. GET /registrations/:registrationId/blockchain-status
+Đối soát trạng thái on-chain/off-chain cho hồ sơ đăng ký.
+
+### Response data
+```json
+{
+  "registrationId": "reg_001",
+  "registrationCode": "REG-2026-0001",
+  "landCode": "LAND-2026-0001",
+  "offChain": {
+    "status": "DA_GHI_BLOCKCHAIN",
+    "tokenId": 1001,
+    "txHash": "0x123456"
+  },
+  "onChain": {
+    "mode": "rpc",
+    "contractAddress": "0xabc...",
+    "registrationTokenId": 1001,
+    "landTokenId": 1001
+  },
+  "inSync": true
+}
+```
+
+### RBAC
+- `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`, `ADMIN`, `AUDITOR`.
+
+## 8.21. GET /registrations/:registrationId/tx-lifecycle
+Lấy vòng đời giao dịch blockchain của hồ sơ (`PENDING|CONFIRMED|FAILED|REJECTED`).
+
+### Response data
+```json
+{
+  "items": [
+    {
+      "id": "txl_001",
+      "action": "BLOCKCHAIN_SYNC",
+      "network": "SEPOLIA",
+      "chainId": 11155111,
+      "walletAddress": "0xabc...def",
+      "txHash": "0x123456",
+      "explorerUrl": "https://sepolia.etherscan.io/tx/0x123456",
+      "status": "CONFIRMED",
+      "errorCode": null,
+      "errorMessage": null,
+      "createdAt": "2026-05-12T04:00:00.000Z",
+      "updatedAt": "2026-05-12T04:00:15.000Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### RBAC
+- `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`, `ADMIN`, `AUDITOR`.
+
+## 8.22. Service Wallet Governance APIs (Sprint 4)
+> Nhóm API quản trị ví công vụ, chỉ cho `ADMIN`.
+
+### GET /service-wallets
+Lấy danh sách quyền ví công vụ, hỗ trợ filter theo `status/network/roleScope/organizationId/chainId`.
+
+### POST /service-wallets
+Cấp quyền ví công vụ từ ví đã `VERIFIED`.
+
+#### Request
+```json
+{
+  "walletId": "wal_001",
+  "roleScope": "APPROVAL_AUTHORITY",
+  "chainId": 11155111,
+  "effectiveTo": "2026-12-31T16:59:59.000Z",
+  "reason": "Phân công ký giao dịch hồ sơ đăng ký"
+}
+```
+
+#### Rule bắt buộc
+- `roleScope` chỉ cho phép: `LAND_REGISTRY_OFFICER`, `APPROVAL_AUTHORITY`.
+- Không cho phép cấp quyền ví công vụ với `roleScope=ADMIN`.
+
+### PATCH /service-wallets/:id/status
+Cập nhật trạng thái quyền ví công vụ: `ACTIVE|REVOKED|EXPIRED`.
+
+### GET /service-wallets/:id/audit
+Lấy audit trail của quyền ví công vụ.
+
 ---
 
-## 7. Transfer APIs – Đăng ký biến động / chuyển nhượng
+## 9. Transfer APIs – Đăng ký biến động / chuyển nhượng
 
-## 7.1. POST /transfers
+## 9.1. POST /transfers
 Tạo hồ sơ biến động do chuyển nhượng.
 
 ### Request
@@ -372,16 +948,16 @@ Tạo hồ sơ biến động do chuyển nhượng.
 }
 ```
 
-## 7.2. POST /transfers/:transferId/submit
+## 9.2. POST /transfers/:transferId/submit
 Nộp hồ sơ biến động.
 
-## 7.3. GET /transfers/:transferId
+## 9.3. GET /transfers/:transferId
 Chi tiết hồ sơ chuyển nhượng.
 
-## 7.4. GET /transfers
+## 9.4. GET /transfers
 Danh sách hồ sơ biến động.
 
-## 7.5. PATCH /transfers/:transferId/status
+## 9.5. PATCH /transfers/:transferId/status
 Đổi trạng thái hồ sơ biến động.
 
 ### Request
@@ -392,10 +968,10 @@ Danh sách hồ sơ biến động.
 }
 ```
 
-## 7.6. POST /transfers/:transferId/tax-transfer
+## 9.6. POST /transfers/:transferId/tax-transfer
 Chuyển thông tin nghĩa vụ tài chính.
 
-## 7.7. POST /transfers/:transferId/complete
+## 9.7. POST /transfers/:transferId/complete
 Hoàn tất cập nhật biến động.
 
 ### Request
@@ -406,7 +982,7 @@ Hoàn tất cập nhật biến động.
 }
 ```
 
-## 7.8. POST /transfers/:transferId/blockchain-sync
+## 9.8. POST /transfers/:transferId/blockchain-sync
 Ghi lịch sử giao dịch số hỗ trợ.
 
 ### Response data
@@ -420,9 +996,9 @@ Ghi lịch sử giao dịch số hỗ trợ.
 
 ---
 
-## 8. Land / Search APIs
+## 10. Land / Search APIs
 
-## 8.1. GET /lands/:landId
+## 10.1. GET /lands/:landId
 Chi tiết thửa đất.
 
 ### Response data
@@ -438,10 +1014,10 @@ Chi tiết thửa đất.
 }
 ```
 
-## 8.2. GET /lands/:landId/history
+## 10.2. GET /lands/:landId/history
 Lịch sử đăng ký và biến động.
 
-## 8.3. GET /search/lands
+## 10.3. GET /search/lands
 Tra cứu theo từ khóa.
 
 ### Query params
@@ -452,14 +1028,14 @@ Tra cứu theo từ khóa.
 - `page`
 - `pageSize`
 
-## 8.4. GET /search/registrations
+## 10.4. GET /search/registrations
 Tra cứu hồ sơ.
 
 ---
 
-## 9. OCR / AI Support APIs
+## 11. OCR / AI Support APIs
 
-## 9.1. POST /ocr/jobs
+## 11.1. POST /ocr/jobs
 Tạo job OCR.
 
 ### Request
@@ -478,10 +1054,10 @@ Tạo job OCR.
 }
 ```
 
-## 9.2. GET /ocr/jobs/:ocrJobId
+## 11.2. GET /ocr/jobs/:ocrJobId
 Xem trạng thái OCR.
 
-## 9.3. GET /registrations/:registrationId/ocr-result
+## 11.3. GET /registrations/:registrationId/ocr-result
 Lấy kết quả OCR và cảnh báo.
 
 ### Response data
@@ -502,9 +1078,9 @@ Lấy kết quả OCR và cảnh báo.
 
 ---
 
-## 10. Dashboard / Report APIs
+## 12. Dashboard / Report APIs
 
-## 10.1. GET /dashboard/summary
+## 12.1. GET /dashboard/summary
 Tổng quan hồ sơ.
 
 ### Response data
@@ -519,10 +1095,14 @@ Tổng quan hồ sơ.
 }
 ```
 
-## 10.2. GET /dashboard/transactions
+### Ghi chú Sprint 2 (`US-098`)
+- `/dashboard/summary` trả payload khác nhau theo `role` của user đăng nhập.
+- Trường `data.role` luôn có mặt để frontend render theo quyền.
+
+## 12.2. GET /dashboard/transactions
 Giám sát giao dịch blockchain.
 
-## 10.3. GET /reports/summary
+## 12.3. GET /reports/summary
 Báo cáo tổng hợp.
 
 ### Query params
@@ -532,13 +1112,34 @@ Báo cáo tổng hợp.
 
 ---
 
-## 11. Audit Trail APIs
+## 13. Audit Trail APIs
 
-## 11.1. GET /audit/registrations/:registrationId
-Lịch sử thay đổi hồ sơ đăng ký.
+## 13.1. GET /audit/access-logs
+Nhật ký truy cập/xác thực (`AUTH_*`).
 
-## 11.2. GET /audit/transfers/:transferId
-Lịch sử thay đổi hồ sơ biến động.
+### Query params
+- `page`
+- `pageSize`
+- `actorId`
+- `action`
+- `from`
+- `to`
+
+## 13.2. GET /audit/user-actions
+Nhật ký thao tác người dùng/cán bộ (`USER_*`, `REGISTRATION_*`, `TRANSFER_*`, `FILE_*`, `AUTH_PASSWORD_*`).
+
+### Query params
+- `page`
+- `pageSize`
+- `actorId`
+- `entityType`
+- `entityId`
+- `action`
+- `from`
+- `to`
+
+## 13.3. GET /audit/rbac-changes
+Nhật ký thay đổi phân quyền (`RBAC_*`).
 
 ### Audit record mẫu
 ```json
@@ -555,27 +1156,34 @@ Lịch sử thay đổi hồ sơ biến động.
 }
 ```
 
+## 13.4. Sprint 1 closure evidence (Auth/Test/Audit)
+- Auth lifecycle và RBAC behavior: [backend/test/auth-rbac.test.ts](../backend/test/auth-rbac.test.ts), [backend/src/modules/auth/auth.routes.ts](../backend/src/modules/auth/auth.routes.ts).
+- Audit API RBAC scope: [backend/src/modules/audit/audit.routes.ts](../backend/src/modules/audit/audit.routes.ts).
+- CI check names dùng cho required checks: [.github/workflows/ci.yml](../.github/workflows/ci.yml).
+- Branch protection / required checks / secret scanning là trạng thái GitHub remote, không thể kết luận chỉ từ local repo.
+
 ---
 
-## 12. Validation rules tối thiểu
+## 14. Validation rules tối thiểu
 
-## 12.1. Auth
+## 14.1. Auth
 - email hợp lệ
 - password đủ độ mạnh
 - identityNumber theo regex cấu hình
 
-## 12.2. Registration
+## 14.2. Registration
 - `parcelNumber` bắt buộc
 - `mapSheetNumber` bắt buộc
 - `area > 0`
-- ít nhất 1 `attachedFileId`
+- `procedureCode` bắt buộc khi tạo hồ sơ
+- `legalBasisCode` bắt buộc cho submit và các bước chuyển trạng thái xử lý
 
-## 12.3. Transfer
+## 14.3. Transfer
 - phải có `landId`
 - phải có `contractFileId`
 - phải có thông tin bên nhận tối thiểu: `fullName`, `identityNumber`
 
-## 12.4. Status transitions
+## 14.4. Status transitions
 Các chuyển trạng thái không hợp lệ phải trả `409 Conflict`.
 
 Ví dụ:
@@ -584,22 +1192,44 @@ Ví dụ:
 
 ---
 
-## 13. Quy tắc phân quyền endpoint
+## 15. Quy tắc phân quyền endpoint
 
 | Endpoint nhóm | Role tối thiểu |
 |---|---|
 | Auth self-service | CITIZEN, BUSINESS |
+| Auth refresh/logout/password reset | Tất cả role đã xác thực hoặc self-service |
 | Tạo/nộp hồ sơ đăng ký | CITIZEN, BUSINESS |
 | Tiếp nhận hồ sơ | RECEPTION_OFFICER |
 | Xác nhận cấp xã | COMMUNE_OFFICER |
 | Thẩm định chuyên môn | LAND_REGISTRY_OFFICER |
+| Chuyển/ghi nhận nghĩa vụ tài chính | LAND_REGISTRY_OFFICER, TAX_OFFICER |
 | Ký/phê duyệt | APPROVAL_AUTHORITY |
 | Dashboard / reports | ADMIN, LAND_REGISTRY_OFFICER |
 | OCR result nội bộ | RECEPTION_OFFICER, COMMUNE_OFFICER, LAND_REGISTRY_OFFICER |
+| User/Organization management | ADMIN |
+| Audit APIs | ADMIN, LAND_REGISTRY_OFFICER, AUDITOR |
+| Land parcel management Sprint 2 | RECEPTION_OFFICER, COMMUNE_OFFICER, LAND_REGISTRY_OFFICER, APPROVAL_AUTHORITY, TAX_OFFICER, ADMIN |
+| Dashboard summary | Tất cả role đã xác thực (payload theo role) |
 
 ---
 
-## 14. Những gì không được thay đổi tự ý
+## 16. Quy ước lỗi chuẩn (`US-111`)
+- Validation lỗi: `400`.
+- Không có quyền: `403`.
+- Không tìm thấy tài nguyên: `404`.
+- Trùng dữ liệu ràng buộc unique: `409`.
+- Mọi lỗi phải tuân envelope:
+```json
+{
+  "success": false,
+  "message": "Conflict error",
+  "errors": []
+}
+```
+
+---
+
+## 17. Những gì không được thay đổi tự ý
 
 - Không đổi tên enum trạng thái nếu chưa cập nhật toàn bộ backend, frontend, tests và docs.
 - Không thay đổi request/response shape nếu chưa cập nhật file này.
@@ -608,7 +1238,7 @@ Ví dụ:
 
 ---
 
-## 15. Mapping API sang module code
+## 18. Mapping API sang module code
 
 | Module | Trách nhiệm |
 |---|---|
@@ -621,3 +1251,199 @@ Ví dụ:
 | `dashboard` | Dashboard, reports |
 | `audit` | Lịch sử thay đổi |
 
+---
+
+# PHỤ LỤC — Legal-aligned API Patch 2025
+
+## 1. Role codes bổ sung/chuẩn hóa
+
+```text
+CITIZEN
+BUSINESS
+RECEPTION_OFFICER
+COMMUNE_OFFICER
+LAND_REGISTRY_OFFICER
+TAX_OFFICER
+APPROVAL_AUTHORITY
+ADMIN
+AUDITOR
+```
+
+## 2. Enum RegistrationStatus chuẩn từ Sprint 2+
+
+```text
+MOI_TAO
+CHO_TIEP_NHAN
+CAN_BO_SUNG
+DA_TIEP_NHAN
+CHO_XAC_NHAN_CAP_XA
+DA_XAC_NHAN_CAP_XA
+DANG_THAM_DINH_VPDKDD
+CHO_THUE
+CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH
+DA_HOAN_THANH_NGHIA_VU_TAI_CHINH
+CHO_KY_CAP
+DA_KY_CAP
+DA_CAP
+DA_CAP_NHAT_HO_SO_DIA_CHINH
+DA_GHI_BLOCKCHAIN
+DA_TRA_KET_QUA
+TU_CHOI
+HUY_HO_SO
+```
+
+## 3. Legal procedure metadata endpoints
+
+```http
+GET /api/v1/legal/procedures
+GET /api/v1/legal/procedures/:procedureCode
+GET /api/v1/legal/authority-matrix
+```
+
+### `LegalProcedure` DTO
+
+```json
+{
+  "procedureCode": "1.013978",
+  "procedureName": "Đăng ký đất đai, tài sản gắn liền với đất, cấp Giấy chứng nhận lần đầu...",
+  "sourceDecision": "3380/QĐ-BNNMT/2025",
+  "fallbackSourceDecision": "2304/QĐ-BNNMT/2025",
+  "legalBasis": ["151/2025/NĐ-CP", "118/2025/NĐ-CP", "101/2024/NĐ-CP"],
+  "level": "CAP_XA|CAP_TINH|TRUNG_UONG",
+  "authorityActors": ["RECEPTION_OFFICER", "COMMUNE_OFFICER", "LAND_REGISTRY_OFFICER", "TAX_OFFICER", "APPROVAL_AUTHORITY"],
+  "requiresTaxStep": true,
+  "requiresCommuneConfirmation": true,
+  "isMockedForMvp": true
+}
+```
+
+## 4. Document version endpoints
+
+```http
+GET  /api/v1/documents/:documentId/versions
+POST /api/v1/documents/:documentId/versions
+POST /api/v1/document-versions/:versionId/lock
+POST /api/v1/document-versions/:versionId/supersede
+POST /api/v1/document-versions/:versionId/sign/mock
+POST /api/v1/document-versions/:versionId/sign/wallet
+POST /api/v1/document-versions/:versionId/verify
+POST /api/v1/document-versions/:versionId/record-on-chain
+```
+
+Rule: không trả PII dư thừa; signature payload chỉ chứa hash/id/timestamp/role, không chứa toàn văn giấy tờ.
+
+## 5. Payment obligation endpoints
+
+```http
+POST /api/v1/payment-obligations
+GET  /api/v1/payment-obligations/:id
+POST /api/v1/payment-obligations/:id/generate-qr-test
+POST /api/v1/payment-obligations/:id/mock-confirm
+POST /api/v1/payment-obligations/:id/verify-receipt
+POST /api/v1/payment-obligations/:id/record-on-chain
+```
+
+### `PaymentObligationType`
+
+```text
+INTAKE_FEE
+LAND_FINANCIAL_OBLIGATION
+REGISTRATION_FEE
+LATE_FEE
+OTHER_LEGAL_FEE
+```
+
+Rule: MoMo Test/QR test là mô phỏng. Không mô tả `paidByBlockchain=true` cho thuế/phí thật.
+
+### Payment obligation fields (runtime Sprint 5)
+
+```text
+id
+registrationId
+type
+status (PENDING|CONFIRMED|CANCELLED)
+legalBasisCode
+referenceNo
+noticeRef
+noticeIssuedAt
+receiptRef
+receiptFileId
+receiptSubmittedAt
+amount
+note
+verifiedById
+verifiedAt
+verifyNote
+evidenceTxHash
+evidenceCid
+evidenceHash
+evidenceRecordedAt
+```
+
+### Operational note (compatibility)
+
+- Nested endpoints dưới registration vẫn giữ để tương thích ngược:
+  - `GET /api/v1/registrations/:registrationId/payment-obligations`
+  - `POST /api/v1/registrations/:registrationId/payment-obligations`
+  - `PATCH /api/v1/registrations/:registrationId/payment-obligations/:obligationId/status`
+- Top-level endpoints ở Sprint 5 là lớp mở rộng legal flow (`notice -> receipt -> verify -> record evidence`).
+
+## 6. Map parcel endpoints
+
+```http
+GET  /api/v1/map/parcels
+GET  /api/v1/map/parcels/:landRecordId
+POST /api/v1/map/parcels/:landRecordId/geometry
+POST /api/v1/map/parcels/:landRecordId/review
+POST /api/v1/map/parcels/:landRecordId/approve-offchain
+POST /api/v1/map/parcels/:landRecordId/record-boundary-hash
+GET  /api/v1/map/layers
+```
+
+### Geometry source enum
+
+```text
+DEMO
+IMPORTED
+OFFICIAL_REFERENCE
+UNKNOWN_NEEDS_REVIEW
+```
+
+### Geometry status enum (runtime Sprint 5)
+
+```text
+DRAFT
+UNDER_REVIEW
+OFFCHAIN_APPROVED
+BOUNDARY_HASH_RECORDED
+```
+
+### Map state flow rule
+
+- `POST /geometry` -> `geometryStatus = DRAFT`
+- `POST /review` -> `UNDER_REVIEW` (hoặc trả về `DRAFT` nếu review yêu cầu cập nhật lại)
+- `POST /approve-offchain` chỉ hợp lệ từ `UNDER_REVIEW`
+- `POST /record-boundary-hash` chỉ hợp lệ từ `OFFCHAIN_APPROVED`
+- Không cho sửa geometry sau khi đã `BOUNDARY_HASH_RECORDED`.
+
+## 7. Workflow transition endpoint rule
+
+```http
+POST /api/v1/registrations/:id/transition
+```
+
+Request phải có:
+
+```json
+{
+  "fromStatus": "DA_TIEP_NHAN",
+  "toStatus": "CHO_XAC_NHAN_CAP_XA",
+  "actorRole": "RECEPTION_OFFICER",
+  "reason": "Hồ sơ đủ thành phần",
+  "legalBasisCode": "151/2025-ND-CP|3380/QD-BNNMT",
+  "evidenceIds": ["docver_..."],
+  "requiresPmDecision": false
+}
+```
+
+Backend phải reject nếu actor/status transition không khớp legal workflow.

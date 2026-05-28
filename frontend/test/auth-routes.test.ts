@@ -1,16 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { CITIZEN_ROLES, DASHBOARD_ROLES, OFFICER_ROLES, ROLE_LABELS } from '../src/auth/roles';
+import {
+  ADMIN_ONLY_ROLES,
+  ALL_AUTH_ROLES,
+  CITIZEN_ROLES,
+  DASHBOARD_ROLES,
+  LAND_MANAGEMENT_ROLES,
+  REGISTRATION_REVIEW_ROLES,
+  ROLE_LABELS
+} from '../src/auth/roles';
 
 describe('auth route role mapping', () => {
-  it('keeps citizen and officer roles separated for guarded navigation', () => {
+  it('keeps route guards aligned with Sprint 2 RBAC', () => {
     expect(CITIZEN_ROLES).toEqual(['CITIZEN', 'BUSINESS']);
-    expect(DASHBOARD_ROLES).toEqual(['LAND_REGISTRY_OFFICER', 'ADMIN']);
-    expect(OFFICER_ROLES).toContain('RECEPTION_OFFICER');
-    expect(CITIZEN_ROLES).not.toContain('ADMIN');
+    expect(DASHBOARD_ROLES).toEqual(ALL_AUTH_ROLES);
+    expect(ADMIN_ONLY_ROLES).toEqual(['ADMIN']);
+    expect(LAND_MANAGEMENT_ROLES).toContain('RECEPTION_OFFICER');
+    expect(LAND_MANAGEMENT_ROLES).toContain('ADMIN');
+    expect(LAND_MANAGEMENT_ROLES).not.toContain('CITIZEN');
+    expect(REGISTRATION_REVIEW_ROLES).toEqual(LAND_MANAGEMENT_ROLES);
   });
 
   it('has labels for all route guard roles', () => {
-    [...CITIZEN_ROLES, ...OFFICER_ROLES].forEach((role) => {
+    ALL_AUTH_ROLES.forEach((role) => {
       expect(ROLE_LABELS[role]).toBeTruthy();
     });
   });

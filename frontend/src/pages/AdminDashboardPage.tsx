@@ -1,122 +1,145 @@
-import { useEffect, useState } from 'react';
-import { apiGet, apiPost } from '../lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import { apiGet } from '../lib/api';
+import { ROLE_LABELS, UserRole } from '../auth/roles';
+import { useToast } from '../ui/ToastContext';
 
-type Summary = {
-  registrations: { total: number; pending: number; approved: number; rejected: number; supplement: number };
-  transfers: { total: number; pending: number; completed: number; rejected: number };
-  blockchain: { latestTxCount: number };
+type SummaryResponse = {
+  role: string;
+  summary: Record<string, Record<string, number>>;
 };
 
-type RegistrationItem = {
-  id: string;
-  code: string;
-  ownerFullName: string;
-  parcelNumber: string;
-  mapSheetNumber: string;
-  address: string;
-  status: string;
-  notes: string[];
-  landCode?: string;
+function isNumberRecord(value: unknown): value is Record<string, number> {
+  if (typeof value !== 'object' || value === null) return false;
+  return Object.values(value).every((item) => typeof item === 'number');
+}
+
+const GROUP_LABELS: Record<string, string> = {
+  users: 'Người dùng',
+  organizations: 'Đơn vị',
+  lands: 'Thửa đất',
+  registrations: 'Hồ sơ đăng ký',
+  transfers: 'Hồ sơ biến động',
+  queue: 'Hàng đợi xử lý'
 };
 
-type RegistrationListResponse = { items: RegistrationItem[]; total: number };
-
-type ApproveResult = {
-  registration: RegistrationItem;
-  land: { landCode: string; txHash?: string };
+const METRIC_LABELS: Record<string, string> = {
+  total: 'Tổng số',
+  active: 'Đang hoạt động',
+  locked: 'Đã khóa',
+  inactive: 'Ngừng hoạt động',
+  pending: 'Chờ xử lý',
+  approved: 'Đã phê duyệt',
+  rejected: 'Bị từ chối',
+  supplement: 'Cần bổ sung',
+  appraising: 'Đang thẩm định',
+  waitingApproval: 'Chờ phê duyệt',
+  submitted: 'Mới nộp',
+  accepted: 'Đã tiếp nhận',
+  pendingCommune: 'Chờ xác nhận cấp xã',
+  confirmedCommune: 'Đã xác nhận cấp xã',
+  completed: 'Đã hoàn tất'
 };
+
+const WORD_LABELS: Record<string, string> = {
+  queue: 'hàng đợi',
+  waiting: 'chờ',
+  approval: 'phê duyệt',
+  appraising: 'thẩm định',
+  submitted: 'mới nộp',
+  accepted: 'đã tiếp nhận',
+  pending: 'chờ xử lý',
+  commune: 'cấp xã',
+  transfers: 'biến động',
+  registrations: 'hồ sơ'
+};
+
+export function toReadableLabel(raw: string) {
+  const normalized = raw.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').toLowerCase();
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return raw;
+  return tokens
+    .map((token: string) => WORD_LABELS[token] ?? token)
+    .join(' ')
+    .replace(/^\w/, (c: string) => c.toUpperCase());
+}
+
+function toRoleLabel(role: string) {
+  return ROLE_LABELS[role as UserRole] ?? role;
+}
+
+export function toGroupLabel(groupName: string) {
+  return GROUP_LABELS[groupName] ?? toReadableLabel(groupName);
+}
+
+export function toMetricLabel(metricName: string) {
+  return METRIC_LABELS[metricName] ?? toReadableLabel(metricName);
+}
 
 export function AdminDashboardPage() {
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [items, setItems] = useState<RegistrationItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [data, setData] = useState<SummaryResponse | null>(null);
+  const { showToast } = useToast();
 
-  async function load() {
-    const [summaryData, registrations] = await Promise.all([
-      apiGet<Summary>('/dashboard/summary'),
-      apiGet<RegistrationListResponse>('/registrations')
-    ]);
-    setSummary(summaryData);
-    setItems(registrations.items);
-  }
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const summary = await apiGet<SummaryResponse>('/dashboard/summary');
+      setData(summary);
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Không tải được bảng điều khiển');
+    } finally {
+      setLoading(false);
+    }
+  }, [showToast]);
 
   useEffect(() => {
-    load().catch(console.error);
-  }, []);
-
-  async function requestSupplement(id: string) {
-    setLoading(true);
-    setMessage('');
-    try {
-      await apiPost(`/registrations/${id}/request-supplement`, {
-        note: 'Cần bổ sung giấy tờ nguồn gốc sử dụng đất'
-      });
-      setMessage('Đã cập nhật trạng thái cần bổ sung hồ sơ.');
-      await load();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Không thể cập nhật hồ sơ');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function approve(id: string) {
-    setLoading(true);
-    setMessage('');
-    try {
-      const result = await apiPost<ApproveResult>(`/registrations/${id}/approve`, {
-        note: 'Hồ sơ hợp lệ, chuyển bước cấp bản ghi đất đai'
-      });
-      setMessage(`Đã phê duyệt ${result.registration.code} và tạo thửa đất ${result.land.landCode}.`);
-      await load();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Không thể phê duyệt hồ sơ');
-    } finally {
-      setLoading(false);
-    }
-  }
+    void load();
+  }, [load]);
 
   return (
     <section>
-      <h2>Dashboard cán bộ</h2>
-      {!summary ? (
-        <p>Đang tải...</p>
-      ) : (
-        <div className="grid-4">
-          <div className="card"><strong>Tổng hồ sơ</strong><div>{summary.registrations.total}</div></div>
-          <div className="card"><strong>Chờ xử lý</strong><div>{summary.registrations.pending}</div></div>
-          <div className="card"><strong>Đã cấp</strong><div>{summary.registrations.approved}</div></div>
-          <div className="card"><strong>Tx blockchain</strong><div>{summary.blockchain.latestTxCount}</div></div>
-        </div>
-      )}
-
-      {message && <p className="notice">{message}</p>}
-
       <div className="section-header">
-        <h3>Hồ sơ đăng ký lần đầu</h3>
-        <button type="button" onClick={() => load().catch(console.error)} disabled={loading}>Làm mới</button>
+        <div>
+          <h2>Bảng điều khiển theo vai trò</h2>
+          <p className="section-subtitle">
+            Theo dõi nhanh khối lượng hồ sơ và trạng thái xử lý theo quyền hiện tại.
+          </p>
+        </div>
+        <button type="button" onClick={() => void load()} disabled={loading}>
+          {loading ? 'Đang tải...' : 'Làm mới'}
+        </button>
       </div>
 
-      {items.map((item) => (
-        <div className="card" key={item.id}>
-          <div className="card-title-row">
-            <strong>{item.code}</strong>
-            <span className="badge">{item.status}</span>
+      {!data ? (
+        <div className="empty-state">Đang tải dữ liệu bảng điều khiển...</div>
+      ) : (
+        <>
+          <div className="card">
+            <div className="card-title-row">
+              <strong>Vai trò hiện tại</strong>
+              <span className="badge badge-success">{toRoleLabel(data.role)}</span>
+            </div>
+            <p className="muted">Số liệu bên dưới được lọc theo đúng phạm vi quyền truy cập của bạn.</p>
           </div>
-          <div>Chủ sử dụng: {item.ownerFullName}</div>
-          <div>Số thửa: {item.parcelNumber} | Số tờ: {item.mapSheetNumber}</div>
-          <div>Địa chỉ: {item.address}</div>
-          <div>Ghi chú mới nhất: {item.notes[item.notes.length - 1]}</div>
-          {item.landCode && <div>Mã đất đã cấp: {item.landCode}</div>}
-          <div className="action-row">
-            <button type="button" onClick={() => void requestSupplement(item.id)} disabled={loading}>Yêu cầu bổ sung</button>
-            <button type="button" onClick={() => void approve(item.id)} disabled={loading || item.status === 'DA_CAP'}>
-              {item.status === 'DA_CAP' ? 'Đã cấp' : 'Phê duyệt'}
-            </button>
-          </div>
-        </div>
-      ))}
+          {Object.entries(data.summary).map(([groupName, groupValue]) => (
+            <div className="card" key={groupName}>
+              <h3>{toGroupLabel(groupName)}</h3>
+              {isNumberRecord(groupValue) ? (
+                <div className="stats-grid">
+                  {Object.entries(groupValue).map(([metricName, metricValue]) => (
+                    <div className="metric-item" key={metricName}>
+                      <span>{toMetricLabel(metricName)}</span>
+                      <strong>{metricValue}</strong>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">Không có dữ liệu hiển thị.</div>
+              )}
+            </div>
+          ))}
+        </>
+      )}
     </section>
   );
 }

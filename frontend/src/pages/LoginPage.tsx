@@ -3,9 +3,9 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { validateLoginForm } from '../auth/validators';
 
-const demoAccounts = [
+const sampleAccounts = [
   ['citizen@urbanchain.vn', 'Công dân'],
-  ['reception@urbanchain.vn', 'Tiếp nhận'],
+  ['reception@urbanchain.vn', 'Cán bộ tiếp nhận'],
   ['registry@urbanchain.vn', 'VPĐKĐĐ'],
   ['approval@urbanchain.vn', 'Phê duyệt'],
   ['admin@urbanchain.vn', 'Quản trị']
@@ -61,7 +61,9 @@ export function LoginPage() {
     <section className="login-shell">
       <div>
         <h2>Đăng nhập UrbanChain-VN</h2>
-        <p>Phiên demo Sprint 1 dùng tài khoản mẫu theo vai trò trong API contract.</p>
+        <p className="section-subtitle">
+          Dùng tài khoản mẫu theo vai trò để kiểm tra các luồng quản lý hồ sơ, người dùng và thửa đất.
+        </p>
         <form className="card row-gap" onSubmit={onSubmit}>
           <label>Email
             <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
@@ -72,17 +74,17 @@ export function LoginPage() {
           <button type="submit" disabled={loading}>{loading ? 'Đang đăng nhập...' : 'Đăng nhập'}</button>
         </form>
         <div className="card row-gap">
-          <h3>VNeID mô phỏng</h3>
-          <p className="muted">Xác thực danh tính demo cho công dân, không kết nối VNeID thật.</p>
+          <h3>Xác thực VNeID mô phỏng</h3>
+          <p className="muted">Chỉ dùng cho môi trường demo, không kết nối dịch vụ VNeID thực tế.</p>
           <button type="button" disabled={loading} onClick={onVneidMockLogin}>
-            Đăng nhập bằng VNeID mock
+            Đăng nhập bằng VNeID mô phỏng
           </button>
         </div>
         {message && <p className="error-notice">{message}</p>}
       </div>
       <div className="card">
-        <h3>Tài khoản demo</h3>
-        {demoAccounts.map(([account, label]) => (
+        <h3>Tài khoản mẫu</h3>
+        {sampleAccounts.map(([account, label]) => (
           <button className="account-button" type="button" key={account} onClick={() => setEmail(account)}>
             <span>{label}</span>
             <small>{account}</small>
