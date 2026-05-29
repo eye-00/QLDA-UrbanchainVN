@@ -1,8 +1,8 @@
-# UrbanChain-VN Repository
+﻿# UrbanChain-VN Repository
 
-Monorepo MVP cho dự án **Quản lý dự án phát triển giải pháp blockchain ứng dụng trong quản lý đô thị**.
+Monorepo MVP cho dá»± Ã¡n **Quáº£n lÃ½ dá»± Ã¡n phÃ¡t triá»ƒn giáº£i phÃ¡p blockchain á»©ng dá»¥ng trong quáº£n lÃ½ Ä‘Ã´ thá»‹**.
 
-Hoàn thành **Sprint 5** — core legal procedure registry, payment obligations, map service layer, E2E Sepolia demo.
+HoÃ n thÃ nh **Sprint 5** â€” core legal procedure registry, payment obligations, map service layer, E2E Sepolia demo.
 
 ## Stack
 
@@ -28,6 +28,34 @@ scripts/     PowerShell dev bootstrap + npm wrapper
 .claude/     Claude Code project rules
 ```
 
+## Target auth model
+
+TÃ i liá»‡u hiá»‡n hÃ nh chuáº©n hÃ³a auth theo:
+
+- `accountType`: loáº¡i tÃ i khoáº£n vÃ  portal truy cáº­p
+- `role`: vai trÃ² nghiá»‡p vá»¥
+- `permission`: thao tÃ¡c cá»¥ thá»ƒ
+- `scope`: pháº¡m vi cÆ¡ quan/phÃ²ng ban/thá»§ tá»¥c/Ä‘á»‹a bÃ n/ownership
+
+Portal split theo `accountType`:
+
+- `CITIZEN` -> `Portal ngÆ°á»i dÃ¢n` -> `/citizen/dashboard`
+- `STAFF` -> `Portal cÃ¡n bá»™` -> `/staff/dashboard`
+- `AGENCY_ADMIN` -> `Portal quáº£n trá»‹ cÆ¡ quan` -> `/admin/dashboard`
+- `SYSTEM_ADMIN` -> `Portal quáº£n trá»‹ há»‡ thá»‘ng` -> `/system/dashboard`
+
+Identifier Ä‘Äƒng nháº­p theo target model:
+
+- `CITIZEN`: `citizenId + password`
+- `STAFF`: `officialUsername` hoáº·c `staffCode + password`
+- `AGENCY_ADMIN`: `username + password`
+- `SYSTEM_ADMIN`: `username + password`
+
+LÆ°u Ã½:
+
+- `email` chá»‰ dÃ¹ng cho liÃªn há»‡/khÃ´i phá»¥c tÃ i khoáº£n, khÃ´ng cÃ²n lÃ  login identifier chÃ­nh trong target model.
+- Runtime code hiá»‡n táº¡i váº«n cÃ²n login chuáº©n theo `email/password`; xem `docs/07-api-contract.md` vÃ  `docs/08-system-design.md` Ä‘á»ƒ biáº¿t mismatch note.
+
 ## Quick start
 
 1. Install dependencies with `npm ci` at repo root.
@@ -52,7 +80,7 @@ If Docker Desktop is not running, start it before `npm run infra:up`.
 
 ## Windows PowerShell stable commands
 
-Nếu PowerShell hiện tại resolve `npm` sai (ví dụ trỏ vào roaming profile và báo `npm-cli.js` không tồn tại), dùng wrapper của repo:
+Náº¿u PowerShell hiá»‡n táº¡i resolve `npm` sai (vÃ­ dá»¥ trá» vÃ o roaming profile vÃ  bÃ¡o `npm-cli.js` khÃ´ng tá»“n táº¡i), dÃ¹ng wrapper cá»§a repo:
 
 ```powershell
 .\scripts\npmw.ps1 run lint
@@ -60,11 +88,11 @@ Nếu PowerShell hiện tại resolve `npm` sai (ví dụ trỏ vào roaming pro
 .\scripts\npmw.ps1 --workspace backend run test
 ```
 
-Wrapper này luôn gọi `npm.cmd` thay vì `npm.ps1`, giúp tránh lỗi PATH/prefix trong PowerShell.
+Wrapper nÃ y luÃ´n gá»i `npm.cmd` thay vÃ¬ `npm.ps1`, giÃºp trÃ¡nh lá»—i PATH/prefix trong PowerShell.
 
 ## Dev bootstrap helpers
 
-Repo có script chuẩn hóa startup để giảm lỗi chạy sai workdir hoặc thiếu env:
+Repo cÃ³ script chuáº©n hÃ³a startup Ä‘á»ƒ giáº£m lá»—i cháº¡y sai workdir hoáº·c thiáº¿u env:
 
 ```powershell
 .\scripts\dev.ps1 check-env
@@ -73,51 +101,51 @@ Repo có script chuẩn hóa startup để giảm lỗi chạy sai workdir hoặ
 .\scripts\dev.ps1 dev:frontend
 ```
 
-Ghi chú:
+Ghi chÃº:
 
-- `check-env`: xác nhận tồn tại `backend/.env`, `frontend/.env`, `contracts/.env`
-- `quickstart`: `infra:up` → `db:generate` → `db:migrate` → `db:seed`
-- Nếu muốn bỏ qua seed trong quickstart:
+- `check-env`: xÃ¡c nháº­n tá»“n táº¡i `backend/.env`, `frontend/.env`, `contracts/.env`
+- `quickstart`: `infra:up` â†’ `db:generate` â†’ `db:migrate` â†’ `db:seed`
+- Náº¿u muá»‘n bá» qua seed trong quickstart:
   ```powershell
   .\scripts\dev.ps1 quickstart -SkipSeed
   ```
 
 ## Sprint 5 runtime modes (IPFS + Blockchain + Legal)
 
-Backend hỗ trợ các chế độ cho luồng ghi nhận blockchain và tra cứu pháp lý:
+Backend há»— trá»£ cÃ¡c cháº¿ Ä‘á»™ cho luá»“ng ghi nháº­n blockchain vÃ  tra cá»©u phÃ¡p lÃ½:
 
-- `mock` (mặc định): không cần node blockchain/IPFS thật, vẫn sinh `cid/hash/txHash` để demo luồng.
-- `local`/`pinata` + `rpc`: dùng hạ tầng thật để upload IPFS và ghi nhận on-chain.
+- `mock` (máº·c Ä‘á»‹nh): khÃ´ng cáº§n node blockchain/IPFS tháº­t, váº«n sinh `cid/hash/txHash` Ä‘á»ƒ demo luá»“ng.
+- `local`/`pinata` + `rpc`: dÃ¹ng háº¡ táº§ng tháº­t Ä‘á»ƒ upload IPFS vÃ  ghi nháº­n on-chain.
 
-Biến môi trường chính (backend):
+Biáº¿n mÃ´i trÆ°á»ng chÃ­nh (backend):
 
 - `IPFS_UPLOAD_MODE`: `mock` | `local` | `pinata`
-- `IPFS_API_URL`: endpoint IPFS API (ví dụ `http://localhost:5001`)
-- `PINATA_JWT`: token Pinata khi dùng `pinata`
+- `IPFS_API_URL`: endpoint IPFS API (vÃ­ dá»¥ `http://localhost:5001`)
+- `PINATA_JWT`: token Pinata khi dÃ¹ng `pinata`
 - `BLOCKCHAIN_MODE`: `mock` | `rpc`
 - `RPC_URL`: RPC endpoint (localhost/sepolia)
-- `CONTRACT_ADDRESS`: địa chỉ `UrbanLandRegistry`
-- `BACKEND_WALLET_PRIVATE_KEY`: private key ví backend để gọi contract
-- `BLOCKCHAIN_DEFAULT_TOKEN_OWNER`: ví owner token mặc định (optional)
-- `LEGAL_DEFAULT_PROCEDURE_CODE`: mã thủ tục hành chính mặc định (VD: `1.013978`)
-- `LEGAL_DEFAULT_BASIS_CODE`: căn cứ pháp lý mặc định (VD: `151/2025-ND-CP|3380/QD-BNNMT`)
+- `CONTRACT_ADDRESS`: Ä‘á»‹a chá»‰ `UrbanLandRegistry`
+- `BACKEND_WALLET_PRIVATE_KEY`: private key vÃ­ backend Ä‘á»ƒ gá»i contract
+- `BLOCKCHAIN_DEFAULT_TOKEN_OWNER`: vÃ­ owner token máº·c Ä‘á»‹nh (optional)
+- `LEGAL_DEFAULT_PROCEDURE_CODE`: mÃ£ thá»§ tá»¥c hÃ nh chÃ­nh máº·c Ä‘á»‹nh (VD: `1.013978`)
+- `LEGAL_DEFAULT_BASIS_CODE`: cÄƒn cá»© phÃ¡p lÃ½ máº·c Ä‘á»‹nh (VD: `151/2025-ND-CP|3380/QD-BNNMT`)
 
 RPC fail-hard smoke (Sprint 4 gate):
 
 - `.\scripts\npmw.ps1 --workspace backend run test:rpc`
-- Test này bắt buộc dùng RPC thật; thiếu env hoặc RPC lỗi sẽ fail cứng.
+- Test nÃ y báº¯t buá»™c dÃ¹ng RPC tháº­t; thiáº¿u env hoáº·c RPC lá»—i sáº½ fail cá»©ng.
 
 ## Quality commands
 
-- `npm run lint` (chạy eslint backend + frontend)
+- `npm run lint` (cháº¡y eslint backend + frontend)
 - `npm run lint:backend`
 - `npm run lint:frontend`
 - `npm run format:check`
 - `npm run build`
 - `npm test`
 
-CI (`.github/workflows/ci.yml`) chạy song song backend-ci, frontend-ci, contracts-ci, docs-check.
-Nightly regression (`.github/workflows/nightly-regression.yml`) chạy daily 18:00 UTC.
+CI (`.github/workflows/ci.yml`) cháº¡y song song backend-ci, frontend-ci, contracts-ci, docs-check.
+Nightly regression (`.github/workflows/nightly-regression.yml`) cháº¡y daily 18:00 UTC.
 
 ### Sprint 5 verification commands
 
@@ -130,7 +158,7 @@ Nightly regression (`.github/workflows/nightly-regression.yml`) chạy daily 18:
 
 - `npm --workspace backend run test -- sprint4-blockchain.client.test.ts`
 - `npm --workspace backend run test -- sprint4-service-wallet-governance.test.ts`
-- `npm --workspace backend run test:rpc` (yêu cầu RPC thật)
+- `npm --workspace backend run test:rpc` (yÃªu cáº§u RPC tháº­t)
 
 ### Sprint 3 verification commands (Registration core + Review UI)
 
@@ -148,44 +176,38 @@ Nightly regression (`.github/workflows/nightly-regression.yml`) chạy daily 18:
 - `npm --workspace frontend run test`
 - `npm --workspace contracts run test`
 
-## Tài khoản test sau khi seed
+## TÃ i khoáº£n test sau khi seed
 
-- Mật khẩu chung cho toàn bộ tài khoản seed: `StrongPassword@123`
-- Công dân:
+- Máº­t kháº©u chung cho toÃ n bá»™ tÃ i khoáº£n seed: `StrongPassword@123`
+- CÃ´ng dÃ¢n:
   - `citizen.nguyenvana@urbanchain.vn`
   - `citizen.tranthib@urbanchain.vn`
-- Doanh nghiệp:
   - `business.minhphat@urbanchain.vn`
-- Cán bộ tiếp nhận:
   - `reception.haichau@urbanchain.vn`
-- Cán bộ cấp xã:
   - `commune.hoakhanh@urbanchain.vn`
-- Cán bộ VPĐKĐĐ:
   - `registry.danang@urbanchain.vn`
-- Cơ quan phê duyệt:
   - `approval.danang@urbanchain.vn`
-- Quản trị:
   - `admin.system@urbanchain.vn`
-- Tài khoản khóa để test login guard:
+- TÃ i khoáº£n khÃ³a Ä‘á»ƒ test login guard:
   - `citizen.locked@urbanchain.vn` (status `LOCKED`)
 
 ## API endpoints (14 route modules)
 
 - `GET /api/v1/health`
-- `/api/v1/auth` — login, refresh, logout, password reset, change-password
-- `/api/v1/users` — user CRUD, RBAC
-- `/api/v1/organizations` — org/unit CRUD
-- `/api/v1/wallets` — wallet connect, challenge/verify, default wallet
-- `/api/v1/registrations` — registration CRUD, submission, review workflow
-- `/api/v1/transfers` — transfer registration flow
-- `/api/v1/lands` — land parcel CRUD, search
-- `/api/v1/files` — file upload/download, integrity check
-- `/api/v1/dashboard` — dashboard metrics
-- `/api/v1/audit` — audit log
-- `/api/v1/legal` — legal procedure registry (Sprint 5)
-- `/api/v1/payment-obligations` — payment obligations (Sprint 5)
-- `/api/v1/service-wallets` — service wallet governance (Sprint 4)
-- `/api/v1/map` — map service layer (Sprint 5)
+- `/api/v1/auth` â€” login, refresh, logout, password reset, change-password
+- `/api/v1/users` â€” user CRUD, RBAC
+- `/api/v1/organizations` â€” org/unit CRUD
+- `/api/v1/wallets` â€” wallet connect, challenge/verify, default wallet
+- `/api/v1/registrations` â€” registration CRUD, submission, review workflow
+- `/api/v1/transfers` â€” transfer registration flow
+- `/api/v1/lands` â€” land parcel CRUD, search
+- `/api/v1/files` â€” file upload/download, integrity check
+- `/api/v1/dashboard` â€” dashboard metrics
+- `/api/v1/audit` â€” audit log
+- `/api/v1/legal` â€” legal procedure registry (Sprint 5)
+- `/api/v1/payment-obligations` â€” payment obligations (Sprint 5)
+- `/api/v1/service-wallets` â€” service wallet governance (Sprint 4)
+- `/api/v1/map` â€” map service layer (Sprint 5)
 
 ## Git workflow
 
@@ -194,7 +216,7 @@ Nightly regression (`.github/workflows/nightly-regression.yml`) chạy daily 18:
 
 ## Core rules
 
-- Không lưu dữ liệu cá nhân nhạy cảm on-chain.
-- Blockchain chỉ lưu `hash`, `cid`, `transactionHash`, `ownerRef`, `parcelRef`.
-- Mọi thay đổi phải bám `docs/04-backlog-mvp.md`, `docs/05-workflow-land-law.md`, `docs/06-smart-contract-spec.md`, `docs/07-api-contract.md`.
-- AI chỉ hỗ trợ nghiệp vụ; quyết định hành chính nằm ở xử lý off-chain.
+- KhÃ´ng lÆ°u dá»¯ liá»‡u cÃ¡ nhÃ¢n nháº¡y cáº£m on-chain.
+- Blockchain chá»‰ lÆ°u `hash`, `cid`, `transactionHash`, `ownerRef`, `parcelRef`.
+- Má»i thay Ä‘á»•i pháº£i bÃ¡m `docs/04-backlog-mvp.md`, `docs/05-workflow-land-law.md`, `docs/06-smart-contract-spec.md`, `docs/07-api-contract.md`.
+- AI chá»‰ há»— trá»£ nghiá»‡p vá»¥; quyáº¿t Ä‘á»‹nh hÃ nh chÃ­nh náº±m á»Ÿ xá»­ lÃ½ off-chain.
