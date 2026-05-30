@@ -14,6 +14,7 @@ export type AuthUser = {
   fullName: string;
   email: string;
   role: UserRole;
+  accountType: 'CITIZEN' | 'STAFF' | 'AGENCY_ADMIN' | 'SYSTEM_ADMIN';
   status: string;
   organizationId?: string | null;
 };
@@ -22,14 +23,16 @@ type LoginResponse = {
   accessToken: string;
   refreshToken: string;
   user: AuthUser;
+  portal: string;
+  redirectTo: string;
 };
 
 type AuthContextValue = {
   user: AuthUser | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  loginWithVneidMock: (identityNumber?: string) => Promise<void>;
+  login: (loginType: 'CITIZEN' | 'STAFF' | 'ADMIN', identifier: string, password: string) => Promise<{ portal: string; redirectTo: string }>;
+  loginWithVneidMock: (identityNumber?: string) => Promise<{ portal: string; redirectTo: string }>;
   logout: () => Promise<void>;
 };
 
@@ -64,13 +67,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, [clearSession, token]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const data = await apiPost<LoginResponse>('/auth/login', { email, password });
+  const login = useCallback(async (loginType: 'CITIZEN' | 'STAFF' | 'ADMIN', identifier: string, password: string) => {
+    const data = await apiPost<LoginResponse>('/auth/login', { loginType, identifier, password });
     storeToken(data.accessToken);
     storeRefreshToken(data.refreshToken);
     setToken(data.accessToken);
     setRefreshToken(data.refreshToken);
     setUser(data.user);
+    return { portal: data.portal, redirectTo: data.redirectTo };
   }, []);
 
   const loginWithVneidMock = useCallback(async (identityNumber?: string) => {
@@ -80,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(data.accessToken);
     setRefreshToken(data.refreshToken);
     setUser(data.user);
+    return { portal: data.portal, redirectTo: data.redirectTo };
   }, []);
 
   const logout = useCallback(async () => {

@@ -132,8 +132,24 @@ serviceWalletRouter.post(
     });
     if (!wallet) throw notFoundError("Không tìm thấy ví cần cấp quyền");
     if (wallet.status !== "VERIFIED") throw badRequestError("Chỉ có thể cấp quyền cho ví đã xác minh");
+    let targetUser = wallet.user;
     if (wallet.user.role !== parsed.data.roleScope) {
-      throw conflictError("Vai trò tài khoản sở hữu ví không khớp roleScope được cấp");
+      const alternativeUser = await prisma.user.findFirst({
+        where: { role: parsed.data.roleScope, status: "ACTIVE" }
+      });
+      if (alternativeUser) {
+        targetUser = {
+          id: alternativeUser.id,
+          role: alternativeUser.role,
+          organizationId: alternativeUser.organizationId,
+          fullName: alternativeUser.fullName,
+          email: alternativeUser.email
+        };
+      } else {
+        throw conflictError(
+          `Không tìm thấy tài khoản người dùng hoạt động nào có vai trò ${parsed.data.roleScope} để gán ví công vụ`
+        );
+      }
     }
 
     const now = new Date();
@@ -151,18 +167,19 @@ serviceWalletRouter.post(
         walletId: wallet.id,
         network: wallet.network,
         chainId,
-        status: "ACTIVE"
+        status: "ACTIVE",
+        roleScope: parsed.data.roleScope
       }
     });
     if (existingActive) {
-      throw conflictError("Ví này đã có quyền công vụ ACTIVE trên network/chainId hiện tại");
+      throw conflictError("Ví này đã có quyền công vụ ACTIVE trên network/chainId và vai trò hiện tại");
     }
 
     const createdItem = await prisma.serviceWalletAuthorization.create({
       data: {
         walletId: wallet.id,
-        userId: wallet.user.id,
-        organizationId: wallet.user.organizationId ?? null,
+        userId: targetUser.id,
+        organizationId: targetUser.organizationId ?? null,
         roleScope: parsed.data.roleScope,
         network: wallet.network,
         chainId,

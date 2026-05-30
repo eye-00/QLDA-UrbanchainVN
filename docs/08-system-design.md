@@ -76,8 +76,8 @@ Quy tắc boundary:
 
 Runtime mismatch note:
 
-- Runtime hiện tại vẫn còn login chuẩn dựa trên `email/password` trong code.
-- Tài liệu này mô tả target auth architecture để chuẩn hóa cổng đăng nhập, portal boundary và data model về lâu dài.
+- Đã hoàn thành đồng bộ: Kiến trúc xác thực (Target Auth Model) và cổng đăng nhập riêng biệt theo phân hệ Portal hiện tại đã được triển khai hoàn chỉnh cả ở backend lẫn frontend.
+- Cấu trúc cơ sở dữ liệu mới (CitizenProfile & StaffProfile) đã được áp dụng và kiểm thử thành công qua 100% các bộ test suites.
 
 ---
 

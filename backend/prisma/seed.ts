@@ -1,4 +1,4 @@
-import { BlockchainNetwork, Prisma, PrismaClient, WalletStatus } from "@prisma/client";
+import { BlockchainNetwork, Prisma, PrismaClient, WalletStatus, AccountType } from "@prisma/client";
 import { randomBytes, scryptSync } from "node:crypto";
 import dotenv from "dotenv";
 import path from "node:path";
@@ -41,7 +41,7 @@ async function seedUsers() {
       email: "citizen@urbanchain.vn",
       fullName: "Nguyễn Văn A",
       role: "CITIZEN" as const,
-      identityNumber: "0482xxxxxxx",
+      identityNumber: "048183746143",
       organizationId: null as string | null
     },
     {
@@ -89,22 +89,80 @@ async function seedUsers() {
   ];
 
   for (const user of users) {
-    await prisma.user.upsert({
+    let accountType: AccountType = "CITIZEN";
+    let username: string | null = null;
+
+    if (user.role === "ADMIN") {
+      accountType = "SYSTEM_ADMIN";
+      username = "admin";
+    } else if (user.role === "CITIZEN" || user.role === "BUSINESS") {
+      accountType = "CITIZEN";
+    } else {
+      accountType = "STAFF";
+    }
+
+    const dbUser = await prisma.user.upsert({
       where: { email: user.email },
       update: {
         fullName: user.fullName,
         role: user.role,
+        accountType,
+        username,
         identityNumber: user.identityNumber,
         status: "ACTIVE",
         organizationId: user.organizationId,
         passwordHash: hashPassword("StrongPassword@123")
       },
       create: {
-        ...user,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        accountType,
+        username,
+        identityNumber: user.identityNumber,
         status: "ACTIVE",
+        organizationId: user.organizationId,
         passwordHash: hashPassword("StrongPassword@123")
       }
     });
+
+    if (accountType === "CITIZEN") {
+      await prisma.citizenProfile.upsert({
+        where: { userId: dbUser.id },
+        update: {
+          citizenId: user.identityNumber || "012345678901",
+          fullName: user.fullName,
+          phone: "0901234567",
+          address: "Đà Nẵng"
+        },
+        create: {
+          userId: dbUser.id,
+          citizenId: user.identityNumber || "012345678901",
+          fullName: user.fullName,
+          phone: "0901234567",
+          address: "Đà Nẵng"
+        }
+      });
+    } else if (accountType === "STAFF") {
+      await prisma.staffProfile.upsert({
+        where: { userId: dbUser.id },
+        update: {
+          staffCode: `STF_${user.role}`,
+          officialUsername: user.email.split("@")[0],
+          fullName: user.fullName,
+          position: user.role,
+          officialEmail: user.email
+        },
+        create: {
+          userId: dbUser.id,
+          staffCode: `STF_${user.role}`,
+          officialUsername: user.email.split("@")[0],
+          fullName: user.fullName,
+          position: user.role,
+          officialEmail: user.email
+        }
+      });
+    }
   }
 }
 
@@ -330,8 +388,7 @@ async function seedWallets() {
     "UrbanChain-VN Wallet Verification",
     `Address: ${pendingWallet.address}`,
     `Nonce: ${nonce}`,
-    `IssuedAt: ${issuedAt.toISOString()}`,
-    "Purpose: Verify wallet ownership for account linking only."
+    `IssuedAt: ${issuedAt.toISOString()}`
   ].join("\n");
 
   await prisma.walletVerificationChallenge.create({
@@ -352,7 +409,7 @@ async function seedWallets() {
     where: {
       wallet_network_address_unique: {
         network: BlockchainNetwork.SEPOLIA,
-        address: "0x2442c655A20adcE8fEd8e431B3a3d05CC98c5984"
+        address: "0x130F64878F3CEAd6eF8263D743230514a0D6A561"
       }
     },
     update: {
@@ -365,7 +422,7 @@ async function seedWallets() {
     create: {
       userId: registryOfficer.id,
       network: BlockchainNetwork.SEPOLIA,
-      address: "0x2442c655A20adcE8fEd8e431B3a3d05CC98c5984",
+      address: "0x130F64878F3CEAd6eF8263D743230514a0D6A561",
       status: WalletStatus.VERIFIED,
       isDefault: true,
       verifiedAt: new Date(),
@@ -377,7 +434,7 @@ async function seedWallets() {
     where: {
       wallet_network_address_unique: {
         network: BlockchainNetwork.SEPOLIA,
-        address: "0x88FB99245BE032C3c1135a286442D09931037B76"
+        address: "0x130F64878F3CEAd6eF8263D743230514a0D6A561"
       }
     },
     update: {
@@ -390,7 +447,7 @@ async function seedWallets() {
     create: {
       userId: approvalOfficer.id,
       network: BlockchainNetwork.SEPOLIA,
-      address: "0x88FB99245BE032C3c1135a286442D09931037B76",
+      address: "0x130F64878F3CEAd6eF8263D743230514a0D6A561",
       status: WalletStatus.VERIFIED,
       isDefault: true,
       verifiedAt: new Date(),
@@ -401,11 +458,7 @@ async function seedWallets() {
   const defaultChainId = Number(process.env.BLOCKCHAIN_CHAIN_ID ?? "11155111");
   const now = new Date();
 
-  await prisma.serviceWalletAuthorization.deleteMany({
-    where: {
-      userId: { in: [registryOfficer.id, approvalOfficer.id] }
-    }
-  });
+  await prisma.serviceWalletAuthorization.deleteMany({});
 
   await prisma.serviceWalletAuthorization.createMany({
     data: [

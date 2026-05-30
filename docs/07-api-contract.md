@@ -122,8 +122,7 @@ Quy tắc áp dụng:
 
 Runtime mismatch note:
 
-- Runtime hiện tại vẫn còn login chuẩn dựa trên `email/password` ở code backend/frontend.
-- Tài liệu này mô tả target auth model cần đạt để tách rõ portal, identifier đăng nhập và boundary truy cập.
+- Mismatch đã được giải quyết: Codebase (cả Backend và Frontend) hiện đã đồng bộ hóa 100% theo Target Auth Model (Strict Mode). Email đã bị loại bỏ hoàn toàn khỏi định danh đăng nhập chính trên toàn hệ thống.
 
 ## 2.8. Portal mapping theo accountType
 
@@ -237,8 +236,8 @@ Target model note:
 Target model note:
 
 - Email không còn là định danh đăng nhập chính.
-- API login chuẩn phải định tuyến theo `loginType` để tìm đúng identifier source và portal boundary.
-- Runtime hiện tại vẫn có thể đang dùng request `{ "email": "...", "password": "..." }`; đây là mismatch tạm thời với target model.
+- API login chuẩn định tuyến theo `loginType` để tìm đúng identifier source và portal boundary.
+- Đã được cập nhật thành công: Đăng nhập bằng email trực tiếp bị chặn hoàn toàn (HTTP 400), toàn bộ các phân hệ Portal đều chạy trên cấu trúc Route Guards phân quyền tuyệt đối.
 
 ### Request
 

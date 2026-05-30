@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Server } from "node:http";
 import { Wallet } from "ethers";
 import { createApp } from "../src/app.js";
+import { prisma } from "../src/lib/prisma.js";
 
 let server: Server;
 let baseUrl: string;
@@ -13,10 +14,31 @@ async function api(path: string, init?: RequestInit) {
 }
 
 async function login(email: string, password = "StrongPassword@123") {
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+    include: { citizenProfile: true, staffProfile: true }
+  });
+
+  let loginType: "CITIZEN" | "STAFF" | "ADMIN" = "CITIZEN";
+  let identifier = email;
+
+  if (user) {
+    if (user.accountType === "CITIZEN") {
+      loginType = "CITIZEN";
+      identifier = user.citizenProfile?.citizenId || "";
+    } else if (user.accountType === "STAFF") {
+      loginType = "STAFF";
+      identifier = user.staffProfile?.officialUsername || "";
+    } else if (user.accountType === "SYSTEM_ADMIN" || user.accountType === "AGENCY_ADMIN") {
+      loginType = "ADMIN";
+      identifier = user.username || "";
+    }
+  }
+
   const result = await api("/api/v1/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ loginType, identifier, password })
   });
 
   expect(result.response.status).toBe(200);
