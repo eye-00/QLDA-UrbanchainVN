@@ -1,4 +1,4 @@
-import { Prisma, UserRole, UserStatus } from "@prisma/client";
+import { Prisma, UserRole, UserStatus, AccountType } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
@@ -134,6 +134,19 @@ userRouter.post(
 
     try {
       const authUser = (req as AuthenticatedRequest).user;
+      const role = parsed.data.role;
+      let accountType: AccountType = "CITIZEN";
+      let username: string | null = null;
+
+      if (role === "ADMIN") {
+        accountType = parsed.data.organizationId ? "AGENCY_ADMIN" : "SYSTEM_ADMIN";
+        username = parsed.data.email.toLowerCase().split("@")[0] + "_" + Date.now();
+      } else if (role === "CITIZEN" || role === "BUSINESS") {
+        accountType = "CITIZEN";
+      } else {
+        accountType = "STAFF";
+      }
+
       const user = await prisma.user.create({
         data: {
           fullName: parsed.data.fullName,
@@ -142,7 +155,33 @@ userRouter.post(
           role: parsed.data.role,
           status: "ACTIVE",
           identityNumber: parsed.data.identityNumber,
-          organizationId: parsed.data.organizationId ?? null
+          organizationId: parsed.data.organizationId ?? null,
+          accountType,
+          username,
+          ...(accountType === "CITIZEN"
+            ? {
+                citizenProfile: {
+                  create: {
+                    citizenId: parsed.data.identityNumber || `cit_${Date.now()}`,
+                    fullName: parsed.data.fullName,
+                    phone: "",
+                    address: ""
+                  }
+                }
+              }
+            : accountType === "STAFF"
+            ? {
+                staffProfile: {
+                  create: {
+                    staffCode: `STF_${Date.now()}`,
+                    officialUsername: parsed.data.email.toLowerCase().split("@")[0],
+                    fullName: parsed.data.fullName,
+                    position: role,
+                    officialEmail: parsed.data.email.toLowerCase()
+                  }
+                }
+              }
+            : {})
         },
         include: { organization: true }
       });

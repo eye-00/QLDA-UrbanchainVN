@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { Prisma, User } from "@prisma/client";
+import { Prisma, User, AccountType } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
@@ -29,11 +29,14 @@ const registerSchema = z.object({
   password: z.string().min(8),
   phone: z.string().optional(),
   identityNumber: z.string().optional(),
-  organizationId: z.string().optional()
+  organizationId: z.string().optional(),
+  accountType: z.enum(["CITIZEN", "STAFF", "AGENCY_ADMIN", "SYSTEM_ADMIN"]).default("CITIZEN"),
+  citizenId: z.string().min(6).optional()
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  loginType: z.enum(["CITIZEN", "STAFF", "ADMIN"]),
+  identifier: z.string().min(3),
   password: z.string().min(8)
 });
 
@@ -75,14 +78,47 @@ const AUTO_LOCK_MINUTES = Number(process.env.AUTH_LOCK_MINUTES || 15);
 const REFRESH_TTL_DAYS = Number(process.env.AUTH_REFRESH_TTL_DAYS || 7);
 const RESET_TOKEN_TTL_MINUTES = Number(process.env.AUTH_RESET_TOKEN_TTL_MINUTES || 15);
 
-function publicUser(user: Pick<User, "id" | "fullName" | "email" | "role" | "status" | "organizationId">) {
+function publicUser(user: any) {
   return {
     userId: user.id,
     fullName: user.fullName,
     email: user.email,
     role: user.role,
-    status: user.status,
+    accountType: user.accountType,
+    roles: [user.role],
+    primaryRole: user.role,
     organizationId: user.organizationId
+  };
+}
+
+function resolvePortalMapping(accountType: AccountType, role: string) {
+  if (accountType === "CITIZEN") {
+    return {
+      portal: "Portal người dân",
+      redirectTo: "/citizen/dashboard"
+    };
+  }
+  if (accountType === "STAFF") {
+    return {
+      portal: "Portal cán bộ",
+      redirectTo: "/staff/dashboard"
+    };
+  }
+  if (accountType === "AGENCY_ADMIN") {
+    return {
+      portal: "Portal quản trị cơ quan",
+      redirectTo: "/admin/dashboard"
+    };
+  }
+  if (accountType === "SYSTEM_ADMIN") {
+    return {
+      portal: "Portal quản trị hệ thống",
+      redirectTo: "/system/dashboard"
+    };
+  }
+  return {
+    portal: "Portal người dân",
+    redirectTo: "/citizen/dashboard"
   };
 }
 
@@ -163,13 +199,13 @@ async function ensureLoginAllowed(user: User) {
   return user;
 }
 
-async function recordFailedLogin(user: User | null, email: string) {
+async function recordFailedLogin(user: User | null, emailOrId: string) {
   if (!user) {
     await writeAuditLog({
       action: "AUTH_LOGIN_FAILED",
       entityType: "USER",
-      entityId: email.toLowerCase(),
-      payload: { email: email.toLowerCase(), reason: "USER_NOT_FOUND" }
+      entityId: emailOrId.toLowerCase(),
+      payload: { identifier: emailOrId.toLowerCase(), reason: "USER_NOT_FOUND" }
     });
     return;
   }
@@ -234,6 +270,9 @@ authRouter.post(
     }
 
     try {
+      const accountType = parsed.data.accountType ?? AccountType.CITIZEN;
+      const citizenId = parsed.data.citizenId || parsed.data.identityNumber || `cit_${Date.now()}`;
+
       const user = await prisma.user.create({
         data: {
           role: registerRole.data,
@@ -242,7 +281,20 @@ authRouter.post(
           passwordHash: hashPassword(parsed.data.password),
           identityNumber: parsed.data.identityNumber,
           organizationId: parsed.data.organizationId,
-          status: "ACTIVE"
+          status: "ACTIVE",
+          accountType,
+          ...(accountType === AccountType.CITIZEN
+            ? {
+                citizenProfile: {
+                  create: {
+                    citizenId,
+                    fullName: parsed.data.fullName,
+                    phone: parsed.data.phone,
+                    address: ""
+                  }
+                }
+              }
+            : {})
         }
       });
 
@@ -258,6 +310,7 @@ authRouter.post(
         res,
         {
           userId: user.id,
+          accountType: user.accountType,
           role: user.role,
           status: user.status
         },
@@ -265,7 +318,7 @@ authRouter.post(
       );
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        throw conflictError("Email already exists");
+        throw conflictError("Email or Citizen ID already exists");
       }
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
         throw badRequestError("Organization is invalid");
@@ -281,24 +334,67 @@ authRouter.post(
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
 
-    const user = await prisma.user.findUnique({
-      where: { email: parsed.data.email.toLowerCase() }
-    });
+    const { loginType, identifier, password } = parsed.data;
+    let user: User | null = null;
+
+    if (loginType === "CITIZEN") {
+      const profile = await prisma.citizenProfile.findUnique({
+        where: { citizenId: identifier },
+        include: { user: true }
+      });
+      if (profile) {
+        user = profile.user;
+      }
+    } else if (loginType === "STAFF") {
+      const profile = await prisma.staffProfile.findFirst({
+        where: {
+          OR: [
+            { officialUsername: identifier },
+            { staffCode: identifier }
+          ]
+        },
+        include: { user: true }
+      });
+      if (profile) {
+        user = profile.user;
+      }
+    } else if (loginType === "ADMIN") {
+      user = await prisma.user.findUnique({
+        where: { username: identifier }
+      });
+    }
 
     if (!user) {
-      await recordFailedLogin(null, parsed.data.email);
-      throw badRequestError("Invalid email or password");
+      await recordFailedLogin(null, identifier);
+      throw badRequestError("Invalid identifier or password");
+    }
+
+    if (loginType === "CITIZEN" && user.accountType !== "CITIZEN") {
+      throw forbiddenError("Invalid portal boundary for citizen");
+    }
+    if (loginType === "STAFF" && user.accountType !== "STAFF") {
+      throw forbiddenError("Invalid portal boundary for staff");
+    }
+    if (loginType === "ADMIN" && user.accountType !== "AGENCY_ADMIN" && user.accountType !== "SYSTEM_ADMIN") {
+      throw forbiddenError("Invalid portal boundary for admin");
     }
 
     const availableUser = await ensureLoginAllowed(user);
     if (availableUser.status !== "ACTIVE") {
-      await recordFailedLogin(availableUser, parsed.data.email);
-      throw badRequestError("Account is locked");
+      await recordFailedLogin(availableUser, identifier);
+      throw badRequestError("Account is locked", [
+        {
+          field: "status",
+          code: "ACCOUNT_LOCKED",
+          detail: `Tài khoản của bạn đã bị khóa tạm thời. Vui lòng thử lại sau ${availableUser.lockedUntil?.toLocaleTimeString("vi-VN") || "ít phút"}.`,
+          lockedUntil: availableUser.lockedUntil?.toISOString()
+        }
+      ]);
     }
 
-    if (!verifyPassword(parsed.data.password, availableUser.passwordHash)) {
-      await recordFailedLogin(availableUser, parsed.data.email);
-      throw badRequestError("Invalid email or password");
+    if (!verifyPassword(password, availableUser.passwordHash)) {
+      await recordFailedLogin(availableUser, identifier);
+      throw badRequestError("Invalid identifier or password");
     }
 
     await resetLoginFailureState(availableUser.id);
@@ -319,13 +415,17 @@ authRouter.post(
       payload: { role: latestUser.role }
     });
 
+    const portalInfo = resolvePortalMapping(latestUser.accountType, latestUser.role);
+
     return ok(res, {
       accessToken,
       refreshToken,
-      user: publicUser(latestUser)
+      user: publicUser(latestUser),
+      ...portalInfo
     });
   })
 );
+
 
 authRouter.post(
   "/refresh",
@@ -567,36 +667,53 @@ authRouter.post(
     const parsed = vneidMockSchema.safeParse(req.body ?? {});
     if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
 
-    const user = await prisma.user.findUnique({
-      where: { email: "citizen@urbanchain.vn" }
+    const citizenId = parsed.data.identityNumber ?? "012345678901";
+    const profile = await prisma.citizenProfile.findUnique({
+      where: { citizenId },
+      include: { user: true }
     });
+
+    let user = profile?.user;
+    if (!user) {
+      user = await prisma.user.findUnique({
+        where: { email: "citizen@urbanchain.vn" }
+      });
+    }
+
     if (!user || user.status !== "ACTIVE") throw notFoundError("Mock VNeID user is not available");
 
     await resetLoginFailureState(user.id);
     const refreshToken = await createSession(user);
+    const latestUser = await prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+      include: { citizenProfile: true, staffProfile: true }
+    });
     const accessToken = signAccessToken({
-      userId: user.id,
-      fullName: user.fullName,
-      email: user.email,
-      role: user.role
+      userId: latestUser.id,
+      fullName: latestUser.fullName,
+      email: latestUser.email,
+      role: latestUser.role
     });
 
     await writeAuditLog({
-      actorId: user.id,
+      actorId: latestUser.id,
       action: "AUTH_VNEID_MOCK_LOGIN_SUCCESS",
       entityType: "USER",
-      entityId: user.id
+      entityId: latestUser.id
     });
+
+    const portalInfo = resolvePortalMapping(latestUser.accountType, latestUser.role);
 
     return ok(
       res,
       {
         accessToken,
         refreshToken,
-        user: publicUser(user),
+        user: publicUser(latestUser),
+        ...portalInfo,
         identity: {
           provider: "VNEID_MOCK",
-          identityNumber: parsed.data.identityNumber ?? user.identityNumber ?? "0482xxxxxxx",
+          identityNumber: citizenId,
           verified: true
         }
       },
@@ -610,7 +727,10 @@ authRouter.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const authUser = (req as AuthenticatedRequest).user;
-    const user = await prisma.user.findUnique({ where: { id: authUser.userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: authUser.userId },
+      include: { citizenProfile: true, staffProfile: true }
+    });
     if (!user) throw notFoundError("User not found");
     return ok(res, publicUser(user));
   })

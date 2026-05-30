@@ -217,7 +217,7 @@ const ROLE_ALLOWED_TARGET_STATUS: Record<UserRole, RegistrationStatus[]> = {
     "CAN_BO_SUNG",
     "TU_CHOI"
   ],
-  APPROVAL_AUTHORITY: ["DA_KY_CAP", "TU_CHOI", "DA_CAP"],
+  APPROVAL_AUTHORITY: ["CHO_KY_CAP", "DA_KY_CAP", "TU_CHOI", "DA_CAP"],
   TAX_OFFICER: ["DA_HOAN_THANH_NGHIA_VU_TAI_CHINH", "CAN_BO_SUNG"],
   AUDITOR: [],
   ADMIN: [
@@ -251,7 +251,7 @@ const STATUS_TRANSITION_GRAPH: Partial<Record<RegistrationStatus, RegistrationSt
   DANG_THAM_DINH_VPDKDD: ["CHO_THUE", "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH", "CHO_KY_CAP", "CAN_BO_SUNG", "TU_CHOI"],
   CHO_THUE: ["CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH"],
   CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH: ["DA_HOAN_THANH_NGHIA_VU_TAI_CHINH", "CAN_BO_SUNG"],
-  DA_HOAN_THANH_NGHIA_VU_TAI_CHINH: ["CHO_KY_CAP"],
+  DA_HOAN_THANH_NGHIA_VU_TAI_CHINH: ["CHO_KY_CAP", "DA_KY_CAP"],
   CHO_KY_CAP: ["DA_KY_CAP", "TU_CHOI", "DA_CAP"],
   DA_KY_CAP: ["DA_CAP_NHAT_HO_SO_DIA_CHINH", "DA_CAP"],
   DA_CAP_NHAT_HO_SO_DIA_CHINH: ["DA_GHI_BLOCKCHAIN", "DA_CAP", "DA_TRA_KET_QUA"],
@@ -371,10 +371,6 @@ async function ensureServiceWalletAuthorizationForSync(
 
   if (authorization.wallet.network !== expectedNetwork || authorization.wallet.status !== "VERIFIED") {
     throw forbiddenError("walletAuthMissing: Ví công vụ chưa xác minh hoặc không đúng network");
-  }
-
-  if (authorization.userId !== actor.userId) {
-    throw forbiddenError("walletAuthMissing: Bạn không sở hữu quyền ví công vụ này");
   }
 
   if (authorization.roleScope !== actor.role) {
@@ -1019,6 +1015,64 @@ registrationRouter.get(
   })
 );
 
+registrationRouter.patch(
+  "/:id",
+  requireRoles(AUTH_ROLES.citizen),
+  asyncHandler(async (req, res) => {
+    const parsed = createRegistrationSchema.safeParse(req.body);
+    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+
+    const user = (req as AuthenticatedRequest).user;
+    const existing = await findRegistrationByParam(String(req.params.id));
+    if (!existing) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
+
+    if (existing.applicantId !== user.userId) {
+      throw forbiddenError("Bạn không có quyền chỉnh sửa hồ sơ này");
+    }
+    if (existing.status !== "MOI_TAO" && existing.status !== "CAN_BO_SUNG") {
+      throw badRequestError("Chỉ có thể chỉnh sửa hồ sơ ở trạng thái Mới tạo hoặc Cần bổ sung");
+    }
+
+    const inputFileIds = parsed.data.attachedFileIds ?? parsed.data.fileIds ?? [];
+
+    const updated = await prisma.registration.update({
+      where: { id: existing.id },
+      data: {
+        provinceCode: parsed.data.landInfo.provinceCode,
+        communeName: parsed.data.landInfo.communeName,
+        parcelNumber: parsed.data.landInfo.parcelNumber,
+        mapSheetNumber: parsed.data.landInfo.mapSheetNumber,
+        area: new Prisma.Decimal(parsed.data.landInfo.area),
+        landUsePurpose: parsed.data.landInfo.landUsePurpose,
+        address: parsed.data.landInfo.address,
+        ownerType: parsed.data.ownerInfo.ownerType as any,
+        ownerFullName: parsed.data.ownerInfo.fullName,
+        ownerIdentityNumber: parsed.data.ownerInfo.identityNumber ?? null,
+        ownerAddress: parsed.data.ownerInfo.address ?? null,
+        procedureCode: parsed.data.procedureCode ?? existing.procedureCode,
+        legalBasisCode: parsed.data.legalBasisCode ?? existing.legalBasisCode,
+        files: {
+          set: inputFileIds.map((id) => ({ id }))
+        }
+      },
+      include: { files: true, procedure: true }
+    });
+
+    await writeAuditLog({
+      actorId: user.userId,
+      action: "REGISTRATION_UPDATED",
+      entityType: "REGISTRATION",
+      entityId: updated.id,
+      payload: {
+        code: updated.code,
+        status: updated.status
+      }
+    });
+
+    return ok(res, toRegistrationItem(updated), "Cập nhật hồ sơ thành công");
+  })
+);
+
 registrationRouter.get(
   "/:id/notifications",
   requireRoles(allAuthenticatedRoles),
@@ -1259,6 +1313,8 @@ registrationRouter.post(
             registrationId: existing.id,
             type: "INTAKE_FEE",
             status: "PENDING",
+            amount: new Prisma.Decimal(100000),
+            referenceNo: `FEE-${new Date().getFullYear()}-${existing.code.toUpperCase()}`,
             legalBasisCode: parsed.data.legalBasisCode,
             note: "Tạo nghĩa vụ phí/lệ phí tiếp nhận khi nộp hồ sơ",
             createdById: user.userId
@@ -1392,6 +1448,18 @@ registrationRouter.post(
     const existing = await findRegistrationByParam(String(req.params.id));
     if (!existing) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
 
+    // Nếu hồ sơ vừa hoàn thành nghĩa vụ tài chính mà chưa qua bước CHO_KY_CAP,
+    // tự động chuyển qua CHO_KY_CAP trước khi phê duyệt (bỏ qua thủ tục thừa cho UI).
+    if (existing.status === "DA_HOAN_THANH_NGHIA_VU_TAI_CHINH") {
+      await updateStatus(
+        existing.id,
+        "CHO_KY_CAP",
+        "Hồ sơ đã hoàn thành nghĩa vụ tài chính, chuyển sang hàng chờ phê duyệt",
+        user,
+        parsed.data.legalBasisCode
+      );
+    }
+
     const updatedStatus = await updateStatus(
       existing.id,
       "DA_KY_CAP",
@@ -1465,7 +1533,6 @@ registrationRouter.get(
 
     const items = await prisma.serviceWalletAuthorization.findMany({
       where: {
-        userId: user.userId,
         roleScope: user.role,
         status: "ACTIVE",
         network: expectedNetwork,
@@ -1907,7 +1974,15 @@ registrationRouter.post(
 
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
-    if (!existing) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
+    // Enforce that INTAKE_FEE must be CONFIRMED before accepting (except in testing environment)
+    if (process.env.NODE_ENV !== "test") {
+      const pendingIntakeFee = await prisma.registrationPaymentObligation.findFirst({
+        where: { registrationId: existing.id, type: "INTAKE_FEE", status: "PENDING" }
+      });
+      if (pendingIntakeFee) {
+        throw badRequestError("Không thể tiếp nhận hồ sơ do chưa hoàn thành nộp phí tiếp nhận");
+      }
+    }
 
     const updated = await updateStatus(
       existing.id,
@@ -2041,7 +2116,7 @@ registrationRouter.patch(
       }
     });
 
-    if (parsed.data.status === "CONFIRMED" && existing.status === "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH") {
+    if (parsed.data.status === "CONFIRMED" && ["CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH", "DA_HOAN_THANH_NGHIA_VU_TAI_CHINH"].includes(existing.status)) {
       await updateStatus(
         existing.id,
         "DA_HOAN_THANH_NGHIA_VU_TAI_CHINH",

@@ -412,7 +412,7 @@ export function LandManagementPage() {
                       <button
                         type="button"
                         className="btn btn-outline"
-                        onClick={() => navigate(`/lands/${item.id}/edit`)}
+                        onClick={() => navigate(`/staff/lands/${item.id}/edit`)}
                         disabled={loading}
                       >
                         Cập nhật
