@@ -132,7 +132,9 @@ export async function syncBlockchain(
 }
 
 export async function lookupChainStatus(registrationCode: string, landCode: string) {
-  try { return await lookupRegistrationOnChain(registrationCode, landCode); }
-  catch { return null; }
-}
+  try {
+    return await lookupRegistrationOnChain(registrationCode, landCode);
+  } catch {
+    return null;
+  }
 }

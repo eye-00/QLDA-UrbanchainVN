@@ -83,7 +83,8 @@ export async function ensureServiceWalletAuthorizationForSync(
   if (authorization.roleScope !== actor.role)
     throw forbiddenError("walletAuthMissing: Vai trò không khớp");
 
-  return { authorization, expectedNetwork, expectedChainId };
+  const normalizedSignerAddress = normalizeAddress(input.signerWalletAddress);
+  return { authorization, expectedNetwork, expectedChainId, normalizedSignerAddress };
 }
 
 export async function ensureCitizenWalletAuthorizationForSync(
