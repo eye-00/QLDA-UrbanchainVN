@@ -673,7 +673,7 @@ authRouter.post(
       include: { user: true }
     });
 
-    let user = profile?.user;
+    let user = profile?.user ?? null;
     if (!user) {
       user = await prisma.user.findUnique({
         where: { email: "citizen@urbanchain.vn" }

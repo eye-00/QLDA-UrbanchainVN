@@ -1974,6 +1974,7 @@ registrationRouter.post(
 
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
+    if (!existing) throw notFoundError("Khong tim thay ho so");
     // Enforce that INTAKE_FEE must be CONFIRMED before accepting (except in testing environment)
     if (process.env.NODE_ENV !== "test") {
       const pendingIntakeFee = await prisma.registrationPaymentObligation.findFirst({
