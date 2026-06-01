@@ -127,9 +127,11 @@ export function RegistrationBlockchainSignPage() {
   }, [user?.role]);
   const isOfficerMode = syncMode === 'OFFICER_SERVICE_WALLET';
 
-  const backPath = location.pathname.includes('/registrations/review/')
+  const backPath = location.pathname.includes('/staff/registrations/review/')
+    ? `/staff/registrations/review/${id}`
+    : location.pathname.includes('/registrations/review/')
     ? `/registrations/review/${id}`
-    : '/registrations/create';
+    : '/citizen/dashboard';
 
   const loadRegistration = useCallback(async () => {
     if (!id) {
@@ -144,8 +146,10 @@ export function RegistrationBlockchainSignPage() {
       setItem(data);
       setLegalBasisCode(data.legalBasisCode ?? '151/2025-ND-CP|3380/QD-BNNMT');
       const firstFileWithMetadata = data.files.find((file) => file.cid && file.hash);
-      setCid(data.ipfsCid ?? firstFileWithMetadata?.cid ?? '');
-      setMetadataHash(data.documentHash ?? firstFileWithMetadata?.hash ?? '');
+      const fallbackFileWithCid = data.files.find((file) => file.cid);
+      const fallbackFileWithHash = data.files.find((file) => file.hash);
+      setCid(data.ipfsCid ?? firstFileWithMetadata?.cid ?? fallbackFileWithCid?.cid ?? '');
+      setMetadataHash(data.documentHash ?? firstFileWithMetadata?.hash ?? fallbackFileWithHash?.hash ?? '');
       setLoadError('');
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Không tải được hồ sơ.');

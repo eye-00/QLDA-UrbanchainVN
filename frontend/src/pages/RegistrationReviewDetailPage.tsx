@@ -57,7 +57,7 @@ type RegistrationItem = {
     status: string;
     amount: number | null;
     referenceNo: string | null;
-    fulfilledAt: string | null;
+    confirmedAt: string | null;
   }>;
   files: UploadedFileItem[];
   notes: string[];
@@ -79,6 +79,7 @@ export function RegistrationReviewDetailPage() {
   const [supplementMissingItems, setSupplementMissingItems] = useState('');
   const [supplementDeadlineAt, setSupplementDeadlineAt] = useState('');
   const [taxReferenceNo, setTaxReferenceNo] = useState('');
+  const [taxAmount, setTaxAmount] = useState('5000000');
   const [approvalNumber, setApprovalNumber] = useState('');
   const [selectedFileMetadata, setSelectedFileMetadata] = useState<UploadedFileItem | null>(null);
   const [fileActionLoadingId, setFileActionLoadingId] = useState<string | null>(null);
@@ -88,7 +89,7 @@ export function RegistrationReviewDetailPage() {
   const reviewSteps = useMemo(() => (item ? getReviewStepsByStatus(item.status) : []), [item]);
 
   function goBackToList() {
-    navigate('/registrations/review');
+    navigate('/staff/registrations/review');
   }
 
   const loadRegistrationDetail = useCallback(async () => {
@@ -100,11 +101,25 @@ export function RegistrationReviewDetailPage() {
     setLoading(true);
     try {
       const data = await apiGet<RegistrationItem>(`/registrations/${id}`);
-      setItem(data);
+      let obligations: any[] = [];
+      try {
+        const obligationsRes = await apiGet<{ items: any[] }>(`/registrations/${id}/payment-obligations`);
+        obligations = obligationsRes.items;
+      } catch (err) {
+        console.error('Error fetching payment obligations:', err);
+      }
+      setItem({
+        ...data,
+        paymentObligations: obligations
+      });
       setSelectedEvidenceFileId((current) => {
         if (current && data.files.some((file) => file.id === current)) return current;
         return data.files[0]?.id ?? '';
       });
+      if (data.code) {
+        setApprovalNumber((curr) => curr || `QD-${new Date().getFullYear()}-${data.code.toUpperCase()}`);
+        setTaxReferenceNo((curr) => curr || `TAX-${new Date().getFullYear()}-${data.code.toUpperCase()}`);
+      }
       setLoadError('');
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Không tải được chi tiết hồ sơ.');
@@ -403,7 +418,7 @@ export function RegistrationReviewDetailPage() {
                       <td>{getPaymentObligationStatusLabel(obligation.status)}</td>
                       <td>{obligation.amount ? obligation.amount.toLocaleString('vi-VN') : 'Chưa xác định'}</td>
                       <td>{obligation.referenceNo ?? 'Chưa có'}</td>
-                      <td>{obligation.fulfilledAt ? new Date(obligation.fulfilledAt).toLocaleString('vi-VN') : 'Chưa hoàn thành'}</td>
+                      <td>{obligation.confirmedAt ? new Date(obligation.confirmedAt).toLocaleString('vi-VN') : (obligation.status === 'CONFIRMED' ? 'Đã xác nhận' : 'Chưa hoàn thành')}</td>
                       <td>
                         {canConfirmPaymentObligation && obligation.status === 'PENDING' ? (
                           <button
@@ -654,6 +669,15 @@ export function RegistrationReviewDetailPage() {
                   placeholder="VD: TAX-2026-001"
                 />
               </label>
+              <label>
+                Số tiền thuế phải nộp (VND)
+                <input
+                  type="number"
+                  value={taxAmount}
+                  onChange={(event) => setTaxAmount(event.target.value)}
+                  placeholder="VD: 5000000"
+                />
+              </label>
               <div className="action-row">
                 <button
                   type="button"
@@ -667,7 +691,11 @@ export function RegistrationReviewDetailPage() {
                       'taxTransfer',
                       '/tax-transfer',
                       withLegalPayload(
-                        { taxReferenceNo, notes: actionNote || undefined },
+                        { 
+                          taxReferenceNo, 
+                          amount: Number(taxAmount) || undefined, 
+                          notes: actionNote || undefined 
+                        },
                       ),
                       'Đã chuyển thông tin nghĩa vụ tài chính.'
                     );
@@ -680,8 +708,26 @@ export function RegistrationReviewDetailPage() {
           )}
 
           {canConfirmPaymentObligation && pendingPaymentObligations.length > 0 && (
-            <div className="notice">
-              Có {pendingPaymentObligations.length} nghĩa vụ tài chính đang chờ xác nhận ở bảng "Nghĩa vụ tài chính".
+            <div className="card row-gap" style={{ border: '1px solid #4caf50', background: '#f9fbf9', padding: '20px', borderRadius: '8px', margin: '15px 0' }}>
+              <h4 style={{ color: '#2e7d32', margin: '0 0 8px 0', fontSize: '15px' }}>Phê duyệt Nghĩa vụ tài chính đất đai</h4>
+              <p className="muted" style={{ fontSize: '13px', margin: '0 0 15px 0' }}>
+                Hồ sơ này có nghĩa vụ tài chính đang chờ xử lý. Nhập ghi chú xử lý bên trên và bấm nút dưới đây để phê duyệt xác nhận hoàn thành nghĩa vụ tài chính.
+              </p>
+              <div className="action-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {pendingPaymentObligations.map((obligation) => (
+                  <button
+                    key={obligation.id}
+                    type="button"
+                    style={{ background: '#2e7d32', color: '#fff', borderColor: '#2e7d32', padding: '10px 20px', fontWeight: 'bold' }}
+                    disabled={paymentUpdatingId === obligation.id || submitting}
+                    onClick={() => void handleConfirmPaymentObligation(obligation.id)}
+                  >
+                    {paymentUpdatingId === obligation.id
+                      ? 'Đang phê duyệt...'
+                      : `Phê duyệt Xác nhận hoàn thành (${obligation.amount ? obligation.amount.toLocaleString('vi-VN') + ' VND' : 'Mã: ' + obligation.referenceNo})`}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -748,7 +794,7 @@ export function RegistrationReviewDetailPage() {
                 <button
                   type="button"
                   disabled={submitting}
-                  onClick={() => navigate(`/registrations/review/${item.id}/blockchain-sign`)}
+                  onClick={() => navigate(`/staff/registrations/review/${item.id}/blockchain-sign`)}
                 >
                   Mở màn ký blockchain
                 </button>

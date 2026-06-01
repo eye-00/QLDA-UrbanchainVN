@@ -57,8 +57,7 @@ function buildVerificationMessage(address: string, nonce: string, issuedAt: stri
     "UrbanChain-VN Wallet Verification",
     `Address: ${address}`,
     `Nonce: ${nonce}`,
-    `IssuedAt: ${issuedAt}`,
-    "Purpose: Verify wallet ownership for account linking only."
+    `IssuedAt: ${issuedAt}`
   ].join("\n");
 }
 
@@ -75,16 +74,26 @@ async function getOwnedWalletOrThrow(walletId: string, userId: string) {
   return wallet;
 }
 
-walletRouter.use(requireAuth, requireRoles(WALLET_MANAGE_ROLES));
-
 walletRouter.get(
   "/me",
+  requireAuth,
   asyncHandler(async (req, res) => {
-    const userId = (req as AuthenticatedRequest).user.userId;
-    const wallets = await prisma.walletAccount.findMany({
-      where: { userId },
-      orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }]
-    });
+    const user = (req as AuthenticatedRequest).user;
+    
+    let wallets;
+    if (user.role === "ADMIN") {
+      wallets = await prisma.walletAccount.findMany({
+        where: { status: WalletStatus.VERIFIED },
+        orderBy: [{ updatedAt: "desc" }]
+      });
+    } else if (WALLET_MANAGE_ROLES.includes(user.role)) {
+      wallets = await prisma.walletAccount.findMany({
+        where: { userId: user.userId },
+        orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }]
+      });
+    } else {
+      throw forbiddenError("Role is not allowed for this action");
+    }
 
     return ok(res, {
       items: wallets.map(toWalletResponse),
@@ -92,6 +101,8 @@ walletRouter.get(
     });
   })
 );
+
+walletRouter.use(requireAuth, requireRoles(WALLET_MANAGE_ROLES));
 
 walletRouter.post(
   "/connect",

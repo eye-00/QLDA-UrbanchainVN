@@ -62,7 +62,7 @@ export function LandEditPage() {
   const canUseCatalog = locationMode === 'api' && provinceOptions.length > 0;
 
   function goBackToList() {
-    navigate('/lands');
+    navigate('/staff/lands');
   }
 
   function switchToManualLocation(message: string) {

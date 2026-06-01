@@ -36,9 +36,40 @@ Các nguyên tắc bắt buộc:
 - Ma trận traceability: [docs-legal-aligned/16-legal-requirement-traceability.md](./docs-legal-aligned/16-legal-requirement-traceability.md)
 
 Rule triển khai nghiệp vụ:
+
 - Actor phải đúng theo phân định thẩm quyền 2 cấp.
 - Phí/lệ phí tiếp nhận và nghĩa vụ tài chính phải tách ở off-chain.
 - Chỉ ghi blockchain sau khi bước cập nhật hồ sơ địa chính/CSDL đất đai đã hợp lệ.
+
+## 1.1. Account model và portal boundary
+
+Target auth model dùng 4 lớp:
+
+- `accountType`: xác định loại tài khoản và portal đăng nhập.
+- `role`: xác định vai trò nghiệp vụ.
+- `permission`: xác định thao tác cụ thể.
+- `scope`: xác định phạm vi dữ liệu/cơ quan/phòng ban/thủ tục/địa bàn.
+
+Portal split:
+
+- `CITIZEN` -> `Portal người dân`
+- `STAFF` -> `Portal cán bộ`
+- `AGENCY_ADMIN` -> `Portal quản trị cơ quan`
+- `SYSTEM_ADMIN` -> `Portal quản trị hệ thống`
+
+Login identifier chuẩn:
+
+- `CITIZEN`: `citizenId`
+- `STAFF`: `officialUsername` hoặc `staffCode`
+- `AGENCY_ADMIN`: `username`
+- `SYSTEM_ADMIN`: `username`
+
+Boundary bắt buộc:
+
+- Luồng nộp hồ sơ, theo dõi hồ sơ, tra cứu ownership của người dân chỉ chạy trong `Portal người dân`.
+- Luồng tiếp nhận, xác nhận cấp xã, thẩm định, xử lý thuế và phê duyệt chỉ chạy trong `Portal cán bộ`.
+- Luồng quản lý user/scope trong một đơn vị chỉ chạy trong `Portal quản trị cơ quan`.
+- Luồng cấu hình liên cơ quan/toàn hệ thống chỉ chạy trong `Portal quản trị hệ thống`.
 
 ### Legal override rule (2026-05-10)
 
@@ -54,18 +85,18 @@ Rule triển khai nghiệp vụ:
 
 ## 2. Tác nhân nghiệp vụ
 
-| Tác nhân | Vai trò trong hệ thống |
-|---|---|
-| Người dân | Tạo hồ sơ đăng ký lần đầu, upload tài liệu, theo dõi trạng thái, tra cứu |
-| Doanh nghiệp | Tham gia tra cứu, giao dịch/chuyển nhượng trong phạm vi được phép |
+| Tác nhân                               | Vai trò trong hệ thống                                                          |
+| -------------------------------------- | ------------------------------------------------------------------------------- |
+| Người dân                              | Tạo hồ sơ đăng ký lần đầu, upload tài liệu, theo dõi trạng thái, tra cứu        |
+| Doanh nghiệp                           | Tham gia tra cứu, giao dịch/chuyển nhượng trong phạm vi được phép               |
 | Cơ quan tiếp nhận hồ sơ và trả kết quả | Tiếp nhận hồ sơ, kiểm tra thành phần, cấp giấy hẹn/yêu cầu bổ sung, trả kết quả |
-| UBND cấp xã | Xác nhận thông tin thuộc thẩm quyền cấp xã trong đăng ký lần đầu |
-| VPĐKĐĐ / Chi nhánh VPĐKĐĐ | Thẩm định chuyên môn, cập nhật hồ sơ địa chính/CSDL đất đai, xử lý biến động |
-| Cơ quan thuế | Xác định nghĩa vụ tài chính khi hồ sơ phát sinh nghĩa vụ |
-| Cơ quan có thẩm quyền ký cấp/phê duyệt | Ký cấp/phê duyệt kết quả theo quy trình |
-| Hệ thống UrbanChain-VN | Luân chuyển hồ sơ, lưu trạng thái, tích hợp IPFS/OCR/Blockchain |
-| AI hỗ trợ | OCR, đối chiếu dữ liệu, cảnh báo thiếu/sai lệch |
-| Blockchain/IPFS | Lưu CID/hash, transaction hash, lịch sử số, tài liệu số off-chain |
+| UBND cấp xã                            | Xác nhận thông tin thuộc thẩm quyền cấp xã trong đăng ký lần đầu                |
+| VPĐKĐĐ / Chi nhánh VPĐKĐĐ              | Thẩm định chuyên môn, cập nhật hồ sơ địa chính/CSDL đất đai, xử lý biến động    |
+| Cơ quan thuế                           | Xác định nghĩa vụ tài chính khi hồ sơ phát sinh nghĩa vụ                        |
+| Cơ quan có thẩm quyền ký cấp/phê duyệt | Ký cấp/phê duyệt kết quả theo quy trình                                         |
+| Hệ thống UrbanChain-VN                 | Luân chuyển hồ sơ, lưu trạng thái, tích hợp IPFS/OCR/Blockchain                 |
+| AI hỗ trợ                              | OCR, đối chiếu dữ liệu, cảnh báo thiếu/sai lệch                                 |
+| Blockchain/IPFS                        | Lưu CID/hash, transaction hash, lịch sử số, tài liệu số off-chain               |
 
 ---
 
@@ -77,36 +108,41 @@ Người dân nộp hồ sơ đăng ký đất đai lần đầu. Hệ thống h
 
 ### 3.2. Quy trình chi tiết
 
-| Bước | Tác nhân | Hoạt động | Dữ liệu vào | Dữ liệu ra / trạng thái |
-|---|---|---|---|---|
-| 1 | Người dân | Đăng nhập, chọn đăng ký lần đầu | Tài khoản | Phiên làm việc |
-| 2 | Người dân | Nhập thông tin thửa đất, chủ sử dụng | Form hồ sơ | Hồ sơ nháp |
-| 3 | Người dân | Upload tài liệu | File scan/tài liệu | File metadata |
-| 4 | Hệ thống | Validate dữ liệu | Form + file | Lỗi hoặc hồ sơ hợp lệ ban đầu |
-| 5 | IPFS | Lưu tài liệu số | File | CID/hash |
-| 6 | AI hỗ trợ | OCR và cảnh báo | File/CID | OCR result, warnings |
-| 7 | Người dân | Submit hồ sơ | Hồ sơ nháp | `SUBMITTED` |
-| 8 | Cơ quan tiếp nhận | Kiểm tra thành phần hồ sơ | Hồ sơ + OCR warning | `INTAKE_REVIEW` |
-| 9 | Cơ quan tiếp nhận | Yêu cầu bổ sung nếu thiếu | Lý do thiếu | `SUPPLEMENT_REQUIRED` |
-| 10 | UBND cấp xã | Xác nhận thông tin thuộc thẩm quyền | Hồ sơ đã tiếp nhận | `COMMUNE_CONFIRMATION` |
-| 11 | VPĐKĐĐ/Chi nhánh | Thẩm định chuyên môn | Hồ sơ + xác nhận | `LAND_OFFICE_REVIEW` |
-| 12 | Cơ quan thuế | Xác định nghĩa vụ tài chính nếu có | Phiếu chuyển thông tin | `TAX_PENDING` / `TAX_COMPLETED` |
-| 13 | Cơ quan ký cấp/phê duyệt | Ký cấp/phê duyệt | Hồ sơ hoàn thiện | `APPROVED` |
-| 14 | VPĐKĐĐ/Chi nhánh | Cập nhật hồ sơ địa chính/CSDL đất đai | Kết quả phê duyệt | LandRecord |
-| 15 | Blockchain | Ghi nhận bản ghi số | Land ID + CID/hash | txHash, event |
-| 16 | Hệ thống | Cập nhật trạng thái | txHash | `BLOCKCHAIN_RECORDED` / `COMPLETED` |
-| 17 | Người dân | Xem kết quả | Mã hồ sơ | Kết quả xử lý |
+| Bước | Tác nhân                 | Hoạt động                                                               | Dữ liệu vào             | Dữ liệu ra / trạng thái             |
+| ---- | ------------------------ | ----------------------------------------------------------------------- | ----------------------- | ----------------------------------- |
+| 1    | Người dân                | Đăng nhập vào `Portal người dân` bằng `citizenId`, chọn đăng ký lần đầu | `accountType = CITIZEN` | Phiên làm việc                      |
+| 2    | Người dân                | Nhập thông tin thửa đất, chủ sử dụng                                    | Form hồ sơ              | Hồ sơ nháp                          |
+| 3    | Người dân                | Upload tài liệu                                                         | File scan/tài liệu      | File metadata                       |
+| 4    | Hệ thống                 | Validate dữ liệu                                                        | Form + file             | Lỗi hoặc hồ sơ hợp lệ ban đầu       |
+| 5    | IPFS                     | Lưu tài liệu số                                                         | File                    | CID/hash                            |
+| 6    | AI hỗ trợ                | OCR và cảnh báo                                                         | File/CID                | OCR result, warnings                |
+| 7    | Người dân                | Submit hồ sơ                                                            | Hồ sơ nháp              | `SUBMITTED`                         |
+| 8    | Cơ quan tiếp nhận        | Kiểm tra thành phần hồ sơ                                               | Hồ sơ + OCR warning     | `INTAKE_REVIEW`                     |
+| 9    | Cơ quan tiếp nhận        | Yêu cầu bổ sung nếu thiếu                                               | Lý do thiếu             | `SUPPLEMENT_REQUIRED`               |
+| 10   | UBND cấp xã              | Xác nhận thông tin thuộc thẩm quyền                                     | Hồ sơ đã tiếp nhận      | `COMMUNE_CONFIRMATION`              |
+| 11   | VPĐKĐĐ/Chi nhánh         | Thẩm định chuyên môn                                                    | Hồ sơ + xác nhận        | `LAND_OFFICE_REVIEW`                |
+| 12   | Cơ quan thuế             | Xác định nghĩa vụ tài chính nếu có                                      | Phiếu chuyển thông tin  | `TAX_PENDING` / `TAX_COMPLETED`     |
+| 13   | Cơ quan ký cấp/phê duyệt | Ký cấp/phê duyệt                                                        | Hồ sơ hoàn thiện        | `APPROVED`                          |
+| 14   | VPĐKĐĐ/Chi nhánh         | Cập nhật hồ sơ địa chính/CSDL đất đai                                   | Kết quả phê duyệt       | LandRecord                          |
+| 15   | Blockchain               | Ghi nhận bản ghi số                                                     | Land ID + CID/hash      | txHash, event                       |
+| 16   | Hệ thống                 | Cập nhật trạng thái                                                     | txHash                  | `BLOCKCHAIN_RECORDED` / `COMPLETED` |
+| 17   | Người dân                | Xem kết quả                                                             | Mã hồ sơ                | Kết quả xử lý                       |
+
+Portal note:
+
+- Role `BUSINESS` nếu tham gia với tư cách external applicant vẫn đi qua `Portal người dân`.
+- `Portal cán bộ` chỉ được dùng từ bước xử lý nội bộ trở đi.
 
 ### 3.3. Decision points
 
-| Decision | Người/cơ quan quyết định | Nhánh Có | Nhánh Không |
-|---|---|---|---|
-| Hồ sơ đầy đủ? | Cơ quan tiếp nhận | Chuyển xử lý | Yêu cầu bổ sung |
-| Cần xác nhận cấp xã? | Hệ thống/cán bộ | Chuyển UBND cấp xã | Chuyển VPĐKĐĐ |
-| Đủ điều kiện chuyên môn? | VPĐKĐĐ/Chi nhánh | Chuyển bước tiếp | Từ chối |
-| Có nghĩa vụ tài chính? | VPĐKĐĐ/Chi nhánh | Chuyển cơ quan thuế | Bỏ qua thuế |
-| Đã hoàn thành nghĩa vụ tài chính? | Cơ quan thuế/hệ thống | Trình ký/phê duyệt | Chờ hoàn thành |
-| Đã phê duyệt/cấp hợp lệ? | Cơ quan có thẩm quyền | Ghi blockchain | Từ chối/kết thúc |
+| Decision                          | Người/cơ quan quyết định | Nhánh Có            | Nhánh Không      |
+| --------------------------------- | ------------------------ | ------------------- | ---------------- |
+| Hồ sơ đầy đủ?                     | Cơ quan tiếp nhận        | Chuyển xử lý        | Yêu cầu bổ sung  |
+| Cần xác nhận cấp xã?              | Hệ thống/cán bộ          | Chuyển UBND cấp xã  | Chuyển VPĐKĐĐ    |
+| Đủ điều kiện chuyên môn?          | VPĐKĐĐ/Chi nhánh         | Chuyển bước tiếp    | Từ chối          |
+| Có nghĩa vụ tài chính?            | VPĐKĐĐ/Chi nhánh         | Chuyển cơ quan thuế | Bỏ qua thuế      |
+| Đã hoàn thành nghĩa vụ tài chính? | Cơ quan thuế/hệ thống    | Trình ký/phê duyệt  | Chờ hoàn thành   |
+| Đã phê duyệt/cấp hợp lệ?          | Cơ quan có thẩm quyền    | Ghi blockchain      | Từ chối/kết thúc |
 
 ### 3.4. State machine
 
@@ -220,17 +256,17 @@ Cán bộ xử lý hồ sơ theo đúng vai trò: cơ quan tiếp nhận kiểm 
 
 ### 4.2. Quy trình chi tiết
 
-| Bước | Tác nhân | Hoạt động | Trạng thái |
-|---|---|---|---|
-| 1 | Cán bộ tiếp nhận | Mở danh sách hồ sơ đã submit | `SUBMITTED` |
-| 2 | Cán bộ tiếp nhận | Kiểm tra thành phần hồ sơ | `INTAKE_REVIEW` |
-| 3 | Cán bộ tiếp nhận | Yêu cầu bổ sung nếu thiếu | `SUPPLEMENT_REQUIRED` |
-| 4 | UBND cấp xã | Xác nhận thông tin thuộc thẩm quyền | `COMMUNE_CONFIRMATION` |
-| 5 | VPĐKĐĐ/Chi nhánh | Thẩm định chuyên môn | `LAND_OFFICE_REVIEW` |
-| 6 | VPĐKĐĐ/Chi nhánh | Từ chối nếu không đủ điều kiện | `REJECTED` |
-| 7 | Cơ quan thuế | Xử lý nghĩa vụ tài chính nếu có | `TAX_PENDING` / `TAX_COMPLETED` |
-| 8 | Cơ quan có thẩm quyền | Phê duyệt/ký cấp | `APPROVED` |
-| 9 | Hệ thống | Thông báo kết quả | `COMPLETED` hoặc `REJECTED` |
+| Bước | Tác nhân              | Hoạt động                           | Trạng thái                      |
+| ---- | --------------------- | ----------------------------------- | ------------------------------- |
+| 1    | Cán bộ tiếp nhận      | Mở danh sách hồ sơ đã submit        | `SUBMITTED`                     |
+| 2    | Cán bộ tiếp nhận      | Kiểm tra thành phần hồ sơ           | `INTAKE_REVIEW`                 |
+| 3    | Cán bộ tiếp nhận      | Yêu cầu bổ sung nếu thiếu           | `SUPPLEMENT_REQUIRED`           |
+| 4    | UBND cấp xã           | Xác nhận thông tin thuộc thẩm quyền | `COMMUNE_CONFIRMATION`          |
+| 5    | VPĐKĐĐ/Chi nhánh      | Thẩm định chuyên môn                | `LAND_OFFICE_REVIEW`            |
+| 6    | VPĐKĐĐ/Chi nhánh      | Từ chối nếu không đủ điều kiện      | `REJECTED`                      |
+| 7    | Cơ quan thuế          | Xử lý nghĩa vụ tài chính nếu có     | `TAX_PENDING` / `TAX_COMPLETED` |
+| 8    | Cơ quan có thẩm quyền | Phê duyệt/ký cấp                    | `APPROVED`                      |
+| 9    | Hệ thống              | Thông báo kết quả                   | `COMPLETED` hoặc `REJECTED`     |
 
 ### 4.3. Rule bắt buộc
 
@@ -250,29 +286,29 @@ Mô phỏng nghiệp vụ chuyển nhượng như một loại đăng ký biến
 
 ### 5.2. Quy trình chi tiết
 
-| Bước | Tác nhân | Hoạt động | Dữ liệu ra / trạng thái |
-|---|---|---|---|
-| 1 | Bên chuyển nhượng | Tạo hồ sơ chuyển nhượng | `DRAFT` |
-| 2 | Bên chuyển nhượng | Upload hợp đồng/tài liệu | CID/hash |
-| 3 | Bên chuyển nhượng | Submit hồ sơ | `SUBMITTED` |
-| 4 | Bên nhận | Xác nhận thông tin giao dịch | `RECEIVER_CONFIRMED` |
-| 5 | Cơ quan tiếp nhận | Kiểm tra thành phần hồ sơ | `INTAKE_REVIEW` |
-| 6 | VPĐKĐĐ/Chi nhánh | Kiểm tra điều kiện thực hiện quyền | `LAND_OFFICE_REVIEW` |
-| 7 | Cơ quan thuế | Xác định nghĩa vụ tài chính nếu có | `TAX_PENDING` / `TAX_COMPLETED` |
-| 8 | VPĐKĐĐ/Chi nhánh | Cập nhật biến động trong CSDL nghiệp vụ | `CHANGE_APPROVED` |
-| 9 | Blockchain | Ghi nhận lịch sử chuyển nhượng số | `BLOCKCHAIN_RECORDED` |
-| 10 | Hệ thống | Hoàn tất hồ sơ và thông báo | `COMPLETED` |
+| Bước | Tác nhân          | Hoạt động                                               | Dữ liệu ra / trạng thái         |
+| ---- | ----------------- | ------------------------------------------------------- | ------------------------------- |
+| 1    | Bên chuyển nhượng | Đăng nhập `Portal người dân` và tạo hồ sơ chuyển nhượng | `DRAFT`                         |
+| 2    | Bên chuyển nhượng | Upload hợp đồng/tài liệu                                | CID/hash                        |
+| 3    | Bên chuyển nhượng | Submit hồ sơ                                            | `SUBMITTED`                     |
+| 4    | Bên nhận          | Xác nhận thông tin giao dịch                            | `RECEIVER_CONFIRMED`            |
+| 5    | Cơ quan tiếp nhận | Kiểm tra thành phần hồ sơ                               | `INTAKE_REVIEW`                 |
+| 6    | VPĐKĐĐ/Chi nhánh  | Kiểm tra điều kiện thực hiện quyền                      | `LAND_OFFICE_REVIEW`            |
+| 7    | Cơ quan thuế      | Xác định nghĩa vụ tài chính nếu có                      | `TAX_PENDING` / `TAX_COMPLETED` |
+| 8    | VPĐKĐĐ/Chi nhánh  | Cập nhật biến động trong CSDL nghiệp vụ                 | `CHANGE_APPROVED`               |
+| 9    | Blockchain        | Ghi nhận lịch sử chuyển nhượng số                       | `BLOCKCHAIN_RECORDED`           |
+| 10   | Hệ thống          | Hoàn tất hồ sơ và thông báo                             | `COMPLETED`                     |
 
 ### 5.3. Decision points
 
-| Decision | Người/cơ quan quyết định | Nhánh Có | Nhánh Không |
-|---|---|---|---|
-| Bên nhận xác nhận? | Bên nhận | Chuyển tiếp | Hủy/chờ xác nhận |
-| Hồ sơ đầy đủ? | Cơ quan tiếp nhận | Chuyển VPĐKĐĐ | Yêu cầu bổ sung |
-| Đủ điều kiện biến động? | VPĐKĐĐ/Chi nhánh | Chuyển thuế/cập nhật | Từ chối |
-| Có nghĩa vụ tài chính? | VPĐKĐĐ/Chi nhánh | Chuyển thuế | Bỏ qua |
-| Đã hoàn thành nghĩa vụ tài chính? | Cơ quan thuế/hệ thống | Cập nhật biến động | Chờ |
-| Đã cập nhật CSDL nghiệp vụ? | VPĐKĐĐ/Chi nhánh | Ghi blockchain | Không ghi blockchain |
+| Decision                          | Người/cơ quan quyết định | Nhánh Có             | Nhánh Không          |
+| --------------------------------- | ------------------------ | -------------------- | -------------------- |
+| Bên nhận xác nhận?                | Bên nhận                 | Chuyển tiếp          | Hủy/chờ xác nhận     |
+| Hồ sơ đầy đủ?                     | Cơ quan tiếp nhận        | Chuyển VPĐKĐĐ        | Yêu cầu bổ sung      |
+| Đủ điều kiện biến động?           | VPĐKĐĐ/Chi nhánh         | Chuyển thuế/cập nhật | Từ chối              |
+| Có nghĩa vụ tài chính?            | VPĐKĐĐ/Chi nhánh         | Chuyển thuế          | Bỏ qua               |
+| Đã hoàn thành nghĩa vụ tài chính? | Cơ quan thuế/hệ thống    | Cập nhật biến động   | Chờ                  |
+| Đã cập nhật CSDL nghiệp vụ?       | VPĐKĐĐ/Chi nhánh         | Ghi blockchain       | Không ghi blockchain |
 
 ### 5.4. State machine
 
@@ -304,21 +340,21 @@ Người dùng tra cứu thông tin thửa đất, trạng thái hồ sơ và l�
 
 ### 6.2. Quy trình chi tiết
 
-| Bước | Tác nhân | Hoạt động |
-|---|---|---|
-| 1 | Người dùng | Đăng nhập |
-| 2 | Người dùng | Nhập mã thửa đất/mã hồ sơ/từ khóa |
-| 3 | Hệ thống | Kiểm tra quyền truy cập |
-| 4 | Hệ thống | Truy vấn CSDL nghiệp vụ |
-| 5 | VPĐKĐĐ/CSDL đất đai | Trả thông tin hồ sơ/thửa đất |
-| 6 | Blockchain/IPFS | Trả CID/hash/transaction hash nếu có |
-| 7 | AI hỗ trợ | Tóm tắt lịch sử nếu cần |
-| 8 | Hệ thống | Hiển thị kết quả |
+| Bước | Tác nhân            | Hoạt động                                |
+| ---- | ------------------- | ---------------------------------------- |
+| 1    | Người dùng          | Đăng nhập đúng portal theo `accountType` |
+| 2    | Người dùng          | Nhập mã thửa đất/mã hồ sơ/từ khóa        |
+| 3    | Hệ thống            | Kiểm tra quyền truy cập                  |
+| 4    | Hệ thống            | Truy vấn CSDL nghiệp vụ                  |
+| 5    | VPĐKĐĐ/CSDL đất đai | Trả thông tin hồ sơ/thửa đất             |
+| 6    | Blockchain/IPFS     | Trả CID/hash/transaction hash nếu có     |
+| 7    | AI hỗ trợ           | Tóm tắt lịch sử nếu cần                  |
+| 8    | Hệ thống            | Hiển thị kết quả                         |
 
 ### 6.3. Rule bắt buộc
 
 - Người dân chỉ xem dữ liệu thuộc phạm vi được phép.
-- Cán bộ xem theo vai trò.
+- Cán bộ xem theo `role + permission + scope`.
 - Blockchain không được coi là nguồn pháp lý duy nhất.
 - Nếu dữ liệu blockchain và CSDL lệch nhau, hệ thống phải cảnh báo “cần đối soát”.
 
@@ -332,16 +368,16 @@ AI OCR hỗ trợ bóc tách thông tin từ tài liệu scan, đối chiếu v�
 
 ### 7.2. Quy trình chi tiết
 
-| Bước | Tác nhân | Hoạt động | Đầu ra |
-|---|---|---|---|
-| 1 | Hệ thống | Nhận file scan/tài liệu | FileObject |
-| 2 | Hệ thống | Gửi file sang OCR service | OCR job |
-| 3 | AI hỗ trợ | OCR tài liệu | raw text |
-| 4 | AI hỗ trợ | Trích xuất trường dữ liệu | extracted fields |
-| 5 | AI hỗ trợ | Đối chiếu với dữ liệu kê khai | discrepancy warnings |
-| 6 | Hệ thống | Lưu OCR result | OcrResult |
-| 7 | Cán bộ | Xem cảnh báo | Gợi ý kiểm tra |
-| 8 | Cán bộ | Ra quyết định nghiệp vụ | Chuyển trạng thái hồ sơ |
+| Bước | Tác nhân  | Hoạt động                     | Đầu ra                  |
+| ---- | --------- | ----------------------------- | ----------------------- |
+| 1    | Hệ thống  | Nhận file scan/tài liệu       | FileObject              |
+| 2    | Hệ thống  | Gửi file sang OCR service     | OCR job                 |
+| 3    | AI hỗ trợ | OCR tài liệu                  | raw text                |
+| 4    | AI hỗ trợ | Trích xuất trường dữ liệu     | extracted fields        |
+| 5    | AI hỗ trợ | Đối chiếu với dữ liệu kê khai | discrepancy warnings    |
+| 6    | Hệ thống  | Lưu OCR result                | OcrResult               |
+| 7    | Cán bộ    | Xem cảnh báo                  | Gợi ý kiểm tra          |
+| 8    | Cán bộ    | Ra quyết định nghiệp vụ       | Chuyển trạng thái hồ sơ |
 
 ### 7.3. Rule bắt buộc
 
@@ -361,16 +397,16 @@ Cán bộ quản lý xem thống kê vận hành của hệ thống.
 
 ### 8.2. Chỉ số chính
 
-| Chỉ số | Ý nghĩa |
-|---|---|
-| Tổng hồ sơ đăng ký lần đầu | Khối lượng hồ sơ |
-| Hồ sơ chờ tiếp nhận | Tải công việc của bộ phận tiếp nhận |
-| Hồ sơ yêu cầu bổ sung | Chất lượng hồ sơ đầu vào |
-| Hồ sơ đang thẩm định | Tải công việc VPĐKĐĐ/Chi nhánh |
-| Hồ sơ đã phê duyệt | Kết quả xử lý |
-| Hồ sơ đã ghi blockchain | Mức độ hoàn tất ghi nhận số |
-| Số giao dịch biến động | Tần suất giao dịch |
-| Cảnh báo OCR | Rủi ro dữ liệu/hồ sơ |
+| Chỉ số                     | Ý nghĩa                             |
+| -------------------------- | ----------------------------------- |
+| Tổng hồ sơ đăng ký lần đầu | Khối lượng hồ sơ                    |
+| Hồ sơ chờ tiếp nhận        | Tải công việc của bộ phận tiếp nhận |
+| Hồ sơ yêu cầu bổ sung      | Chất lượng hồ sơ đầu vào            |
+| Hồ sơ đang thẩm định       | Tải công việc VPĐKĐĐ/Chi nhánh      |
+| Hồ sơ đã phê duyệt         | Kết quả xử lý                       |
+| Hồ sơ đã ghi blockchain    | Mức độ hoàn tất ghi nhận số         |
+| Số giao dịch biến động     | Tần suất giao dịch                  |
+| Cảnh báo OCR               | Rủi ro dữ liệu/hồ sơ                |
 
 ### 8.3. Rule bắt buộc
 
@@ -382,27 +418,27 @@ Cán bộ quản lý xem thống kê vận hành của hệ thống.
 
 ## 9. Mapping quy trình sang module hệ thống
 
-| Quy trình | Frontend | Backend | DB | IPFS | Blockchain | AI |
-|---|---|---|---|---|---|---|
-| Đăng ký lần đầu | Citizen form | registrations, files | registrations, files | Có | Sau phê duyệt | OCR |
-| Duyệt hồ sơ | Admin dashboard | registrations | registrations, audit | Có | Sau phê duyệt | Warnings |
-| Chuyển nhượng | Citizen/Admin | transfers | transfers, lands | Có | Sau cập nhật biến động | Có thể |
-| Tra cứu | Search page | lands | lands, tx | Đọc CID | Đọc tx | Tóm tắt |
-| Dashboard | Admin dashboard | dashboard | aggregate | Không bắt buộc | Chỉ số tx | Tóm tắt |
+| Quy trình       | Frontend        | Backend              | DB                   | IPFS           | Blockchain             | AI       |
+| --------------- | --------------- | -------------------- | -------------------- | -------------- | ---------------------- | -------- |
+| Đăng ký lần đầu | Citizen form    | registrations, files | registrations, files | Có             | Sau phê duyệt          | OCR      |
+| Duyệt hồ sơ     | Admin dashboard | registrations        | registrations, audit | Có             | Sau phê duyệt          | Warnings |
+| Chuyển nhượng   | Citizen/Admin   | transfers            | transfers, lands     | Có             | Sau cập nhật biến động | Có thể   |
+| Tra cứu         | Search page     | lands                | lands, tx            | Đọc CID        | Đọc tx                 | Tóm tắt  |
+| Dashboard       | Admin dashboard | dashboard            | aggregate            | Không bắt buộc | Chỉ số tx              | Tóm tắt  |
 
 ---
 
 ## 10. Mapping quy trình sang AI Agents
 
-| Quy trình | Agent chính | Agent review |
-|---|---|---|
-| Đăng ký lần đầu | AI_04, AI_06, AI_07 | AI_11, AI_15 |
-| Duyệt hồ sơ | AI_04, AI_08 | AI_11, AI_12, AI_15 |
-| Ghi blockchain | AI_02, AI_04 | AI_03, AI_11, AI_15 |
-| Chuyển nhượng | AI_02, AI_04, AI_08 | AI_03, AI_11, AI_15 |
-| Tra cứu | AI_04, AI_07, AI_08 | AI_11, AI_15 |
-| OCR | AI_10, AI_04, AI_08 | AI_12, AI_15 |
-| Dashboard | AI_04, AI_08 | AI_12, AI_14 |
+| Quy trình       | Agent chính         | Agent review        |
+| --------------- | ------------------- | ------------------- |
+| Đăng ký lần đầu | AI_04, AI_06, AI_07 | AI_11, AI_15        |
+| Duyệt hồ sơ     | AI_04, AI_08        | AI_11, AI_12, AI_15 |
+| Ghi blockchain  | AI_02, AI_04        | AI_03, AI_11, AI_15 |
+| Chuyển nhượng   | AI_02, AI_04, AI_08 | AI_03, AI_11, AI_15 |
+| Tra cứu         | AI_04, AI_07, AI_08 | AI_11, AI_15        |
+| OCR             | AI_10, AI_04, AI_08 | AI_12, AI_15        |
+| Dashboard       | AI_04, AI_08        | AI_12, AI_14        |
 
 ---
 
@@ -425,29 +461,29 @@ Một quy trình được xem là đúng nghiệp vụ khi:
 
 ## 1. Quy trình đăng ký lần đầu sau chỉnh pháp lý
 
-| Pha | Actor quyết định | Module | Trạng thái vào | Trạng thái ra | Gate bắt buộc |
-|---|---|---|---|---|---|
-| Tạo hồ sơ | Người dân | Citizen Portal | `MOI_TAO` | `CHO_TIEP_NHAN` | Đủ form tối thiểu + tài liệu bắt buộc |
-| Tiếp nhận | Cơ quan tiếp nhận | Intake | `CHO_TIEP_NHAN` | `DA_TIEP_NHAN` hoặc `CAN_BO_SUNG` | Kiểm tra thành phần hồ sơ, có giấy tiếp nhận/hẹn trả nếu đủ |
-| Xác nhận cấp xã | UBND cấp xã/cơ quan chuyên môn cấp xã | Commune Review | `DA_TIEP_NHAN` | `DA_XAC_NHAN_CAP_XA` | Biên bản/ý kiến xác nhận, công khai/ghi nhận ý kiến nếu workflow yêu cầu |
-| Thẩm định | VPĐKĐĐ/Chi nhánh | Land Registry Review | `DA_XAC_NHAN_CAP_XA` | `CHO_THUE` hoặc `CHO_KY_CAP` hoặc `TU_CHOI` | Kiểm tra điều kiện pháp lý/nghiệp vụ, bản đồ/hồ sơ địa chính |
-| Nghĩa vụ tài chính | Cơ quan thuế | Tax/Payment | `CHO_THUE` | `DA_HOAN_THANH_NGHIA_VU_TAI_CHINH` | Có thông báo nghĩa vụ + bằng chứng hoàn thành |
-| Ký cấp/phê duyệt | Cơ quan có thẩm quyền | Approval | `CHO_KY_CAP` | `DA_KY_CAP` | Actor đúng quyền, có quyết định/ký cấp |
-| Cập nhật CSDL đất đai | VPĐKĐĐ/Chi nhánh | Land DB | `DA_KY_CAP` | `DA_CAP_NHAT_HO_SO_DIA_CHINH` | Chỉ cập nhật khi kết quả đã ký cấp/phê duyệt |
-| Ghi blockchain | Backend service wallet/contract role | Blockchain | `DA_CAP_NHAT_HO_SO_DIA_CHINH` | `DA_GHI_BLOCKCHAIN` | Chỉ hash/CID/tx, không PII |
-| Trả kết quả | Cơ quan tiếp nhận/hệ thống | Result | `DA_GHI_BLOCKCHAIN` hoặc `DA_CAP_NHAT_HO_SO_DIA_CHINH` | `DA_TRA_KET_QUA` | Thông báo người dân, audit log |
+| Pha                   | Actor quyết định                      | Module               | Trạng thái vào                                         | Trạng thái ra                               | Gate bắt buộc                                                            |
+| --------------------- | ------------------------------------- | -------------------- | ------------------------------------------------------ | ------------------------------------------- | ------------------------------------------------------------------------ |
+| Tạo hồ sơ             | Người dân                             | Citizen Portal       | `MOI_TAO`                                              | `CHO_TIEP_NHAN`                             | Đủ form tối thiểu + tài liệu bắt buộc                                    |
+| Tiếp nhận             | Cơ quan tiếp nhận                     | Intake               | `CHO_TIEP_NHAN`                                        | `DA_TIEP_NHAN` hoặc `CAN_BO_SUNG`           | Kiểm tra thành phần hồ sơ, có giấy tiếp nhận/hẹn trả nếu đủ              |
+| Xác nhận cấp xã       | UBND cấp xã/cơ quan chuyên môn cấp xã | Commune Review       | `DA_TIEP_NHAN`                                         | `DA_XAC_NHAN_CAP_XA`                        | Biên bản/ý kiến xác nhận, công khai/ghi nhận ý kiến nếu workflow yêu cầu |
+| Thẩm định             | VPĐKĐĐ/Chi nhánh                      | Land Registry Review | `DA_XAC_NHAN_CAP_XA`                                   | `CHO_THUE` hoặc `CHO_KY_CAP` hoặc `TU_CHOI` | Kiểm tra điều kiện pháp lý/nghiệp vụ, bản đồ/hồ sơ địa chính             |
+| Nghĩa vụ tài chính    | Cơ quan thuế                          | Tax/Payment          | `CHO_THUE`                                             | `DA_HOAN_THANH_NGHIA_VU_TAI_CHINH`          | Có thông báo nghĩa vụ + bằng chứng hoàn thành                            |
+| Ký cấp/phê duyệt      | Cơ quan có thẩm quyền                 | Approval             | `CHO_KY_CAP`                                           | `DA_KY_CAP`                                 | Actor đúng quyền, có quyết định/ký cấp                                   |
+| Cập nhật CSDL đất đai | VPĐKĐĐ/Chi nhánh                      | Land DB              | `DA_KY_CAP`                                            | `DA_CAP_NHAT_HO_SO_DIA_CHINH`               | Chỉ cập nhật khi kết quả đã ký cấp/phê duyệt                             |
+| Ghi blockchain        | Backend service wallet/contract role  | Blockchain           | `DA_CAP_NHAT_HO_SO_DIA_CHINH`                          | `DA_GHI_BLOCKCHAIN`                         | Chỉ hash/CID/tx, không PII                                               |
+| Trả kết quả           | Cơ quan tiếp nhận/hệ thống            | Result               | `DA_GHI_BLOCKCHAIN` hoặc `DA_CAP_NHAT_HO_SO_DIA_CHINH` | `DA_TRA_KET_QUA`                            | Thông báo người dân, audit log                                           |
 
 ## 2. Quy trình đăng ký biến động/chuyển nhượng sau chỉnh pháp lý
 
-| Bước | Actor | Gate |
-|---|---|---|
-| Tạo hồ sơ biến động | Bên chuyển/bên nhận | Thông tin bên tham gia, tài liệu giao dịch, giấy chứng nhận/hợp đồng |
-| Xác nhận bên nhận | Bên nhận | Không làm phát sinh chuyển quyền on-chain |
-| Tiếp nhận | Cơ quan tiếp nhận | Kiểm tra thành phần, yêu cầu bổ sung nếu thiếu |
-| Kiểm tra điều kiện thực hiện quyền | VPĐKĐĐ/Chi nhánh | Không đủ điều kiện thì từ chối có lý do |
-| Nghĩa vụ tài chính | Cơ quan thuế | Chờ hoàn thành nếu phát sinh |
-| Cập nhật biến động | VPĐKĐĐ/Chi nhánh | Cập nhật hồ sơ địa chính/CSDL đất đai trước |
-| Ghi blockchain | Backend service wallet | Ghi lịch sử transfer sau khi off-chain hoàn tất |
+| Bước                               | Actor                  | Gate                                                                 |
+| ---------------------------------- | ---------------------- | -------------------------------------------------------------------- |
+| Tạo hồ sơ biến động                | Bên chuyển/bên nhận    | Thông tin bên tham gia, tài liệu giao dịch, giấy chứng nhận/hợp đồng |
+| Xác nhận bên nhận                  | Bên nhận               | Không làm phát sinh chuyển quyền on-chain                            |
+| Tiếp nhận                          | Cơ quan tiếp nhận      | Kiểm tra thành phần, yêu cầu bổ sung nếu thiếu                       |
+| Kiểm tra điều kiện thực hiện quyền | VPĐKĐĐ/Chi nhánh       | Không đủ điều kiện thì từ chối có lý do                              |
+| Nghĩa vụ tài chính                 | Cơ quan thuế           | Chờ hoàn thành nếu phát sinh                                         |
+| Cập nhật biến động                 | VPĐKĐĐ/Chi nhánh       | Cập nhật hồ sơ địa chính/CSDL đất đai trước                          |
+| Ghi blockchain                     | Backend service wallet | Ghi lịch sử transfer sau khi off-chain hoàn tất                      |
 
 ## 3. Quy trình document version/signature
 

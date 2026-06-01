@@ -1,12 +1,8 @@
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
+import { useMemo } from 'react';
 import {
-  ADMIN_ONLY_ROLES,
-  CITIZEN_ROLES,
-  DASHBOARD_ROLES,
-  LAND_MANAGEMENT_ROLES,
-  REGISTRATION_REVIEW_ROLES,
   ROLE_LABELS,
   UserRole
 } from './auth/roles';
@@ -26,72 +22,55 @@ import { WalletManagementPage } from './pages/WalletManagementPage';
 import { RegistrationBlockchainSignPage } from './pages/RegistrationBlockchainSignPage';
 import { ServiceWalletManagementPage } from './pages/ServiceWalletManagementPage';
 
-function hasRole(role: UserRole | undefined, roles: UserRole[]) {
-  return Boolean(role && roles.includes(role));
+function RequirePortal({
+  allowedTypes,
+  children
+}: {
+  allowedTypes: ('CITIZEN' | 'STAFF' | 'AGENCY_ADMIN' | 'SYSTEM_ADMIN')[];
+  children: JSX.Element;
+}) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (!allowedTypes.includes(user.accountType)) return <Navigate to="/forbidden" replace />;
+  return children;
 }
-
-type NavItem = {
-  to: string;
-  label: string;
-  roles?: UserRole[];
-};
-
-const NAV_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Bảng điều khiển', roles: DASHBOARD_ROLES },
-  { to: '/registrations/create', label: 'Đăng ký lần đầu', roles: CITIZEN_ROLES },
-  { to: '/wallets', label: 'Ví blockchain', roles: CITIZEN_ROLES },
-  { to: '/admin/users', label: 'Người dùng', roles: ADMIN_ONLY_ROLES },
-  { to: '/admin/organizations', label: 'Đơn vị', roles: ADMIN_ONLY_ROLES },
-  { to: '/admin/service-wallets', label: 'Ví công vụ', roles: ADMIN_ONLY_ROLES },
-  { to: '/lands', label: 'Thửa đất', roles: LAND_MANAGEMENT_ROLES },
-  { to: '/registrations/review', label: 'Hồ sơ xử lý', roles: REGISTRATION_REVIEW_ROLES },
-  { to: '/lands/search', label: 'Tra cứu thửa đất', roles: DASHBOARD_ROLES }
-];
 
 function HomeEntry() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (hasRole(user.role, CITIZEN_ROLES)) return <CitizenRegistrationPage />;
-  return <Navigate to="/dashboard" replace />;
+  if (user.accountType === 'CITIZEN') return <Navigate to="/citizen/dashboard" replace />;
+  if (user.accountType === 'STAFF') return <Navigate to="/staff/dashboard" replace />;
+  if (user.accountType === 'AGENCY_ADMIN') return <Navigate to="/admin/dashboard" replace />;
+  if (user.accountType === 'SYSTEM_ADMIN') return <Navigate to="/system/dashboard" replace />;
+  return <Navigate to="/forbidden" replace />;
 }
-
-const PAGE_LABELS: Record<string, string> = {
-  '/': 'Trang chủ',
-  '/login': 'Đăng nhập hệ thống',
-  '/dashboard': 'Bảng điều khiển',
-  '/registrations/create': 'Nộp hồ sơ đăng ký lần đầu',
-  '/wallets': 'Quản lý ví blockchain',
-  '/admin/users': 'Quản lý người dùng',
-  '/admin/users/edit': 'Cập nhật người dùng',
-  '/admin/organizations': 'Quản lý đơn vị',
-  '/admin/organizations/edit': 'Cập nhật đơn vị',
-  '/lands': 'Quản lý thửa đất',
-  '/lands/edit': 'Cập nhật thửa đất',
-  '/registrations/review': 'Xử lý hồ sơ đăng ký',
-  '/registrations/review/detail': 'Chi tiết xử lý hồ sơ',
-  '/registrations/review/blockchain-sign': 'Ký và gửi blockchain',
-  '/registrations/blockchain-sign': 'Ký và gửi blockchain',
-  '/lands/search': 'Tra cứu thửa đất',
-  '/forbidden': 'Không có quyền truy cập'
-};
 
 function isNavItemActive(pathname: string, to: string) {
   if (pathname === to) return true;
-  if (to === '/admin/users' && pathname.startsWith('/admin/users/')) return true;
-  if (to === '/admin/organizations' && pathname.startsWith('/admin/organizations/')) return true;
-  if (to === '/lands' && pathname.startsWith('/lands/')) return true;
-  if (to === '/registrations/review' && pathname.startsWith('/registrations/review/')) return true;
+  if (to === '/admin/users' && pathname.startsWith('/admin/users')) return true;
+  if (to === '/admin/organizations' && pathname.startsWith('/admin/organizations')) return true;
+  if (to === '/staff/lands' && pathname.startsWith('/staff/lands')) return true;
+  if (to === '/staff/registrations/review' && pathname.startsWith('/staff/registrations/review')) return true;
   return false;
 }
 
 function getCurrentPageLabel(pathname: string) {
-  if (pathname.startsWith('/admin/users/') && pathname.endsWith('/edit')) return PAGE_LABELS['/admin/users/edit'];
-  if (pathname.startsWith('/admin/organizations/') && pathname.endsWith('/edit')) return PAGE_LABELS['/admin/organizations/edit'];
-  if (pathname.startsWith('/lands/') && pathname.endsWith('/edit')) return PAGE_LABELS['/lands/edit'];
-  if (pathname.startsWith('/registrations/') && pathname.endsWith('/blockchain-sign')) return PAGE_LABELS['/registrations/blockchain-sign'];
-  if (pathname.startsWith('/registrations/review/') && pathname.endsWith('/blockchain-sign')) return PAGE_LABELS['/registrations/review/blockchain-sign'];
-  if (pathname.startsWith('/registrations/review/')) return PAGE_LABELS['/registrations/review/detail'];
-  return PAGE_LABELS[pathname] ?? 'UrbanChain-VN';
+  if (pathname.includes('/users') && pathname.endsWith('/edit')) return 'Cập nhật người dùng';
+  if (pathname.includes('/users')) return 'Quản lý người dùng';
+  if (pathname.includes('/organizations') && pathname.endsWith('/edit')) return 'Cập nhật đơn vị';
+  if (pathname.includes('/organizations')) return 'Quản lý đơn vị';
+  if (pathname.includes('/service-wallets')) return 'Quản lý ví công vụ';
+  if (pathname.includes('/lands') && pathname.endsWith('/edit')) return 'Cập nhật thửa đất';
+  if (pathname.includes('/lands') && pathname.includes('/search')) return 'Tra cứu thửa đất';
+  if (pathname.includes('/lands')) return 'Quản lý thửa đất';
+  if (pathname.includes('/registrations/review') && pathname.endsWith('/blockchain-sign')) return 'Ký và gửi blockchain';
+  if (pathname.includes('/registrations/review') && (pathname.includes('/review/') || pathname.split('/').length > 4)) return 'Chi tiết xử lý hồ sơ';
+  if (pathname.includes('/registrations/review')) return 'Xử lý hồ sơ đăng ký';
+  if (pathname.includes('/registrations') && pathname.endsWith('/blockchain-sign')) return 'Ký và gửi blockchain';
+  if (pathname.includes('/registrations/create')) return 'Nộp hồ sơ đăng ký lần đầu';
+  if (pathname.includes('/wallets')) return 'Quản lý ví blockchain';
+  if (pathname.includes('/dashboard')) return 'Bảng điều khiển';
+  return 'UrbanChain-VN';
 }
 
 export function App() {
@@ -105,7 +84,36 @@ export function App() {
     navigate('/login', { replace: true });
   }
 
-  const visibleNavItems = NAV_ITEMS.filter((item) => !item.roles || hasRole(user?.role, item.roles));
+  const visibleNavItems = useMemo(() => {
+    if (!user) return [];
+    if (user.accountType === 'CITIZEN') {
+      return [
+        { to: '/citizen/dashboard', label: 'Bảng điều khiển' },
+        { to: '/citizen/registrations/create', label: 'Đăng ký lần đầu' },
+        { to: '/citizen/wallets', label: 'Ví blockchain' },
+        { to: '/citizen/lands/search', label: 'Tra cứu thửa đất' }
+      ];
+    }
+    if (user.accountType === 'STAFF') {
+      return [
+        { to: '/staff/dashboard', label: 'Bảng điều khiển' },
+        { to: '/staff/registrations/review', label: 'Hồ sơ xử lý' },
+        { to: '/staff/lands', label: 'Thửa đất' },
+        { to: '/staff/lands/search', label: 'Tra cứu thửa đất' }
+      ];
+    }
+    if (user.accountType === 'AGENCY_ADMIN' || user.accountType === 'SYSTEM_ADMIN') {
+      const items = [
+        { to: user.accountType === 'SYSTEM_ADMIN' ? '/system/dashboard' : '/admin/dashboard', label: 'Bảng điều khiển' },
+        { to: '/admin/users', label: 'Người dùng' },
+        { to: '/admin/organizations', label: 'Đơn vị' },
+        { to: '/admin/service-wallets', label: 'Ví công vụ' },
+        { to: '/admin/lands/search', label: 'Tra cứu thửa đất' }
+      ];
+      return items;
+    }
+    return [];
+  }, [user]);
 
   if (!user) {
     return (
@@ -158,22 +166,47 @@ export function App() {
               </div>
             }
           />
-          <Route path="/" element={<RequireAuth><HomeEntry /></RequireAuth>} />
-          <Route path="/registrations/create" element={<RequireAuth roles={CITIZEN_ROLES}><CitizenRegistrationPage /></RequireAuth>} />
-          <Route path="/wallets" element={<RequireAuth roles={CITIZEN_ROLES}><WalletManagementPage /></RequireAuth>} />
-          <Route path="/dashboard" element={<RequireAuth roles={DASHBOARD_ROLES}><AdminDashboardPage /></RequireAuth>} />
-          <Route path="/admin/users" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><UserManagementPage /></RequireAuth>} />
-          <Route path="/admin/users/:id/edit" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><UserEditPage /></RequireAuth>} />
-          <Route path="/admin/organizations" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><OrganizationManagementPage /></RequireAuth>} />
-          <Route path="/admin/organizations/:id/edit" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><OrganizationEditPage /></RequireAuth>} />
-          <Route path="/admin/service-wallets" element={<RequireAuth roles={ADMIN_ONLY_ROLES}><ServiceWalletManagementPage /></RequireAuth>} />
-          <Route path="/lands" element={<RequireAuth roles={LAND_MANAGEMENT_ROLES}><LandManagementPage /></RequireAuth>} />
-          <Route path="/lands/:id/edit" element={<RequireAuth roles={LAND_MANAGEMENT_ROLES}><LandEditPage /></RequireAuth>} />
-          <Route path="/registrations/review" element={<RequireAuth roles={REGISTRATION_REVIEW_ROLES}><RegistrationReviewPage /></RequireAuth>} />
-          <Route path="/registrations/review/:id" element={<RequireAuth roles={REGISTRATION_REVIEW_ROLES}><RegistrationReviewDetailPage /></RequireAuth>} />
-          <Route path="/registrations/review/:id/blockchain-sign" element={<RequireAuth roles={REGISTRATION_REVIEW_ROLES}><RegistrationBlockchainSignPage /></RequireAuth>} />
-          <Route path="/registrations/:id/blockchain-sign" element={<RequireAuth roles={CITIZEN_ROLES}><RegistrationBlockchainSignPage /></RequireAuth>} />
-          <Route path="/lands/search" element={<RequireAuth roles={DASHBOARD_ROLES}><SearchLandPage /></RequireAuth>} />
+          <Route path="/" element={<HomeEntry />} />
+
+          {/* Citizen Portal */}
+          <Route path="/citizen/dashboard" element={<RequirePortal allowedTypes={['CITIZEN']}><CitizenRegistrationPage /></RequirePortal>} />
+          <Route path="/citizen/registrations/create" element={<RequirePortal allowedTypes={['CITIZEN']}><CitizenRegistrationPage /></RequirePortal>} />
+          <Route path="/citizen/wallets" element={<RequirePortal allowedTypes={['CITIZEN']}><WalletManagementPage /></RequirePortal>} />
+          <Route path="/citizen/lands/search" element={<RequirePortal allowedTypes={['CITIZEN']}><SearchLandPage /></RequirePortal>} />
+          <Route path="/citizen/registrations/:id/blockchain-sign" element={<RequirePortal allowedTypes={['CITIZEN']}><RegistrationBlockchainSignPage /></RequirePortal>} />
+
+          {/* Staff Portal */}
+          <Route path="/staff/dashboard" element={<RequirePortal allowedTypes={['STAFF']}><AdminDashboardPage /></RequirePortal>} />
+          <Route path="/staff/registrations/review" element={<RequirePortal allowedTypes={['STAFF']}><RegistrationReviewPage /></RequirePortal>} />
+          <Route path="/staff/registrations/review/:id" element={<RequirePortal allowedTypes={['STAFF']}><RegistrationReviewDetailPage /></RequirePortal>} />
+          <Route path="/staff/registrations/review/:id/blockchain-sign" element={<RequirePortal allowedTypes={['STAFF']}><RegistrationBlockchainSignPage /></RequirePortal>} />
+          <Route path="/staff/lands" element={<RequirePortal allowedTypes={['STAFF']}><LandManagementPage /></RequirePortal>} />
+          <Route path="/staff/lands/:id/edit" element={<RequirePortal allowedTypes={['STAFF']}><LandEditPage /></RequirePortal>} />
+          <Route path="/staff/lands/search" element={<RequirePortal allowedTypes={['STAFF']}><SearchLandPage /></RequirePortal>} />
+
+          {/* Admin Portal */}
+          <Route path="/admin/dashboard" element={<RequirePortal allowedTypes={['AGENCY_ADMIN', 'SYSTEM_ADMIN']}><AdminDashboardPage /></RequirePortal>} />
+          <Route path="/admin/users" element={<RequirePortal allowedTypes={['AGENCY_ADMIN', 'SYSTEM_ADMIN']}><UserManagementPage /></RequirePortal>} />
+          <Route path="/admin/users/:id/edit" element={<RequirePortal allowedTypes={['AGENCY_ADMIN', 'SYSTEM_ADMIN']}><UserEditPage /></RequirePortal>} />
+          <Route path="/admin/organizations" element={<RequirePortal allowedTypes={['AGENCY_ADMIN', 'SYSTEM_ADMIN']}><OrganizationManagementPage /></RequirePortal>} />
+          <Route path="/admin/organizations/:id/edit" element={<RequirePortal allowedTypes={['AGENCY_ADMIN', 'SYSTEM_ADMIN']}><OrganizationEditPage /></RequirePortal>} />
+          <Route path="/admin/service-wallets" element={<RequirePortal allowedTypes={['AGENCY_ADMIN', 'SYSTEM_ADMIN']}><ServiceWalletManagementPage /></RequirePortal>} />
+          <Route path="/admin/lands/search" element={<RequirePortal allowedTypes={['AGENCY_ADMIN', 'SYSTEM_ADMIN']}><SearchLandPage /></RequirePortal>} />
+
+          {/* System Portal */}
+          <Route path="/system/dashboard" element={<RequirePortal allowedTypes={['SYSTEM_ADMIN']}><AdminDashboardPage /></RequirePortal>} />
+
+          {/* Compatibility Routes for internal pages navigation */}
+          <Route path="/registrations/create" element={<RequirePortal allowedTypes={['CITIZEN']}><CitizenRegistrationPage /></RequirePortal>} />
+          <Route path="/wallets" element={<RequirePortal allowedTypes={['CITIZEN']}><WalletManagementPage /></RequirePortal>} />
+          <Route path="/registrations/:id/blockchain-sign" element={<RequirePortal allowedTypes={['CITIZEN']}><RegistrationBlockchainSignPage /></RequirePortal>} />
+          <Route path="/registrations/review" element={<RequirePortal allowedTypes={['STAFF']}><RegistrationReviewPage /></RequirePortal>} />
+          <Route path="/registrations/review/:id" element={<RequirePortal allowedTypes={['STAFF']}><RegistrationReviewDetailPage /></RequirePortal>} />
+          <Route path="/registrations/review/:id/blockchain-sign" element={<RequirePortal allowedTypes={['STAFF']}><RegistrationBlockchainSignPage /></RequirePortal>} />
+          <Route path="/lands" element={<RequirePortal allowedTypes={['STAFF']}><LandManagementPage /></RequirePortal>} />
+          <Route path="/lands/:id/edit" element={<RequirePortal allowedTypes={['STAFF']}><LandEditPage /></RequirePortal>} />
+          <Route path="/dashboard" element={<HomeEntry />} />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </section>

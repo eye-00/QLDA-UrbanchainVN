@@ -24,6 +24,13 @@ enum UserStatus {
   LOCKED
 }
 
+enum AccountType {
+  CITIZEN
+  STAFF
+  AGENCY_ADMIN
+  SYSTEM_ADMIN
+}
+
 enum WalletStatus {
   PENDING_VERIFICATION
   VERIFIED
@@ -130,6 +137,8 @@ model User {
   email          String         @unique
   fullName       String
   role           UserRole
+  accountType    AccountType    @default(CITIZEN)
+  username       String?        @unique
   status         UserStatus     @default(ACTIVE)
   passwordHash   String
   failedLoginAttempts Int       @default(0)
@@ -155,6 +164,8 @@ model User {
   landGeometryReviewed LandParcel[] @relation("LandGeometryReviewedBy")
   landGeometryApproved LandParcel[] @relation("LandGeometryApprovedBy")
   landBoundaryHashRecorded LandParcel[] @relation("LandBoundaryHashRecordedBy")
+  citizenProfile CitizenProfile?
+  staffProfile   StaffProfile?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -465,4 +476,29 @@ model AuditLog {
   entityId   String
   payload    Json?
   createdAt  DateTime @default(now())
+}
+
+model CitizenProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  citizenId String   @unique
+  fullName  String
+  phone     String?
+  address   String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StaffProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  staffCode        String   @unique
+  officialUsername String   @unique
+  fullName         String
+  position         String?
+  officialEmail    String?
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }

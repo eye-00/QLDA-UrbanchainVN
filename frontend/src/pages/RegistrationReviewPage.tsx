@@ -185,7 +185,7 @@ export function RegistrationReviewPage() {
                       <button
                         type="button"
                         className="btn btn-outline"
-                        onClick={() => navigate(`/registrations/review/${item.id}`)}
+                        onClick={() => navigate(`/staff/registrations/review/${item.id}`)}
                       >
                         Mở hồ sơ
                       </button>
