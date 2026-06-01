@@ -145,7 +145,7 @@ export function App() {
         <header className="app-topbar">
           <div className="topbar-title">
             <strong>{currentPageLabel}</strong>
-            <span>{ROLE_LABELS[user.role]}</span>
+            <span className="topbar-role-badge">{ROLE_LABELS[user.role]}</span>
           </div>
           <div className="topbar-actions">
             <span className="topbar-user">{user.fullName}</span>
