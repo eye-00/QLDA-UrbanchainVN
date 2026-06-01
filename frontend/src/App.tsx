@@ -1,10 +1,8 @@
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
-import { RequireAuth } from './auth/RequireAuth';
 import { useMemo } from 'react';
 import {
-  ROLE_LABELS,
-  UserRole
+  ROLE_LABELS
 } from './auth/roles';
 import { CitizenRegistrationPage } from './pages/CitizenRegistrationPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';

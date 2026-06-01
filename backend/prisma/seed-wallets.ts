@@ -1,4 +1,4 @@
-import { BlockchainNetwork, Prisma, PrismaClient, WalletStatus } from "@prisma/client";
+import { BlockchainNetwork, PrismaClient, WalletStatus } from "@prisma/client";
 import { randomBytes, scryptSync } from "node:crypto";
 import dotenv from "dotenv";
 import path from "node:path";
@@ -8,6 +8,11 @@ const backendEnvPath = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 dotenv.config({ path: backendEnvPath });
 
 const prisma = new PrismaClient();
+
+type SeedUserRef = {
+  id: string;
+  organizationId: string | null;
+};
 
 function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -36,7 +41,7 @@ async function main() {
     { email: "approval_test@urbanchain.vn", fullName: "Cán bộ Phê duyệt (Test)", role: "APPROVAL_AUTHORITY" as const, organizationId: approvalOrg.id }
   ];
 
-  const dbUsers: Record<string, any> = {};
+  const dbUsers: Record<string, SeedUserRef> = {};
 
   for (const user of users) {
     const dbUser = await prisma.user.upsert({
@@ -66,7 +71,7 @@ async function main() {
   const wallet3Address = "0x9e117a91BD210d5265716006Fe4407547F119b4B".toLowerCase(); // Citizen B
 
   // Link Wallet 1 (Citizen A)
-  const w1 = await prisma.walletAccount.upsert({
+  await prisma.walletAccount.upsert({
     where: {
       wallet_network_address_unique: {
         network: BlockchainNetwork.SEPOLIA,
@@ -93,7 +98,7 @@ async function main() {
   console.log(`Linked Wallet 1 (${wallet1Address}) to citizen@urbanchain.vn`);
 
   // Link Wallet 3 (Citizen B)
-  const w3 = await prisma.walletAccount.upsert({
+  await prisma.walletAccount.upsert({
     where: {
       wallet_network_address_unique: {
         network: BlockchainNetwork.SEPOLIA,

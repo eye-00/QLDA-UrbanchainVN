@@ -1045,7 +1045,7 @@ registrationRouter.patch(
         area: new Prisma.Decimal(parsed.data.landInfo.area),
         landUsePurpose: parsed.data.landInfo.landUsePurpose,
         address: parsed.data.landInfo.address,
-        ownerType: parsed.data.ownerInfo.ownerType as any,
+        ownerType: parsed.data.ownerInfo.ownerType,
         ownerFullName: parsed.data.ownerInfo.fullName,
         ownerIdentityNumber: parsed.data.ownerInfo.identityNumber ?? null,
         ownerAddress: parsed.data.ownerInfo.address ?? null,

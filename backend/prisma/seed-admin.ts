@@ -1,4 +1,4 @@
-import { BlockchainNetwork, Prisma, PrismaClient, WalletStatus } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { randomBytes, scryptSync } from "node:crypto";
 import dotenv from "dotenv";
 import path from "node:path";

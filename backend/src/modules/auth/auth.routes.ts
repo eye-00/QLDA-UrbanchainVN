@@ -78,7 +78,7 @@ const AUTO_LOCK_MINUTES = Number(process.env.AUTH_LOCK_MINUTES || 15);
 const REFRESH_TTL_DAYS = Number(process.env.AUTH_REFRESH_TTL_DAYS || 7);
 const RESET_TOKEN_TTL_MINUTES = Number(process.env.AUTH_RESET_TOKEN_TTL_MINUTES || 15);
 
-function publicUser(user: any) {
+function publicUser(user: Pick<User, "id" | "fullName" | "email" | "role" | "accountType" | "organizationId">) {
   return {
     userId: user.id,
     fullName: user.fullName,
@@ -91,7 +91,7 @@ function publicUser(user: any) {
   };
 }
 
-function resolvePortalMapping(accountType: AccountType, role: string) {
+function resolvePortalMapping(accountType: AccountType) {
   if (accountType === "CITIZEN") {
     return {
       portal: "Portal người dân",
@@ -415,7 +415,7 @@ authRouter.post(
       payload: { role: latestUser.role }
     });
 
-    const portalInfo = resolvePortalMapping(latestUser.accountType, latestUser.role);
+    const portalInfo = resolvePortalMapping(latestUser.accountType);
 
     return ok(res, {
       accessToken,
@@ -702,7 +702,7 @@ authRouter.post(
       entityId: latestUser.id
     });
 
-    const portalInfo = resolvePortalMapping(latestUser.accountType, latestUser.role);
+    const portalInfo = resolvePortalMapping(latestUser.accountType);
 
     return ok(
       res,

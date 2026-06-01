@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
 type LoginType = 'CITIZEN' | 'STAFF' | 'ADMIN';
+type AccountLockedApiError = { errors?: Array<{ code?: string; lockedUntil?: string | null }> };
 
 const sampleCitizens = [
   { identifier: '012345678901', name: 'Công dân A (CCCD: 012345678901 - Ví 1)', type: 'CITIZEN' as const },
@@ -51,9 +52,10 @@ export function LoginPage() {
       const { redirectTo } = await login(loginType, identifier.trim(), password);
       const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? redirectTo;
       navigate(from, { replace: true });
-    } catch (error: any) {
-      if (error && error.errors && error.errors[0]?.code === 'ACCOUNT_LOCKED') {
-        const lockedUntil = error.errors[0].lockedUntil;
+    } catch (error: unknown) {
+      const accountError = error as AccountLockedApiError;
+      if (accountError.errors?.[0]?.code === 'ACCOUNT_LOCKED') {
+        const lockedUntil = accountError.errors[0].lockedUntil;
         const timeStr = lockedUntil ? new Date(lockedUntil).toLocaleTimeString('vi-VN') : 'vài phút';
         setMessage(`Tài khoản của bạn đã bị khóa tạm thời do nhập sai mật khẩu quá nhiều lần. Vui lòng thử lại sau ${timeStr}.`);
       } else {

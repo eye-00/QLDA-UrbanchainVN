@@ -52,6 +52,20 @@ type RegistrationListResponse = {
   total: number;
 };
 
+type PaymentObligationItem = {
+  id: string;
+  type: string;
+  status: string;
+  amount: number | null;
+  referenceNo: string | null;
+  fulfilledAt?: string | null;
+};
+
+type PaymentObligationWithRegistration = PaymentObligationItem & {
+  registrationCode: string;
+  registrationId: string;
+};
+
 type CreateRegistrationResponse = {
   registrationId: string;
   registrationCode: string;
@@ -108,18 +122,18 @@ export function CitizenRegistrationPage() {
   const [editingRegistrationId, setEditingRegistrationId] = useState<string | null>(null);
   const [editingCode, setEditingCode] = useState<string>('');
   const [selectedRegistration, setSelectedRegistration] = useState<RegistrationItem | null>(null);
-  const [selectedPaymentObligations, setSelectedPaymentObligations] = useState<any[]>([]);
+  const [selectedPaymentObligations, setSelectedPaymentObligations] = useState<PaymentObligationItem[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
-  const [payingObligation, setPayingObligation] = useState<any | null>(null);
+  const [payingObligation, setPayingObligation] = useState<PaymentObligationItem | PaymentObligationWithRegistration | null>(null);
   const [mockPaymentSuccess, setMockPaymentSuccess] = useState<boolean>(false);
-  const [allObligations, setAllObligations] = useState<any[]>([]);
+  const [allObligations, setAllObligations] = useState<PaymentObligationWithRegistration[]>([]);
 
   const loadAllObligations = useCallback(async (registrationItems: RegistrationItem[]) => {
     try {
       const promises = registrationItems.map(async (reg) => {
         try {
-          const res = await apiGet<{ items: any[] }>(`/registrations/${reg.id}/payment-obligations`);
-          return res.items.map((ob: any) => ({ ...ob, registrationCode: reg.code, registrationId: reg.id }));
+          const res = await apiGet<{ items: PaymentObligationItem[] }>(`/registrations/${reg.id}/payment-obligations`);
+          return res.items.map((ob) => ({ ...ob, registrationCode: reg.code, registrationId: reg.id }));
         } catch {
           return [];
         }
@@ -145,7 +159,7 @@ export function CitizenRegistrationPage() {
   const handleSelectRegistration = useCallback(async (item: RegistrationItem) => {
     setSelectedRegistration(item);
     try {
-      const data = await apiGet<{ items: any[] }>(`/registrations/${item.id}/payment-obligations`);
+      const data = await apiGet<{ items: PaymentObligationItem[] }>(`/registrations/${item.id}/payment-obligations`);
       setSelectedPaymentObligations(data.items);
     } catch {
       setSelectedPaymentObligations([]);
@@ -924,4 +938,3 @@ export function CitizenRegistrationPage() {
     </section>
   );
 }
-

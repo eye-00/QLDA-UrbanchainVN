@@ -64,6 +64,8 @@ type RegistrationItem = {
   updatedAt: string;
 };
 
+type PaymentObligationItem = NonNullable<RegistrationItem["paymentObligations"]>[number];
+
 export function RegistrationReviewDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -101,9 +103,9 @@ export function RegistrationReviewDetailPage() {
     setLoading(true);
     try {
       const data = await apiGet<RegistrationItem>(`/registrations/${id}`);
-      let obligations: any[] = [];
+      let obligations: PaymentObligationItem[] = [];
       try {
-        const obligationsRes = await apiGet<{ items: any[] }>(`/registrations/${id}/payment-obligations`);
+        const obligationsRes = await apiGet<{ items: PaymentObligationItem[] }>(`/registrations/${id}/payment-obligations`);
         obligations = obligationsRes.items;
       } catch (err) {
         console.error('Error fetching payment obligations:', err);

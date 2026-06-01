@@ -1,4 +1,4 @@
-import { BlockchainNetwork, Prisma, PrismaClient, WalletStatus, AccountType } from "@prisma/client";
+import { BlockchainNetwork, PrismaClient, WalletStatus, AccountType } from "@prisma/client";
 import { randomBytes, scryptSync } from "node:crypto";
 import dotenv from "dotenv";
 import path from "node:path";
@@ -8,6 +8,11 @@ const backendEnvPath = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 dotenv.config({ path: backendEnvPath });
 
 const prisma = new PrismaClient();
+
+type SeedUserRef = {
+  id: string;
+  organizationId: string | null;
+};
 
 function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -109,7 +114,7 @@ async function main() {
     }
   ];
 
-  const dbUsers: Record<string, any> = {};
+  const dbUsers: Record<string, SeedUserRef> = {};
 
   for (const seed of userSeeds) {
     const dbUser = await prisma.user.upsert({
