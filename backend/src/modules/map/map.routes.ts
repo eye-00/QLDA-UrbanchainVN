@@ -2,43 +2,63 @@ import { LandSourceType, ParcelGeometryStatus, Prisma } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
-import { asyncHandler, badRequestError, conflictError, notFoundError } from "../../lib/errors.js";
+import {
+  asyncHandler,
+  badRequestError,
+  conflictError,
+  notFoundError,
+} from "../../lib/errors.js";
 import { ok } from "../../lib/response.js";
 import { prisma } from "../../lib/prisma.js";
-import { AUTH_ROLES, requireAuth, requireRoles, type AuthenticatedRequest } from "../auth/auth.middleware.js";
+import {
+  AUTH_ROLES,
+  requireAuth,
+  requireRoles,
+  type AuthenticatedRequest,
+} from "../auth/auth.middleware.js";
 
-const sourceTypeSchema = z.enum(["DEMO", "IMPORTED", "OFFICIAL_REFERENCE", "UNKNOWN_NEEDS_REVIEW"]);
-const geometryStatusSchema = z.enum(["DRAFT", "UNDER_REVIEW", "OFFCHAIN_APPROVED", "BOUNDARY_HASH_RECORDED"]);
+const sourceTypeSchema = z.enum([
+  "DEMO",
+  "IMPORTED",
+  "OFFICIAL_REFERENCE",
+  "UNKNOWN_NEEDS_REVIEW",
+]);
+const geometryStatusSchema = z.enum([
+  "DRAFT",
+  "UNDER_REVIEW",
+  "OFFCHAIN_APPROVED",
+  "BOUNDARY_HASH_RECORDED",
+]);
 
 const listSchema = z.object({
   keyword: z.string().optional(),
   sourceType: sourceTypeSchema.optional(),
   geometryStatus: geometryStatusSchema.optional(),
   page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(100).default(20)
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
 
 const upsertGeometrySchema = z.object({
   sourceType: sourceTypeSchema.optional(),
   geometry: z.record(z.any()),
-  note: z.string().min(3).optional()
+  note: z.string().min(3).optional(),
 });
 
 const reviewGeometrySchema = z.object({
   decision: z.enum(["REVIEWED", "NEEDS_UPDATE"]).default("REVIEWED"),
   note: z.string().min(3),
-  sourceType: sourceTypeSchema.optional()
+  sourceType: sourceTypeSchema.optional(),
 });
 
 const approveOffchainSchema = z.object({
-  note: z.string().min(3).optional()
+  note: z.string().min(3).optional(),
 });
 
 const recordBoundaryHashSchema = z.object({
   boundaryHashValue: z.string().min(8),
   boundaryHashTxHash: z.string().min(8).optional(),
   boundaryHashCid: z.string().min(3).optional(),
-  note: z.string().min(3).optional()
+  note: z.string().min(3).optional(),
 });
 
 function toMapParcelItem(item: {
@@ -85,12 +105,14 @@ function toMapParcelItem(item: {
     boundaryHashTxHash: item.boundaryHashTxHash,
     boundaryHashCid: item.boundaryHashCid,
     boundaryHashValue: item.boundaryHashValue,
-    updatedAt: item.updatedAt
+    updatedAt: item.updatedAt,
   };
 }
 
 async function findLandOrThrow(landRecordId: string) {
-  const land = await prisma.landParcel.findUnique({ where: { id: landRecordId } });
+  const land = await prisma.landParcel.findUnique({
+    where: { id: landRecordId },
+  });
   if (!land) throw notFoundError("Không tìm thấy thửa đất");
   return land;
 }
@@ -103,7 +125,8 @@ mapRouter.get(
   requireRoles([...AUTH_ROLES.officers, ...AUTH_ROLES.citizen]),
   asyncHandler(async (req, res) => {
     const parsed = listSchema.safeParse(req.query ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const { page, pageSize, keyword, sourceType, geometryStatus } = parsed.data;
     const skip = (page - 1) * pageSize;
@@ -116,10 +139,10 @@ mapRouter.get(
               { parcelCode: { contains: keyword } },
               { parcelNumber: { contains: keyword } },
               { mapSheetNumber: { contains: keyword } },
-              { address: { contains: keyword } }
-            ]
+              { address: { contains: keyword } },
+            ],
           }
-        : {})
+        : {}),
     };
 
     const [items, total] = await Promise.all([
@@ -127,12 +150,17 @@ mapRouter.get(
         where,
         orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
         skip,
-        take: pageSize
+        take: pageSize,
       }),
-      prisma.landParcel.count({ where })
+      prisma.landParcel.count({ where }),
     ]);
-    return ok(res, { items: items.map((item) => toMapParcelItem(item)), total, page, pageSize });
-  })
+    return ok(res, {
+      items: items.map((item) => toMapParcelItem(item)),
+      total,
+      page,
+      pageSize,
+    });
+  }),
 );
 
 mapRouter.get(
@@ -141,7 +169,7 @@ mapRouter.get(
   asyncHandler(async (req, res) => {
     const land = await findLandOrThrow(String(req.params.landRecordId));
     return ok(res, toMapParcelItem(land));
-  })
+  }),
 );
 
 mapRouter.post(
@@ -149,12 +177,15 @@ mapRouter.post(
   requireRoles(["LAND_REGISTRY_OFFICER", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = upsertGeometrySchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
     const actor = (req as AuthenticatedRequest).user;
     const land = await findLandOrThrow(String(req.params.landRecordId));
 
     if (land.geometryStatus === "BOUNDARY_HASH_RECORDED") {
-      throw conflictError("Không thể cập nhật geometry sau khi đã ghi boundary hash");
+      throw conflictError(
+        "Không thể cập nhật geometry sau khi đã ghi boundary hash",
+      );
     }
 
     const updated = await prisma.landParcel.update({
@@ -171,8 +202,8 @@ mapRouter.post(
         boundaryHashRecordedById: null,
         boundaryHashTxHash: null,
         boundaryHashCid: null,
-        boundaryHashValue: null
-      }
+        boundaryHashValue: null,
+      },
     });
 
     await writeAuditLog({
@@ -183,12 +214,12 @@ mapRouter.post(
       payload: {
         sourceType: updated.sourceType,
         geometryStatus: updated.geometryStatus,
-        note: parsed.data.note ?? null
-      }
+        note: parsed.data.note ?? null,
+      },
     });
 
     return ok(res, toMapParcelItem(updated), "Đã cập nhật dữ liệu geometry");
-  })
+  }),
 );
 
 mapRouter.post(
@@ -196,16 +227,21 @@ mapRouter.post(
   requireRoles(["COMMUNE_OFFICER", "LAND_REGISTRY_OFFICER", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = reviewGeometrySchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
     const actor = (req as AuthenticatedRequest).user;
     const land = await findLandOrThrow(String(req.params.landRecordId));
 
-    if (!land.geometry) throw badRequestError("Thửa đất chưa có geometry để review");
+    if (!land.geometry)
+      throw badRequestError("Thửa đất chưa có geometry để review");
     if (land.geometryStatus === "BOUNDARY_HASH_RECORDED") {
-      throw conflictError("Không thể review geometry sau khi đã ghi boundary hash");
+      throw conflictError(
+        "Không thể review geometry sau khi đã ghi boundary hash",
+      );
     }
 
-    const nextStatus: ParcelGeometryStatus = parsed.data.decision === "NEEDS_UPDATE" ? "DRAFT" : "UNDER_REVIEW";
+    const nextStatus: ParcelGeometryStatus =
+      parsed.data.decision === "NEEDS_UPDATE" ? "DRAFT" : "UNDER_REVIEW";
     const updated = await prisma.landParcel.update({
       where: { id: land.id },
       data: {
@@ -221,10 +257,10 @@ mapRouter.post(
               boundaryHashRecordedAt: null,
               boundaryHashTxHash: null,
               boundaryHashCid: null,
-              boundaryHashValue: null
+              boundaryHashValue: null,
             }
-          : {})
-      }
+          : {}),
+      },
     });
 
     await writeAuditLog({
@@ -235,12 +271,12 @@ mapRouter.post(
       payload: {
         decision: parsed.data.decision,
         geometryStatus: updated.geometryStatus,
-        note: parsed.data.note
-      }
+        note: parsed.data.note,
+      },
     });
 
     return ok(res, toMapParcelItem(updated), "Đã review dữ liệu geometry");
-  })
+  }),
 );
 
 mapRouter.post(
@@ -248,13 +284,17 @@ mapRouter.post(
   requireRoles(["LAND_REGISTRY_OFFICER", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = approveOffchainSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
     const actor = (req as AuthenticatedRequest).user;
     const land = await findLandOrThrow(String(req.params.landRecordId));
 
-    if (!land.geometry) throw badRequestError("Thửa đất chưa có geometry để phê duyệt");
+    if (!land.geometry)
+      throw badRequestError("Thửa đất chưa có geometry để phê duyệt");
     if (land.geometryStatus !== "UNDER_REVIEW") {
-      throw conflictError(`Không thể phê duyệt off-chain khi trạng thái geometry hiện tại là ${land.geometryStatus}`);
+      throw conflictError(
+        `Không thể phê duyệt off-chain khi trạng thái geometry hiện tại là ${land.geometryStatus}`,
+      );
     }
 
     const updated = await prisma.landParcel.update({
@@ -262,8 +302,8 @@ mapRouter.post(
       data: {
         geometryStatus: "OFFCHAIN_APPROVED",
         geometryApprovedById: actor.userId,
-        geometryOffchainApprovedAt: new Date()
-      }
+        geometryOffchainApprovedAt: new Date(),
+      },
     });
 
     await writeAuditLog({
@@ -273,12 +313,16 @@ mapRouter.post(
       entityId: updated.id,
       payload: {
         geometryStatus: updated.geometryStatus,
-        note: parsed.data.note ?? null
-      }
+        note: parsed.data.note ?? null,
+      },
     });
 
-    return ok(res, toMapParcelItem(updated), "Đã phê duyệt off-chain dữ liệu geometry");
-  })
+    return ok(
+      res,
+      toMapParcelItem(updated),
+      "Đã phê duyệt off-chain dữ liệu geometry",
+    );
+  }),
 );
 
 mapRouter.post(
@@ -286,12 +330,15 @@ mapRouter.post(
   requireRoles(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = recordBoundaryHashSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
     const actor = (req as AuthenticatedRequest).user;
     const land = await findLandOrThrow(String(req.params.landRecordId));
 
     if (land.geometryStatus !== "OFFCHAIN_APPROVED") {
-      throw conflictError(`Không thể ghi boundary hash khi trạng thái geometry hiện tại là ${land.geometryStatus}`);
+      throw conflictError(
+        `Không thể ghi boundary hash khi trạng thái geometry hiện tại là ${land.geometryStatus}`,
+      );
     }
 
     const updated = await prisma.landParcel.update({
@@ -302,8 +349,8 @@ mapRouter.post(
         boundaryHashRecordedAt: new Date(),
         boundaryHashTxHash: parsed.data.boundaryHashTxHash ?? null,
         boundaryHashCid: parsed.data.boundaryHashCid ?? null,
-        boundaryHashValue: parsed.data.boundaryHashValue
-      }
+        boundaryHashValue: parsed.data.boundaryHashValue,
+      },
     });
 
     await writeAuditLog({
@@ -315,12 +362,16 @@ mapRouter.post(
         boundaryHashValue: parsed.data.boundaryHashValue,
         boundaryHashTxHash: parsed.data.boundaryHashTxHash ?? null,
         boundaryHashCid: parsed.data.boundaryHashCid ?? null,
-        note: parsed.data.note ?? null
-      }
+        note: parsed.data.note ?? null,
+      },
     });
 
-    return ok(res, toMapParcelItem(updated), "Đã ghi nhận boundary hash cho thửa đất");
-  })
+    return ok(
+      res,
+      toMapParcelItem(updated),
+      "Đã ghi nhận boundary hash cho thửa đất",
+    );
+  }),
 );
 
 mapRouter.get(
@@ -333,21 +384,22 @@ mapRouter.get(
           key: "parcel-base",
           name: "Lớp thửa đất",
           sourceType: "DEMO",
-          warning: "Dữ liệu demo chỉ phục vụ mô phỏng nghiệp vụ."
+          warning: "Dữ liệu demo chỉ phục vụ mô phỏng nghiệp vụ.",
         },
         {
           key: "official-reference",
           name: "Lớp tham chiếu chính thức",
           sourceType: "OFFICIAL_REFERENCE",
-          warning: null
+          warning: null,
         },
         {
           key: "review-overlay",
           name: "Lớp rà soát pháp lý",
           sourceType: "UNKNOWN_NEEDS_REVIEW",
-          warning: "Cần rà soát lại nguồn dữ liệu trước khi dùng cho quyết định nghiệp vụ."
-        }
-      ]
+          warning:
+            "Cần rà soát lại nguồn dữ liệu trước khi dùng cho quyết định nghiệp vụ.",
+        },
+      ],
     });
-  })
+  }),
 );

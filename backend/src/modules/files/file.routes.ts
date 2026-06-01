@@ -3,12 +3,22 @@ import multer from "multer";
 import { readFile, unlink } from "node:fs/promises";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
-import { asyncHandler, badRequestError, forbiddenError, notFoundError } from "../../lib/errors.js";
+import {
+  asyncHandler,
+  badRequestError,
+  forbiddenError,
+  notFoundError,
+} from "../../lib/errors.js";
 import { uploadToIpfs } from "../../lib/ipfs.js";
 import { created, ok } from "../../lib/response.js";
 import { prisma } from "../../lib/prisma.js";
 import { demoStore } from "../../lib/store/demo-store.js";
-import { AUTH_ROLES, requireAuth, requireRoles, type AuthenticatedRequest } from "../auth/auth.middleware.js";
+import {
+  AUTH_ROLES,
+  requireAuth,
+  requireRoles,
+  type AuthenticatedRequest,
+} from "../auth/auth.middleware.js";
 
 const upload = multer({ dest: "tmp/uploads" });
 export const fileRouter = Router();
@@ -17,11 +27,13 @@ const uploadSchema = z.object({
   documentType: z.string().min(1).default("UNKNOWN"),
   ownerType: z.string().min(1).default("USER"),
   ownerId: z.string().optional(),
-  registrationId: z.string().optional()
+  registrationId: z.string().optional(),
 });
 
 function isCitizenRole(role: string) {
-  return AUTH_ROLES.citizen.includes(role as (typeof AUTH_ROLES.citizen)[number]);
+  return AUTH_ROLES.citizen.includes(
+    role as (typeof AUTH_ROLES.citizen)[number],
+  );
 }
 
 function canAccessDemoFile(fileId: string, user: AuthenticatedRequest["user"]) {
@@ -29,18 +41,26 @@ function canAccessDemoFile(fileId: string, user: AuthenticatedRequest["user"]) {
 
   const hasRegistrationFile = demoStore
     .listRegistrations()
-    .some((registration) => registration.applicantId === user.userId && registration.fileIds.some((file) => file.id === fileId));
+    .some(
+      (registration) =>
+        registration.applicantId === user.userId &&
+        registration.fileIds.some((file) => file.id === fileId),
+    );
 
   if (hasRegistrationFile) return true;
 
   return demoStore
     .listTransfers()
-    .some((transfer) => transfer.fromUserId === user.userId && transfer.supportingFileIds.includes(fileId));
+    .some(
+      (transfer) =>
+        transfer.fromUserId === user.userId &&
+        transfer.supportingFileIds.includes(fileId),
+    );
 }
 
 async function canAccessPrismaFile(
   file: { ownerId: string; registration: { applicantId: string } | null },
-  user: AuthenticatedRequest["user"]
+  user: AuthenticatedRequest["user"],
 ) {
   if (!isCitizenRole(user.role)) return true;
   if (file.ownerId === user.userId) return true;
@@ -55,11 +75,13 @@ fileRouter.post(
   upload.single("file"),
   asyncHandler(async (req, res) => {
     const parsed = uploadSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
     if (!req.file) throw badRequestError("Thiếu tệp đính kèm");
 
     const user = (req as AuthenticatedRequest).user;
-    const originalName = req.file?.originalname ?? req.body.originalName ?? "document.bin";
+    const originalName =
+      req.file?.originalname ?? req.body.originalName ?? "document.bin";
     let ipfsUpload: Awaited<ReturnType<typeof uploadToIpfs>>;
 
     try {
@@ -67,7 +89,7 @@ fileRouter.post(
       ipfsUpload = await uploadToIpfs({
         buffer,
         fileName: originalName,
-        contentType: req.file.mimetype
+        contentType: req.file.mimetype,
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Upload thất bại";
@@ -77,8 +99,11 @@ fileRouter.post(
     }
 
     if (parsed.data.registrationId) {
-      const registration = await prisma.registration.findUnique({ where: { id: parsed.data.registrationId } });
-      if (!registration) throw notFoundError("Không tìm thấy hồ sơ đăng ký để gắn tệp");
+      const registration = await prisma.registration.findUnique({
+        where: { id: parsed.data.registrationId },
+      });
+      if (!registration)
+        throw notFoundError("Không tìm thấy hồ sơ đăng ký để gắn tệp");
     }
 
     const createdFile = await prisma.fileAsset.create({
@@ -90,14 +115,14 @@ fileRouter.post(
         storageStatus: "UPLOADED_IPFS",
         cid: ipfsUpload.cid,
         hash: ipfsUpload.hash,
-        registrationId: parsed.data.registrationId
-      }
+        registrationId: parsed.data.registrationId,
+      },
     });
 
     if (createdFile.registrationId) {
       const aggregate = await prisma.registrationDocumentVersion.aggregate({
         where: { registrationId: createdFile.registrationId },
-        _max: { versionNumber: true }
+        _max: { versionNumber: true },
       });
       const nextVersionNumber = (aggregate._max.versionNumber ?? 0) + 1;
 
@@ -105,12 +130,12 @@ fileRouter.post(
         where: {
           registrationId: createdFile.registrationId,
           documentType: createdFile.documentType,
-          status: "ACTIVE"
+          status: "ACTIVE",
         },
         data: {
           status: "REPLACED",
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
       await prisma.registrationDocumentVersion.create({
@@ -124,8 +149,8 @@ fileRouter.post(
           status: "ACTIVE",
           note: "Tạo version tự động từ API upload file",
           fileAssetId: createdFile.id,
-          createdById: user.userId
-        }
+          createdById: user.userId,
+        },
       });
     }
 
@@ -137,8 +162,8 @@ fileRouter.post(
       payload: {
         documentType: createdFile.documentType,
         storageStatus: createdFile.storageStatus,
-        registrationId: createdFile.registrationId ?? null
-      }
+        registrationId: createdFile.registrationId ?? null,
+      },
     });
 
     return created(
@@ -150,11 +175,11 @@ fileRouter.post(
         storageStatus: createdFile.storageStatus,
         cid: createdFile.cid,
         hash: createdFile.hash,
-        provider: ipfsUpload.provider
+        provider: ipfsUpload.provider,
       },
-      "Đã tải tệp và lưu metadata IPFS thành công"
+      "Đã tải tệp và lưu metadata IPFS thành công",
     );
-  })
+  }),
 );
 
 fileRouter.get(
@@ -166,11 +191,12 @@ fileRouter.get(
     const fileId = String(req.params.fileId);
     const file = await prisma.fileAsset.findUnique({
       where: { id: fileId },
-      include: { registration: { select: { applicantId: true } } }
+      include: { registration: { select: { applicantId: true } } },
     });
 
     if (file) {
-      if (!(await canAccessPrismaFile(file, user))) throw forbiddenError("Bạn không có quyền xem file này");
+      if (!(await canAccessPrismaFile(file, user)))
+        throw forbiddenError("Bạn không có quyền xem file này");
 
       return ok(res, {
         id: file.id,
@@ -179,15 +205,16 @@ fileRouter.get(
         storageStatus: file.storageStatus,
         cid: file.cid,
         hash: file.hash,
-        createdAt: file.createdAt
+        createdAt: file.createdAt,
       });
     }
 
     const demoFile = demoStore.getFile(fileId);
     if (!demoFile) throw notFoundError("Không tìm thấy file");
-    if (!canAccessDemoFile(fileId, user)) throw forbiddenError("Bạn không có quyền xem file này");
+    if (!canAccessDemoFile(fileId, user))
+      throw forbiddenError("Bạn không có quyền xem file này");
     return ok(res, demoFile);
-  })
+  }),
 );
 
 fileRouter.get(
@@ -199,29 +226,33 @@ fileRouter.get(
     const fileId = String(req.params.fileId);
     const file = await prisma.fileAsset.findUnique({
       where: { id: fileId },
-      include: { registration: { select: { applicantId: true } } }
+      include: { registration: { select: { applicantId: true } } },
     });
 
     if (file) {
-      if (!(await canAccessPrismaFile(file, user))) throw forbiddenError("Bạn không có quyền tải file này");
+      if (!(await canAccessPrismaFile(file, user)))
+        throw forbiddenError("Bạn không có quyền tải file này");
 
       return ok(res, {
         fileId: file.id,
         cid: file.cid,
-        downloadUrl: file.cid ? `http://localhost:8081/ipfs/${file.cid}` : null
+        downloadUrl: file.cid ? `http://localhost:8081/ipfs/${file.cid}` : null,
       });
     }
 
     const demoFile = demoStore.getFile(fileId);
     if (!demoFile) throw notFoundError("Không tìm thấy file");
-    if (!canAccessDemoFile(fileId, user)) throw forbiddenError("Bạn không có quyền tải file này");
+    if (!canAccessDemoFile(fileId, user))
+      throw forbiddenError("Bạn không có quyền tải file này");
 
     return ok(res, {
       fileId: demoFile.id,
       cid: demoFile.cid,
-      downloadUrl: demoFile.cid ? `http://localhost:8081/ipfs/${demoFile.cid}` : null
+      downloadUrl: demoFile.cid
+        ? `http://localhost:8081/ipfs/${demoFile.cid}`
+        : null,
     });
-  })
+  }),
 );
 
 fileRouter.get(
@@ -233,25 +264,27 @@ fileRouter.get(
     const fileId = String(req.params.fileId);
     const file = await prisma.fileAsset.findUnique({
       where: { id: fileId },
-      include: { registration: { select: { applicantId: true } } }
+      include: { registration: { select: { applicantId: true } } },
     });
 
     if (file) {
-      if (!(await canAccessPrismaFile(file, user))) throw forbiddenError("Bạn không có quyền kiểm tra tệp này");
+      if (!(await canAccessPrismaFile(file, user)))
+        throw forbiddenError("Bạn không có quyền kiểm tra tệp này");
 
       const checks = {
         hasCid: Boolean(file.cid),
         hasHash: Boolean(file.hash),
-        storageStatusValid: file.storageStatus === "UPLOADED_IPFS"
+        storageStatusValid: file.storageStatus === "UPLOADED_IPFS",
       };
-      const isValid = checks.hasCid && checks.hasHash && checks.storageStatusValid;
+      const isValid =
+        checks.hasCid && checks.hasHash && checks.storageStatusValid;
 
       await writeAuditLog({
         actorId: user.userId,
         action: "FILE_INTEGRITY_CHECKED",
         entityType: "FILE",
         entityId: file.id,
-        payload: { isValid, checks }
+        payload: { isValid, checks },
       });
 
       return ok(
@@ -262,22 +295,26 @@ fileRouter.get(
           hash: file.hash,
           storageStatus: file.storageStatus,
           checks,
-          isValid
+          isValid,
         },
-        isValid ? "Kiểm tra toàn vẹn tệp thành công" : "Phát hiện rủi ro toàn vẹn tệp"
+        isValid
+          ? "Kiểm tra toàn vẹn tệp thành công"
+          : "Phát hiện rủi ro toàn vẹn tệp",
       );
     }
 
     const demoFile = demoStore.getFile(fileId);
     if (!demoFile) throw notFoundError("Không tìm thấy file");
-    if (!canAccessDemoFile(fileId, user)) throw forbiddenError("Bạn không có quyền kiểm tra tệp này");
+    if (!canAccessDemoFile(fileId, user))
+      throw forbiddenError("Bạn không có quyền kiểm tra tệp này");
 
     const checks = {
       hasCid: Boolean(demoFile.cid),
       hasHash: Boolean(demoFile.hash),
-      storageStatusValid: demoFile.storageStatus === "UPLOADED_IPFS"
+      storageStatusValid: demoFile.storageStatus === "UPLOADED_IPFS",
     };
-    const isValid = checks.hasCid && checks.hasHash && checks.storageStatusValid;
+    const isValid =
+      checks.hasCid && checks.hasHash && checks.storageStatusValid;
 
     return ok(
       res,
@@ -287,9 +324,11 @@ fileRouter.get(
         hash: demoFile.hash,
         storageStatus: demoFile.storageStatus,
         checks,
-        isValid
+        isValid,
       },
-      isValid ? "Kiểm tra toàn vẹn tệp thành công" : "Phát hiện rủi ro toàn vẹn tệp"
+      isValid
+        ? "Kiểm tra toàn vẹn tệp thành công"
+        : "Phát hiện rủi ro toàn vẹn tệp",
     );
-  })
+  }),
 );

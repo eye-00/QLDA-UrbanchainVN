@@ -3,11 +3,22 @@ import { Prisma, User } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
-import { asyncHandler, badRequestError, conflictError, forbiddenError, notFoundError, unauthorizedError } from "../../lib/errors.js";
+import {
+  asyncHandler,
+  badRequestError,
+  conflictError,
+  forbiddenError,
+  notFoundError,
+  unauthorizedError,
+} from "../../lib/errors.js";
 import { hashPassword, verifyPassword } from "../../lib/password.js";
 import { created, ok } from "../../lib/response.js";
 import { prisma } from "../../lib/prisma.js";
-import { requireAuth, signAccessToken, type AuthenticatedRequest } from "./auth.middleware.js";
+import {
+  requireAuth,
+  signAccessToken,
+  type AuthenticatedRequest,
+} from "./auth.middleware.js";
 
 const roleSchema = z.enum([
   "CITIZEN",
@@ -18,7 +29,7 @@ const roleSchema = z.enum([
   "TAX_OFFICER",
   "APPROVAL_AUTHORITY",
   "AUDITOR",
-  "ADMIN"
+  "ADMIN",
 ]);
 const selfRegisterRoleSchema = z.enum(["CITIZEN", "BUSINESS"]);
 
@@ -29,43 +40,43 @@ const registerSchema = z.object({
   password: z.string().min(8),
   phone: z.string().optional(),
   identityNumber: z.string().optional(),
-  organizationId: z.string().optional()
+  organizationId: z.string().optional(),
 });
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8)
+  password: z.string().min(8),
 });
 
 const refreshSchema = z.object({
-  refreshToken: z.string().min(20)
+  refreshToken: z.string().min(20),
 });
 
 const logoutSchema = z.object({
-  refreshToken: z.string().min(20).optional()
+  refreshToken: z.string().min(20).optional(),
 });
 
 const passwordResetRequestSchema = z.object({
-  email: z.string().email()
+  email: z.string().email(),
 });
 
 const passwordResetConfirmSchema = z.object({
   email: z.string().email(),
   token: z.string().min(8),
-  newPassword: z.string().min(8)
+  newPassword: z.string().min(8),
 });
 
 const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(8),
-    newPassword: z.string().min(8)
+    newPassword: z.string().min(8),
   })
   .refine((value) => value.currentPassword !== value.newPassword, {
-    message: "New password must be different from current password"
+    message: "New password must be different from current password",
   });
 
 const vneidMockSchema = z.object({
-  identityNumber: z.string().min(6).optional()
+  identityNumber: z.string().min(6).optional(),
 });
 
 export const authRouter = Router();
@@ -73,16 +84,23 @@ export const authRouter = Router();
 const LOCK_THRESHOLD = Number(process.env.AUTH_MAX_FAILED_ATTEMPTS || 5);
 const AUTO_LOCK_MINUTES = Number(process.env.AUTH_LOCK_MINUTES || 15);
 const REFRESH_TTL_DAYS = Number(process.env.AUTH_REFRESH_TTL_DAYS || 7);
-const RESET_TOKEN_TTL_MINUTES = Number(process.env.AUTH_RESET_TOKEN_TTL_MINUTES || 15);
+const RESET_TOKEN_TTL_MINUTES = Number(
+  process.env.AUTH_RESET_TOKEN_TTL_MINUTES || 15,
+);
 
-function publicUser(user: Pick<User, "id" | "fullName" | "email" | "role" | "status" | "organizationId">) {
+function publicUser(
+  user: Pick<
+    User,
+    "id" | "fullName" | "email" | "role" | "status" | "organizationId"
+  >,
+) {
   return {
     userId: user.id,
     fullName: user.fullName,
     email: user.email,
     role: user.role,
     status: user.status,
-    organizationId: user.organizationId
+    organizationId: user.organizationId,
   };
 }
 
@@ -109,8 +127,8 @@ async function createSession(user: Pick<User, "id">) {
       userId: user.id,
       refreshTokenHash: hashPassword(refreshToken),
       refreshTokenFingerprint: computeRefreshTokenFingerprint(refreshToken),
-      expiresAt: computeSessionExpiry()
-    }
+      expiresAt: computeSessionExpiry(),
+    },
   });
   return refreshToken;
 }
@@ -120,9 +138,9 @@ async function findActiveSessionByRefreshToken(refreshToken: string) {
     where: {
       refreshTokenFingerprint: computeRefreshTokenFingerprint(refreshToken),
       revokedAt: null,
-      expiresAt: { gt: new Date() }
+      expiresAt: { gt: new Date() },
     },
-    include: { user: true }
+    include: { user: true },
   });
 
   if (!session) return null;
@@ -130,14 +148,17 @@ async function findActiveSessionByRefreshToken(refreshToken: string) {
   return session;
 }
 
-async function findActiveUserSessionByRefreshToken(userId: string, refreshToken: string) {
+async function findActiveUserSessionByRefreshToken(
+  userId: string,
+  refreshToken: string,
+) {
   const session = await prisma.authSession.findFirst({
     where: {
       userId,
       refreshTokenFingerprint: computeRefreshTokenFingerprint(refreshToken),
       revokedAt: null,
-      expiresAt: { gt: new Date() }
-    }
+      expiresAt: { gt: new Date() },
+    },
   });
 
   if (!session) return null;
@@ -146,7 +167,11 @@ async function findActiveUserSessionByRefreshToken(userId: string, refreshToken:
 }
 
 function shouldAutoUnlock(user: Pick<User, "status" | "lockedUntil">) {
-  return Boolean(user.status === "LOCKED" && user.lockedUntil && user.lockedUntil.getTime() <= Date.now());
+  return Boolean(
+    user.status === "LOCKED" &&
+    user.lockedUntil &&
+    user.lockedUntil.getTime() <= Date.now(),
+  );
 }
 
 async function ensureLoginAllowed(user: User) {
@@ -156,8 +181,8 @@ async function ensureLoginAllowed(user: User) {
       data: {
         status: "ACTIVE",
         lockedUntil: null,
-        failedLoginAttempts: 0
-      }
+        failedLoginAttempts: 0,
+      },
     });
   }
   return user;
@@ -169,7 +194,7 @@ async function recordFailedLogin(user: User | null, email: string) {
       action: "AUTH_LOGIN_FAILED",
       entityType: "USER",
       entityId: email.toLowerCase(),
-      payload: { email: email.toLowerCase(), reason: "USER_NOT_FOUND" }
+      payload: { email: email.toLowerCase(), reason: "USER_NOT_FOUND" },
     });
     return;
   }
@@ -183,10 +208,10 @@ async function recordFailedLogin(user: User | null, email: string) {
       ...(shouldLock
         ? {
             status: "LOCKED",
-            lockedUntil: new Date(Date.now() + AUTO_LOCK_MINUTES * 60 * 1000)
+            lockedUntil: new Date(Date.now() + AUTO_LOCK_MINUTES * 60 * 1000),
           }
-        : {})
-    }
+        : {}),
+    },
   });
 
   await writeAuditLog({
@@ -197,8 +222,8 @@ async function recordFailedLogin(user: User | null, email: string) {
     payload: {
       email: user.email,
       failedLoginAttempts: updated.failedLoginAttempts,
-      lockedUntil: updated.lockedUntil?.toISOString() ?? null
-    }
+      lockedUntil: updated.lockedUntil?.toISOString() ?? null,
+    },
   });
 }
 
@@ -208,8 +233,8 @@ async function resetLoginFailureState(userId: string) {
     data: {
       failedLoginAttempts: 0,
       lockedUntil: null,
-      lastLoginAt: new Date()
-    }
+      lastLoginAt: new Date(),
+    },
   });
 }
 
@@ -217,7 +242,8 @@ authRouter.post(
   "/register",
   asyncHandler(async (req, res) => {
     const parsed = registerSchema.safeParse(req.body);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const registerRole = selfRegisterRoleSchema.safeParse(parsed.data.role);
     if (!registerRole.success) {
@@ -227,10 +253,12 @@ authRouter.post(
         entityId: parsed.data.email.toLowerCase(),
         payload: {
           attemptedRole: parsed.data.role,
-          email: parsed.data.email.toLowerCase()
-        }
+          email: parsed.data.email.toLowerCase(),
+        },
       });
-      throw forbiddenError("Public register only supports CITIZEN or BUSINESS roles");
+      throw forbiddenError(
+        "Public register only supports CITIZEN or BUSINESS roles",
+      );
     }
 
     try {
@@ -242,8 +270,8 @@ authRouter.post(
           passwordHash: hashPassword(parsed.data.password),
           identityNumber: parsed.data.identityNumber,
           organizationId: parsed.data.organizationId,
-          status: "ACTIVE"
-        }
+          status: "ACTIVE",
+        },
       });
 
       await writeAuditLog({
@@ -251,7 +279,7 @@ authRouter.post(
         action: "AUTH_REGISTER_SUCCESS",
         entityType: "USER",
         entityId: user.id,
-        payload: { role: user.role }
+        payload: { role: user.role },
       });
 
       return created(
@@ -259,30 +287,37 @@ authRouter.post(
         {
           userId: user.id,
           role: user.role,
-          status: user.status
+          status: user.status,
         },
-        "Created successfully"
+        "Created successfully",
       );
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
         throw conflictError("Email already exists");
       }
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2003"
+      ) {
         throw badRequestError("Organization is invalid");
       }
       throw error;
     }
-  })
+  }),
 );
 
 authRouter.post(
   "/login",
   asyncHandler(async (req, res) => {
     const parsed = loginSchema.safeParse(req.body);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = await prisma.user.findUnique({
-      where: { email: parsed.data.email.toLowerCase() }
+      where: { email: parsed.data.email.toLowerCase() },
     });
 
     if (!user) {
@@ -303,12 +338,14 @@ authRouter.post(
 
     await resetLoginFailureState(availableUser.id);
     const refreshToken = await createSession(availableUser);
-    const latestUser = await prisma.user.findUniqueOrThrow({ where: { id: availableUser.id } });
+    const latestUser = await prisma.user.findUniqueOrThrow({
+      where: { id: availableUser.id },
+    });
     const accessToken = signAccessToken({
       userId: latestUser.id,
       fullName: latestUser.fullName,
       email: latestUser.email,
-      role: latestUser.role
+      role: latestUser.role,
     });
 
     await writeAuditLog({
@@ -316,27 +353,29 @@ authRouter.post(
       action: "AUTH_LOGIN_SUCCESS",
       entityType: "USER",
       entityId: latestUser.id,
-      payload: { role: latestUser.role }
+      payload: { role: latestUser.role },
     });
 
     return ok(res, {
       accessToken,
       refreshToken,
-      user: publicUser(latestUser)
+      user: publicUser(latestUser),
     });
-  })
+  }),
 );
 
 authRouter.post(
   "/refresh",
   asyncHandler(async (req, res) => {
     const parsed = refreshSchema.safeParse(req.body);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const currentRefreshToken = parsed.data.refreshToken;
     const session = await findActiveSessionByRefreshToken(currentRefreshToken);
     if (!session) throw unauthorizedError("Invalid refresh token");
-    if (session.user.status !== "ACTIVE") throw unauthorizedError("Invalid session");
+    if (session.user.status !== "ACTIVE")
+      throw unauthorizedError("Invalid session");
 
     const now = new Date();
     const nextRefreshToken = generatePlainToken();
@@ -344,24 +383,27 @@ authRouter.post(
       where: {
         id: session.id,
         refreshTokenHash: session.refreshTokenHash,
-        refreshTokenFingerprint: computeRefreshTokenFingerprint(currentRefreshToken),
+        refreshTokenFingerprint:
+          computeRefreshTokenFingerprint(currentRefreshToken),
         revokedAt: null,
-        expiresAt: { gt: now }
+        expiresAt: { gt: now },
       },
       data: {
         refreshTokenHash: hashPassword(nextRefreshToken),
-        refreshTokenFingerprint: computeRefreshTokenFingerprint(nextRefreshToken),
+        refreshTokenFingerprint:
+          computeRefreshTokenFingerprint(nextRefreshToken),
         expiresAt: computeSessionExpiry(),
-        lastUsedAt: now
-      }
+        lastUsedAt: now,
+      },
     });
-    if (rotateResult.count !== 1) throw unauthorizedError("Invalid refresh token");
+    if (rotateResult.count !== 1)
+      throw unauthorizedError("Invalid refresh token");
 
     const accessToken = signAccessToken({
       userId: session.user.id,
       fullName: session.user.fullName,
       email: session.user.email,
-      role: session.user.role
+      role: session.user.role,
     });
 
     await writeAuditLog({
@@ -370,16 +412,16 @@ authRouter.post(
       entityType: "AUTH_SESSION",
       entityId: session.id,
       payload: {
-        userId: session.user.id
-      }
+        userId: session.user.id,
+      },
     });
 
     return ok(res, {
       accessToken,
       refreshToken: nextRefreshToken,
-      user: publicUser(session.user)
+      user: publicUser(session.user),
     });
-  })
+  }),
 );
 
 authRouter.post(
@@ -387,30 +429,35 @@ authRouter.post(
   requireAuth,
   asyncHandler(async (req, res) => {
     const parsed = logoutSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
     const authUser = (req as AuthenticatedRequest).user;
     const now = new Date();
 
     if (parsed.data.refreshToken) {
-      const candidate = await findActiveUserSessionByRefreshToken(authUser.userId, parsed.data.refreshToken);
-      if (!candidate) return ok(res, { revokedSessions: 0 }, "No active session was matched");
+      const candidate = await findActiveUserSessionByRefreshToken(
+        authUser.userId,
+        parsed.data.refreshToken,
+      );
+      if (!candidate)
+        return ok(res, { revokedSessions: 0 }, "No active session was matched");
 
       await prisma.authSession.update({
         where: { id: candidate.id },
-        data: { revokedAt: now }
+        data: { revokedAt: now },
       });
       await writeAuditLog({
         actorId: authUser.userId,
         action: "AUTH_LOGOUT",
         entityType: "AUTH_SESSION",
-        entityId: candidate.id
+        entityId: candidate.id,
       });
       return ok(res, { revokedSessions: 1 }, "Logout successful");
     }
 
     const revokeResult = await prisma.authSession.updateMany({
       where: { userId: authUser.userId, revokedAt: null },
-      data: { revokedAt: now }
+      data: { revokedAt: now },
     });
 
     await writeAuditLog({
@@ -418,20 +465,27 @@ authRouter.post(
       action: "AUTH_LOGOUT_ALL",
       entityType: "USER",
       entityId: authUser.userId,
-      payload: { revokedSessions: revokeResult.count }
+      payload: { revokedSessions: revokeResult.count },
     });
 
-    return ok(res, { revokedSessions: revokeResult.count }, "Logout successful");
-  })
+    return ok(
+      res,
+      { revokedSessions: revokeResult.count },
+      "Logout successful",
+    );
+  }),
 );
 
 authRouter.post(
   "/password/reset-request",
   asyncHandler(async (req, res) => {
     const parsed = passwordResetRequestSchema.safeParse(req.body);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
-    const user = await prisma.user.findUnique({ where: { email: parsed.data.email.toLowerCase() } });
+    const user = await prisma.user.findUnique({
+      where: { email: parsed.data.email.toLowerCase() },
+    });
     const resetToken = generatePlainToken(24);
 
     if (user) {
@@ -439,21 +493,23 @@ authRouter.post(
         where: { id: user.id },
         data: {
           passwordResetTokenHash: hashPassword(resetToken),
-          passwordResetExpiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000)
-        }
+          passwordResetExpiresAt: new Date(
+            Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000,
+          ),
+        },
       });
 
       await writeAuditLog({
         actorId: user.id,
         action: "AUTH_PASSWORD_RESET_REQUESTED",
         entityType: "USER",
-        entityId: user.id
+        entityId: user.id,
       });
     } else {
       await writeAuditLog({
         action: "AUTH_PASSWORD_RESET_REQUESTED_UNKNOWN",
         entityType: "USER",
-        entityId: parsed.data.email.toLowerCase()
+        entityId: parsed.data.email.toLowerCase(),
       });
     }
 
@@ -461,21 +517,22 @@ authRouter.post(
       res,
       {
         accepted: true,
-        ...(process.env.NODE_ENV !== "production" ? { resetToken } : {})
+        ...(process.env.NODE_ENV !== "production" ? { resetToken } : {}),
       },
-      "If the account exists, reset instructions have been created"
+      "If the account exists, reset instructions have been created",
     );
-  })
+  }),
 );
 
 authRouter.post(
   "/password/reset-confirm",
   asyncHandler(async (req, res) => {
     const parsed = passwordResetConfirmSchema.safeParse(req.body);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = await prisma.user.findUnique({
-      where: { email: parsed.data.email.toLowerCase() }
+      where: { email: parsed.data.email.toLowerCase() },
     });
     if (!user || !user.passwordResetTokenHash || !user.passwordResetExpiresAt) {
       throw badRequestError("Reset token is invalid");
@@ -496,25 +553,25 @@ authRouter.post(
           failedLoginAttempts: 0,
           lockedUntil: null,
           passwordResetTokenHash: null,
-          passwordResetExpiresAt: null
-        }
+          passwordResetExpiresAt: null,
+        },
       }),
       prisma.authSession.updateMany({
         where: { userId: user.id, revokedAt: null },
-        data: { revokedAt: new Date() }
+        data: { revokedAt: new Date() },
       }),
       prisma.auditLog.create({
         data: {
           actorId: user.id,
           action: "AUTH_PASSWORD_RESET_CONFIRMED",
           entityType: "USER",
-          entityId: user.id
-        }
-      })
+          entityId: user.id,
+        },
+      }),
     ]);
 
     return ok(res, { reset: true }, "Password has been reset");
-  })
+  }),
 );
 
 authRouter.post(
@@ -522,9 +579,12 @@ authRouter.post(
   requireAuth,
   asyncHandler(async (req, res) => {
     const parsed = changePasswordSchema.safeParse(req.body);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
     const authUser = (req as AuthenticatedRequest).user;
-    const user = await prisma.user.findUnique({ where: { id: authUser.userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: authUser.userId },
+    });
     if (!user) throw notFoundError("User not found");
     if (!verifyPassword(parsed.data.currentPassword, user.passwordHash)) {
       throw badRequestError("Current password is invalid");
@@ -538,39 +598,42 @@ authRouter.post(
           failedLoginAttempts: 0,
           lockedUntil: null,
           passwordResetTokenHash: null,
-          passwordResetExpiresAt: null
-        }
+          passwordResetExpiresAt: null,
+        },
       }),
       prisma.authSession.updateMany({
         where: { userId: user.id, revokedAt: null },
-        data: { revokedAt: new Date() }
+        data: { revokedAt: new Date() },
       }),
       prisma.auditLog.create({
         data: {
           actorId: user.id,
           action: "AUTH_PASSWORD_CHANGED",
           entityType: "USER",
-          entityId: user.id
-        }
-      })
+          entityId: user.id,
+        },
+      }),
     ]);
 
     return ok(res, { changed: true }, "Password has been changed");
-  })
+  }),
 );
 
 authRouter.post(
   "/vneid/mock",
   asyncHandler(async (req, res) => {
-    if (!isVneidMockAllowed()) throw forbiddenError("VNeID mock endpoint is not enabled");
+    if (!isVneidMockAllowed())
+      throw forbiddenError("VNeID mock endpoint is not enabled");
 
     const parsed = vneidMockSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = await prisma.user.findUnique({
-      where: { email: "citizen@urbanchain.vn" }
+      where: { email: "citizen@urbanchain.vn" },
     });
-    if (!user || user.status !== "ACTIVE") throw notFoundError("Mock VNeID user is not available");
+    if (!user || user.status !== "ACTIVE")
+      throw notFoundError("Mock VNeID user is not available");
 
     await resetLoginFailureState(user.id);
     const refreshToken = await createSession(user);
@@ -578,14 +641,14 @@ authRouter.post(
       userId: user.id,
       fullName: user.fullName,
       email: user.email,
-      role: user.role
+      role: user.role,
     });
 
     await writeAuditLog({
       actorId: user.id,
       action: "AUTH_VNEID_MOCK_LOGIN_SUCCESS",
       entityType: "USER",
-      entityId: user.id
+      entityId: user.id,
     });
 
     return ok(
@@ -596,13 +659,14 @@ authRouter.post(
         user: publicUser(user),
         identity: {
           provider: "VNEID_MOCK",
-          identityNumber: parsed.data.identityNumber ?? user.identityNumber ?? "0482xxxxxxx",
-          verified: true
-        }
+          identityNumber:
+            parsed.data.identityNumber ?? user.identityNumber ?? "0482xxxxxxx",
+          verified: true,
+        },
       },
-      "Dang nhap VNeID mo phong thanh cong"
+      "Dang nhap VNeID mo phong thanh cong",
     );
-  })
+  }),
 );
 
 authRouter.get(
@@ -610,8 +674,10 @@ authRouter.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const authUser = (req as AuthenticatedRequest).user;
-    const user = await prisma.user.findUnique({ where: { id: authUser.userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: authUser.userId },
+    });
     if (!user) throw notFoundError("User not found");
     return ok(res, publicUser(user));
-  })
+  }),
 );

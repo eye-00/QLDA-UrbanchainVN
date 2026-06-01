@@ -1,27 +1,43 @@
-import { BlockchainNetwork, ServiceWalletAuthorization, UserRole } from "@prisma/client";
+import {
+  BlockchainNetwork,
+  ServiceWalletAuthorization,
+  UserRole,
+} from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
-import { asyncHandler, badRequestError, conflictError, notFoundError } from "../../lib/errors.js";
+import {
+  asyncHandler,
+  badRequestError,
+  conflictError,
+  notFoundError,
+} from "../../lib/errors.js";
 import { created, ok } from "../../lib/response.js";
 import { prisma } from "../../lib/prisma.js";
-import { requireAuth, requireRoles, type AuthenticatedRequest } from "../auth/auth.middleware.js";
+import {
+  requireAuth,
+  requireRoles,
+  type AuthenticatedRequest,
+} from "../auth/auth.middleware.js";
 
 const serviceWalletRouter = Router();
 
-const managedRoleSchema = z.enum(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY"]);
+const managedRoleSchema = z.enum([
+  "LAND_REGISTRY_OFFICER",
+  "APPROVAL_AUTHORITY",
+]);
 
 const createAuthorizationSchema = z.object({
   walletId: z.string().min(1),
   roleScope: managedRoleSchema,
   chainId: z.coerce.number().int().positive().optional(),
   effectiveTo: z.string().datetime().optional(),
-  reason: z.string().min(3).max(191).optional()
+  reason: z.string().min(3).max(191).optional(),
 });
 
 const updateAuthorizationStatusSchema = z.object({
   status: z.enum(["ACTIVE", "REVOKED", "EXPIRED"]),
-  reason: z.string().min(3).max(191).optional()
+  reason: z.string().min(3).max(191).optional(),
 });
 
 const listQuerySchema = z.object({
@@ -31,7 +47,7 @@ const listQuerySchema = z.object({
   organizationId: z.string().min(1).optional(),
   chainId: z.coerce.number().int().positive().optional(),
   page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(100).default(20)
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
 
 function resolveChainId() {
@@ -40,11 +56,18 @@ function resolveChainId() {
   return parsed;
 }
 
-function mapServiceWalletAuthorization(item: ServiceWalletAuthorization & {
-  wallet: { address: string; network: BlockchainNetwork };
-  user: { fullName: string; email: string; role: UserRole; organizationId: string | null };
-  revokedBy: { id: string; fullName: string } | null;
-}) {
+function mapServiceWalletAuthorization(
+  item: ServiceWalletAuthorization & {
+    wallet: { address: string; network: BlockchainNetwork };
+    user: {
+      fullName: string;
+      email: string;
+      role: UserRole;
+      organizationId: string | null;
+    };
+    revokedBy: { id: string; fullName: string } | null;
+  },
+) {
   return {
     id: item.id,
     walletId: item.walletId,
@@ -58,7 +81,7 @@ function mapServiceWalletAuthorization(item: ServiceWalletAuthorization & {
       fullName: item.user.fullName,
       email: item.user.email,
       role: item.user.role,
-      organizationId: item.user.organizationId
+      organizationId: item.user.organizationId,
     },
     organizationId: item.organizationId,
     effectiveFrom: item.effectiveFrom,
@@ -68,11 +91,11 @@ function mapServiceWalletAuthorization(item: ServiceWalletAuthorization & {
     revokedBy: item.revokedBy
       ? {
           id: item.revokedBy.id,
-          fullName: item.revokedBy.fullName
+          fullName: item.revokedBy.fullName,
         }
       : null,
     createdAt: item.createdAt,
-    updatedAt: item.updatedAt
+    updatedAt: item.updatedAt,
   };
 }
 
@@ -82,15 +105,24 @@ serviceWalletRouter.get(
   "/",
   asyncHandler(async (req, res) => {
     const parsed = listQuerySchema.safeParse(req.query);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
-    const { page, pageSize, status, network, roleScope, organizationId, chainId } = parsed.data;
+    const {
+      page,
+      pageSize,
+      status,
+      network,
+      roleScope,
+      organizationId,
+      chainId,
+    } = parsed.data;
     const where = {
       ...(status ? { status } : {}),
       ...(network ? { network } : {}),
       ...(roleScope ? { roleScope } : {}),
       ...(organizationId ? { organizationId } : {}),
-      ...(chainId ? { chainId } : {})
+      ...(chainId ? { chainId } : {}),
     };
 
     const [items, total] = await Promise.all([
@@ -98,46 +130,69 @@ serviceWalletRouter.get(
         where,
         include: {
           wallet: { select: { address: true, network: true } },
-          user: { select: { fullName: true, email: true, role: true, organizationId: true } },
-          revokedBy: { select: { id: true, fullName: true } }
+          user: {
+            select: {
+              fullName: true,
+              email: true,
+              role: true,
+              organizationId: true,
+            },
+          },
+          revokedBy: { select: { id: true, fullName: true } },
         },
         orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
         skip: (page - 1) * pageSize,
-        take: pageSize
+        take: pageSize,
       }),
-      prisma.serviceWalletAuthorization.count({ where })
+      prisma.serviceWalletAuthorization.count({ where }),
     ]);
 
     return ok(
       res,
       {
         items: items.map(mapServiceWalletAuthorization),
-        total
+        total,
       },
-      "Service wallet authorizations loaded"
+      "Service wallet authorizations loaded",
     );
-  })
+  }),
 );
 
 serviceWalletRouter.post(
   "/",
   asyncHandler(async (req, res) => {
     const parsed = createAuthorizationSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
     const actor = (req as AuthenticatedRequest).user;
 
     const wallet = await prisma.walletAccount.findUnique({
       where: { id: parsed.data.walletId },
-      include: { user: { select: { id: true, role: true, organizationId: true, fullName: true, email: true } } }
+      include: {
+        user: {
+          select: {
+            id: true,
+            role: true,
+            organizationId: true,
+            fullName: true,
+            email: true,
+          },
+        },
+      },
     });
     if (!wallet) throw notFoundError("Không tìm thấy ví cần cấp quyền");
-    if (wallet.status !== "VERIFIED") throw badRequestError("Chỉ có thể cấp quyền cho ví đã xác minh");
+    if (wallet.status !== "VERIFIED")
+      throw badRequestError("Chỉ có thể cấp quyền cho ví đã xác minh");
     if (wallet.user.role !== parsed.data.roleScope) {
-      throw conflictError("Vai trò tài khoản sở hữu ví không khớp roleScope được cấp");
+      throw conflictError(
+        "Vai trò tài khoản sở hữu ví không khớp roleScope được cấp",
+      );
     }
 
     const now = new Date();
-    const effectiveTo = parsed.data.effectiveTo ? new Date(parsed.data.effectiveTo) : null;
+    const effectiveTo = parsed.data.effectiveTo
+      ? new Date(parsed.data.effectiveTo)
+      : null;
     if (effectiveTo && Number.isNaN(effectiveTo.getTime())) {
       throw badRequestError("effectiveTo không hợp lệ");
     }
@@ -151,11 +206,13 @@ serviceWalletRouter.post(
         walletId: wallet.id,
         network: wallet.network,
         chainId,
-        status: "ACTIVE"
-      }
+        status: "ACTIVE",
+      },
     });
     if (existingActive) {
-      throw conflictError("Ví này đã có quyền công vụ ACTIVE trên network/chainId hiện tại");
+      throw conflictError(
+        "Ví này đã có quyền công vụ ACTIVE trên network/chainId hiện tại",
+      );
     }
 
     const createdItem = await prisma.serviceWalletAuthorization.create({
@@ -169,13 +226,20 @@ serviceWalletRouter.post(
         status: "ACTIVE",
         effectiveFrom: now,
         effectiveTo,
-        reason: parsed.data.reason ?? null
+        reason: parsed.data.reason ?? null,
       },
       include: {
         wallet: { select: { address: true, network: true } },
-        user: { select: { fullName: true, email: true, role: true, organizationId: true } },
-        revokedBy: { select: { id: true, fullName: true } }
-      }
+        user: {
+          select: {
+            fullName: true,
+            email: true,
+            role: true,
+            organizationId: true,
+          },
+        },
+        revokedBy: { select: { id: true, fullName: true } },
+      },
     });
 
     await writeAuditLog({
@@ -190,28 +254,40 @@ serviceWalletRouter.post(
         roleScope: createdItem.roleScope,
         network: createdItem.network,
         chainId: createdItem.chainId,
-        effectiveTo: createdItem.effectiveTo
-      }
+        effectiveTo: createdItem.effectiveTo,
+      },
     });
 
-    return created(res, mapServiceWalletAuthorization(createdItem), "Đã cấp quyền ví công vụ");
-  })
+    return created(
+      res,
+      mapServiceWalletAuthorization(createdItem),
+      "Đã cấp quyền ví công vụ",
+    );
+  }),
 );
 
 serviceWalletRouter.patch(
   "/:id/status",
   asyncHandler(async (req, res) => {
     const parsed = updateAuthorizationStatusSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
     const actor = (req as AuthenticatedRequest).user;
 
     const existing = await prisma.serviceWalletAuthorization.findUnique({
       where: { id: String(req.params.id) },
       include: {
         wallet: { select: { address: true, network: true } },
-        user: { select: { fullName: true, email: true, role: true, organizationId: true } },
-        revokedBy: { select: { id: true, fullName: true } }
-      }
+        user: {
+          select: {
+            fullName: true,
+            email: true,
+            role: true,
+            organizationId: true,
+          },
+        },
+        revokedBy: { select: { id: true, fullName: true } },
+      },
     });
     if (!existing) throw notFoundError("Không tìm thấy quyền ví công vụ");
 
@@ -222,18 +298,31 @@ serviceWalletRouter.patch(
         status: parsed.data.status,
         reason: parsed.data.reason ?? existing.reason,
         revokedAt: parsed.data.status === "REVOKED" ? now : existing.revokedAt,
-        revokedById: parsed.data.status === "REVOKED" ? actor.userId : existing.revokedById
+        revokedById:
+          parsed.data.status === "REVOKED"
+            ? actor.userId
+            : existing.revokedById,
       },
       include: {
         wallet: { select: { address: true, network: true } },
-        user: { select: { fullName: true, email: true, role: true, organizationId: true } },
-        revokedBy: { select: { id: true, fullName: true } }
-      }
+        user: {
+          select: {
+            fullName: true,
+            email: true,
+            role: true,
+            organizationId: true,
+          },
+        },
+        revokedBy: { select: { id: true, fullName: true } },
+      },
     });
 
     await writeAuditLog({
       actorId: actor.userId,
-      action: updated.status === "REVOKED" ? "SERVICE_WALLET_REVOKED" : "SERVICE_WALLET_UPDATED",
+      action:
+        updated.status === "REVOKED"
+          ? "SERVICE_WALLET_REVOKED"
+          : "SERVICE_WALLET_UPDATED",
       entityType: "SERVICE_WALLET_AUTHORIZATION",
       entityId: updated.id,
       payload: {
@@ -243,28 +332,32 @@ serviceWalletRouter.patch(
         walletAddress: updated.wallet.address,
         network: updated.network,
         chainId: updated.chainId,
-        reason: parsed.data.reason ?? null
-      }
+        reason: parsed.data.reason ?? null,
+      },
     });
 
-    return ok(res, mapServiceWalletAuthorization(updated), "Đã cập nhật trạng thái ví công vụ");
-  })
+    return ok(
+      res,
+      mapServiceWalletAuthorization(updated),
+      "Đã cập nhật trạng thái ví công vụ",
+    );
+  }),
 );
 
 serviceWalletRouter.get(
   "/:id/audit",
   asyncHandler(async (req, res) => {
     const item = await prisma.serviceWalletAuthorization.findUnique({
-      where: { id: String(req.params.id) }
+      where: { id: String(req.params.id) },
     });
     if (!item) throw notFoundError("Không tìm thấy quyền ví công vụ");
 
     const logs = await prisma.auditLog.findMany({
       where: {
         entityType: "SERVICE_WALLET_AUTHORIZATION",
-        entityId: item.id
+        entityId: item.id,
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     return ok(
@@ -275,13 +368,13 @@ serviceWalletRouter.get(
           action: log.action,
           actorId: log.actorId,
           payload: log.payload,
-          createdAt: log.createdAt
+          createdAt: log.createdAt,
         })),
-        total: logs.length
+        total: logs.length,
       },
-      "Đã tải nhật ký ví công vụ"
+      "Đã tải nhật ký ví công vụ",
     );
-  })
+  }),
 );
 
 export { serviceWalletRouter };

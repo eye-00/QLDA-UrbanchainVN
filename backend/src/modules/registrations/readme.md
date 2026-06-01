@@ -102,16 +102,16 @@ DA_GHI_BLOCKCHAIN
 
 ### 3. Ma trận role → status được phép (`ROLE_ALLOWED_TARGET_STATUS`)
 
-| Role                    | Được set status                                                                                                                                 |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CITIZEN`               | `CHO_TIEP_NHAN`                                                                                                                                 |
-| `BUSINESS`              | `CHO_TIEP_NHAN`                                                                                                                                 |
-| `RECEPTION_OFFICER`     | `DA_TIEP_NHAN`, `CAN_BO_SUNG`, `CHO_XAC_NHAN_CAP_XA`                                                                                            |
-| `COMMUNE_OFFICER`       | `DA_XAC_NHAN_CAP_XA`, `CAN_BO_SUNG`                                                                                                             |
+| Role | Được set status |
+| --- | --- |
+| `CITIZEN` | `CHO_TIEP_NHAN` |
+| `BUSINESS` | `CHO_TIEP_NHAN` |
+| `RECEPTION_OFFICER` | `DA_TIEP_NHAN`, `CAN_BO_SUNG`, `CHO_XAC_NHAN_CAP_XA` |
+| `COMMUNE_OFFICER` | `DA_XAC_NHAN_CAP_XA`, `CAN_BO_SUNG` |
 | `LAND_REGISTRY_OFFICER` | `DANG_THAM_DINH_VPDKDD`, `CHO_THUE`, `CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH`, `CHO_KY_CAP`, `DA_CAP_NHAT_HO_SO_DIA_CHINH`, `CAN_BO_SUNG`, `TU_CHOI` |
-| `APPROVAL_AUTHORITY`    | `DA_KY_CAP`, `TU_CHOI`, `DA_CAP`                                                                                                                |
-| `TAX_OFFICER`           | `DA_HOAN_THANH_NGHIA_VU_TAI_CHINH`, `CAN_BO_SUNG`                                                                                               |
-| `ADMIN`                 | Tất cả 17 status                                                                                                                                |
+| `APPROVAL_AUTHORITY` | `DA_KY_CAP`, `TU_CHOI`, `DA_CAP` |
+| `TAX_OFFICER` | `DA_HOAN_THANH_NGHIA_VU_TAI_CHINH`, `CAN_BO_SUNG` |
+| `ADMIN` | Tất cả 17 status |
 
 ---
 
@@ -130,15 +130,25 @@ DA_GHI_BLOCKCHAIN
 
 - **Auth:** Citizen/Business
 - **Body:**
+
   ```typescript
+
   {
+
     landInfo: { provinceCode, communeName, parcelNumber, mapSheetNumber, area, landUsePurpose, address },
+
     ownerInfo: { ownerType, fullName, identityNumber?, address? },
+
     procedureCode?: string,        // mặc định DEFAULT_REGISTRATION_PROCEDURE_CODE
+
     legalBasisCode?: string,
+
     attachedFileIds?: string[]     // connect file assets đã upload
+
   }
+
   ```
+
 - **Behavior:**
   1. Validate `procedureCode` (tra cứu `LegalProcedure`)
   2. Sinh mã hồ sơ (`REG-YYYY-timestamp-random`)
@@ -304,30 +314,29 @@ DA_GHI_BLOCKCHAIN
 
 - **Auth:** Tax Officer, Admin
 - **Body:** `{ status: PENDING | CONFIRMED | CANCELLED, legalBasisCode, note? }`
-- Nếu `CONFIRMED` và registration đang ở `CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH`:
-  tự động chuyển → `DA_HOAN_THANH_NGHIA_VU_TAI_CHINH`
+- Nếu `CONFIRMED` và registration đang ở `CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH`: tự động chuyển → `DA_HOAN_THANH_NGHIA_VU_TAI_CHINH`
 
 ---
 
 ## Helper functions chính
 
-| Hàm                                         | Mô tả                                                                                              |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `isCitizenRole()`                           | Kiểm tra role có thuộc nhóm citizen/business                                                       |
-| `assertTransitionAllowed()`                 | Kiểm tra transition graph + role permission. Chặn direct set `DA_GHI_BLOCKCHAIN`                   |
-| `ensureProcedureAndAuthority()`             | Kiểm tra `LegalProcedure` active + actor role ∈ authority actors                                   |
-| `ensureServiceWalletAuthorizationForSync()` | Xác thực service wallet: hạn dùng, network, chainId, ownership, roleScope                          |
-| `ensureCitizenWalletAuthorizationForSync()` | Xác thực citizen wallet: ownership hồ sơ, wallet mặc định, network                                 |
-| `resolveBlockchainSyncMode()`               | Phân giải sync mode theo role: citizen → `CITIZEN_DIRECT_SIGN`, officer → `OFFICER_SERVICE_WALLET` |
-| `classifyBlockchainErrorStatus()`           | Parse lỗi blockchain: user denied → REJECTED, còn lại → FAILED                                     |
-| `findRegistrationByParam()`                 | Tra cứu registration theo `id` hoặc `code`                                                         |
-| `updateStatus()`                            | Core function: validate + update status + ghi noteHistory + audit log + notification               |
-| `createDocumentVersion()`                   | Tạo version mới với versionNumber tự động tăng                                                     |
-| `ensureActiveDocumentVersions()`            | Tự động seed document versions từ files nếu chưa có                                                |
-| `createSubmissionSnapshot()`                | Tạo snapshot nộp hồ sơ với snapshotNo tự động tăng                                                 |
-| `toRegistrationItem()`                      | Transform Prisma model → response shape                                                            |
-| `toDocumentVersionItem()`                   | Transform document version → response shape                                                        |
-| `toPaymentObligationItem()`                 | Transform payment obligation → response shape                                                      |
+| Hàm | Mô tả |
+| --- | --- |
+| `isCitizenRole()` | Kiểm tra role có thuộc nhóm citizen/business |
+| `assertTransitionAllowed()` | Kiểm tra transition graph + role permission. Chặn direct set `DA_GHI_BLOCKCHAIN` |
+| `ensureProcedureAndAuthority()` | Kiểm tra `LegalProcedure` active + actor role ∈ authority actors |
+| `ensureServiceWalletAuthorizationForSync()` | Xác thực service wallet: hạn dùng, network, chainId, ownership, roleScope |
+| `ensureCitizenWalletAuthorizationForSync()` | Xác thực citizen wallet: ownership hồ sơ, wallet mặc định, network |
+| `resolveBlockchainSyncMode()` | Phân giải sync mode theo role: citizen → `CITIZEN_DIRECT_SIGN`, officer → `OFFICER_SERVICE_WALLET` |
+| `classifyBlockchainErrorStatus()` | Parse lỗi blockchain: user denied → REJECTED, còn lại → FAILED |
+| `findRegistrationByParam()` | Tra cứu registration theo `id` hoặc `code` |
+| `updateStatus()` | Core function: validate + update status + ghi noteHistory + audit log + notification |
+| `createDocumentVersion()` | Tạo version mới với versionNumber tự động tăng |
+| `ensureActiveDocumentVersions()` | Tự động seed document versions từ files nếu chưa có |
+| `createSubmissionSnapshot()` | Tạo snapshot nộp hồ sơ với snapshotNo tự động tăng |
+| `toRegistrationItem()` | Transform Prisma model → response shape |
+| `toDocumentVersionItem()` | Transform document version → response shape |
+| `toPaymentObligationItem()` | Transform payment obligation → response shape |
 
 ---
 
@@ -397,7 +406,7 @@ const statusMutationRoles = [
   "LAND_REGISTRY_OFFICER",
   "APPROVAL_AUTHORITY",
   "TAX_OFFICER",
-  "ADMIN"
+  "ADMIN",
 ];
 ```
 
@@ -405,57 +414,96 @@ const statusMutationRoles = [
 
 ## Environment variables used
 
-| Variable                              | Mặc định                           | Mô tả                                           |
-| ------------------------------------- | ---------------------------------- | ----------------------------------------------- |
-| `DEFAULT_REGISTRATION_PROCEDURE_CODE` | `DKDD_LANDAU_3380`                 | Procedure code mặc định nếu không được cung cấp |
-| `BLOCKCHAIN_NETWORK`                  | `SEPOLIA`                          | Mạng blockchain mục tiêu                        |
-| `BLOCKCHAIN_CHAIN_ID`                 | `11155111`                         | Chain ID (Sepolia = 11155111)                   |
-| `BLOCKCHAIN_EXPLORER_BASE_URL`        | `https://sepolia.etherscan.io/tx/` | Base URL cho explorer link                      |
+| Variable | Mặc định | Mô tả |
+| --- | --- | --- |
+| `DEFAULT_REGISTRATION_PROCEDURE_CODE` | `DKDD_LANDAU_3380` | Procedure code mặc định nếu không được cung cấp |
+| `BLOCKCHAIN_NETWORK` | `SEPOLIA` | Mạng blockchain mục tiêu |
+| `BLOCKCHAIN_CHAIN_ID` | `11155111` | Chain ID (Sepolia = 11155111) |
+| `BLOCKCHAIN_EXPLORER_BASE_URL` | `https://sepolia.etherscan.io/tx/` | Base URL cho explorer link |
 
 17 trạng thái tạo thành một đồ thị có hướng (directed graph) — mỗi trạng thái chỉ có thể chuyển sang một số trạng thái nhất định. Dưới đây là cách chúng liên kết với nhau theo luồng xử lý:
+
 Luồng chính (happy path)
+
 MOI_TAO ──► CHO_TIEP_NHAN ──► DA_TIEP_NHAN ──► CHO_XAC_NHAN_CAP_XA
+
 │
+
 ▼
+
 DA_XAC_NHAN_CAP_XA
+
 │
+
 ▼
+
 DANG_THAM_DINH_VPDKDD
+
 │
+
 ▼
+
 CHO_HOAN_THANH_NVTC
+
 │
+
 ▼
+
 DA_HOAN_THANH_NVTC
+
 │
+
 ▼
+
 CHO_KY_CAP ──► DA_KY_CAP
+
 │
+
 ▼
+
 DA_CAP_NHAT_HSDC
+
 │
+
 ▼
+
 DA_GHI_BLOCKCHAIN
+
 │
+
 ▼
+
 DA_TRA_KET_QUA
+
 Các nhánh rẽ và đường tắt
+
 Nhánh Mô tả
+
 DA_TIEP_NHAN → DA_XAC_NHAN_CAP_XA Bỏ qua bước xác nhận cấp xã (hồ sơ đặc biệt)
+
 DANG_THAM_DINH_VPDKDD → CHO_THUE Cần thông báo thuế riêng
+
 DANG_THAM_DINH_VPDKDD → CHO_KY_CAP Thẩm định xong → chờ ký cấp luôn (bỏ qua bước thuế)
+
 CHO_KY_CAP → DA_CAP Bỏ qua ký cấp, duyệt thẳng
+
 DA_KY_CAP → DA_CAP Cấp luôn không cần cập nhật địa chính
+
 DA_CAP_NHAT_HSDC → DA_CAP Đã cập nhật địa chính → cấp luôn không cần blockchain
+
 DA_CAP → DA_TRA_KET_QUA Cấp xong → trả kết quả (bỏ qua blockchain)
+
 Nhánh từ chối / hủy
 
 - Từ chối (TU_CHOI) từ: CHO_TIEP_NHAN, DANG_THAM_DINH_VPDKDD, CHO_KY_CAP
-- Cần bổ sung (CAN_BO_SUNG) từ hầu hết các trạng thái — và từ CAN_BO_SUNG quay lại CHO_TIEP_NHAN
-  Vòng lặp bổ sung
+- Cần bổ sung (CAN_BO_SUNG) từ hầu hết các trạng thái — và từ CAN_BO_SUNG quay lại CHO_TIEP_NHAN Vòng lặp bổ sung
+
   ... ──► CAN_BO_SUNG ──► CHO_TIEP_NHAN ──► ... (tiếp tục luồng)
+
   Đây là vòng lặp duy nhất trong đồ thị — cho phép citizen bổ sung hồ sơ và nộp lại.
+
   Tóm tắt quan hệ
+
 - Luồng tuyến tính là chính: từ tạo → tiếp nhận → xác nhận → thẩm định → thuế → ký → địa chính → blockchain → trả kết quả
 - Các đường tắt (skip steps) tồn tại để linh hoạt theo nghiệp vụ thực tế
 - CAN_BO_SUNG là trạng thái "hub" — có thể đến từ nhiều nơi và quay về CHO_TIEP_NHAN

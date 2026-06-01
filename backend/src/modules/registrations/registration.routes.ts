@@ -6,17 +6,31 @@ import {
   PaymentObligationType,
   Prisma,
   RegistrationStatus,
-  UserRole
+  UserRole,
 } from "@prisma/client";
 import { Router } from "express";
 import { ethers } from "ethers";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
-import { asyncHandler, badRequestError, conflictError, forbiddenError, notFoundError } from "../../lib/errors.js";
-import { lookupRegistrationOnChain, mintRegistrationRecord } from "../../lib/blockchain/urban-land-registry.client.js";
+import {
+  asyncHandler,
+  badRequestError,
+  conflictError,
+  forbiddenError,
+  notFoundError,
+} from "../../lib/errors.js";
+import {
+  lookupRegistrationOnChain,
+  mintRegistrationRecord,
+} from "../../lib/blockchain/urban-land-registry.client.js";
 import { created, ok } from "../../lib/response.js";
 import { prisma } from "../../lib/prisma.js";
-import { AUTH_ROLES, requireAuth, requireRoles, type AuthenticatedRequest } from "../auth/auth.middleware.js";
+import {
+  AUTH_ROLES,
+  requireAuth,
+  requireRoles,
+  type AuthenticatedRequest,
+} from "../auth/auth.middleware.js";
 
 const registrationStatusSchema = z.enum([
   "MOI_TAO",
@@ -36,7 +50,7 @@ const registrationStatusSchema = z.enum([
   "DA_CAP",
   "DA_TRA_KET_QUA",
   "HUY_HO_SO",
-  "TU_CHOI"
+  "TU_CHOI",
 ]);
 
 const legalBasisCodeSchema = z.string().min(3).max(191);
@@ -54,18 +68,18 @@ const createRegistrationSchema = z.object({
     mapSheetNumber: z.string().min(1),
     area: z.coerce.number().positive(),
     landUsePurpose: z.string().min(1),
-    address: z.string().min(1)
+    address: z.string().min(1),
   }),
   ownerInfo: z.object({
     ownerType: z.string().min(1).default("INDIVIDUAL"),
     fullName: z.string().min(2),
     identityNumber: z.string().optional(),
-    address: z.string().optional()
+    address: z.string().optional(),
   }),
   procedureCode: z.string().min(3).max(64).optional(),
   legalBasisCode: legalBasisCodeSchema.optional(),
   attachedFileIds: z.array(z.string()).optional(),
-  fileIds: z.array(z.string()).optional()
+  fileIds: z.array(z.string()).optional(),
 });
 
 const listSchema = z.object({
@@ -73,26 +87,29 @@ const listSchema = z.object({
   keyword: z.string().optional(),
   procedureCode: z.string().optional(),
   page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(100).default(20)
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
 
 const submitSchema = z.object({
   legalBasisCode: legalBasisCodeSchema,
-  note: z.string().min(3).optional()
+  note: z.string().min(3).optional(),
 });
 
 const patchStatusSchema = z
   .object({
     status: registrationStatusSchema,
     legalBasisCode: legalBasisCodeSchema,
-    reason: z.string().min(3).optional()
+    reason: z.string().min(3).optional(),
   })
   .superRefine((value, ctx) => {
-    if ((value.status === "CAN_BO_SUNG" || value.status === "TU_CHOI") && !value.reason) {
+    if (
+      (value.status === "CAN_BO_SUNG" || value.status === "TU_CHOI") &&
+      !value.reason
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["reason"],
-        message: "reason is required for supplement/reject status"
+        message: "reason is required for supplement/reject status",
       });
     }
   });
@@ -101,14 +118,14 @@ const communeConfirmSchema = z.object({
   confirmed: z.boolean(),
   legalBasisCode: legalBasisCodeSchema,
   notes: z.string().min(3),
-  evidenceFileId: z.string().min(3)
+  evidenceFileId: z.string().min(3),
 });
 
 const taxTransferSchema = z.object({
   legalBasisCode: legalBasisCodeSchema,
   taxReferenceNo: z.string().min(3),
   amount: z.coerce.number().positive().optional(),
-  notes: z.string().min(3).optional()
+  notes: z.string().min(3).optional(),
 });
 
 const approveSchema = z.object({
@@ -116,15 +133,18 @@ const approveSchema = z.object({
   approvalNumber: z.string().min(3).optional(),
   approvalDate: z.string().optional(),
   note: z.string().min(3).optional(),
-  landCode: z.string().optional()
+  landCode: z.string().optional(),
 });
 
 const cadastralUpdateSchema = z.object({
   legalBasisCode: legalBasisCodeSchema,
-  note: z.string().min(3).optional()
+  note: z.string().min(3).optional(),
 });
 
-const blockchainSyncModeSchema = z.enum(["OFFICER_SERVICE_WALLET", "CITIZEN_DIRECT_SIGN"]);
+const blockchainSyncModeSchema = z.enum([
+  "OFFICER_SERVICE_WALLET",
+  "CITIZEN_DIRECT_SIGN",
+]);
 
 const blockchainSyncSchema = z.object({
   legalBasisCode: legalBasisCodeSchema,
@@ -135,12 +155,12 @@ const blockchainSyncSchema = z.object({
   signerWalletAddress: z.string().min(1),
   signerChainId: z.coerce.number().int().positive(),
   signingMessage: z.string().min(3),
-  signature: z.string().min(20)
+  signature: z.string().min(20),
 });
 
 const requiredNoteSchema = z.object({
   legalBasisCode: legalBasisCodeSchema,
-  note: z.string().min(3)
+  note: z.string().min(3),
 });
 
 const supplementRequestSchema = z
@@ -148,7 +168,7 @@ const supplementRequestSchema = z
     legalBasisCode: legalBasisCodeSchema,
     note: z.string().min(3),
     missingItems: z.array(z.string().min(2)).min(1),
-    deadlineAt: z.string().datetime()
+    deadlineAt: z.string().datetime(),
   })
   .superRefine((value, ctx) => {
     const deadline = new Date(value.deadlineAt);
@@ -156,7 +176,7 @@ const supplementRequestSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["deadlineAt"],
-        message: "deadlineAt must be a valid future datetime"
+        message: "deadlineAt must be a valid future datetime",
       });
     }
   });
@@ -167,7 +187,7 @@ const createDocumentVersionSchema = z.object({
   fileAssetId: z.string().optional(),
   cid: z.string().optional(),
   hash: z.string().optional(),
-  note: z.string().optional()
+  note: z.string().optional(),
 });
 
 const createPaymentObligationSchema = z.object({
@@ -176,7 +196,7 @@ const createPaymentObligationSchema = z.object({
     "LAND_FINANCIAL_OBLIGATION",
     "REGISTRATION_FEE",
     "LATE_FEE",
-    "OTHER_LEGAL_FEE"
+    "OTHER_LEGAL_FEE",
   ]),
   legalBasisCode: legalBasisCodeSchema,
   referenceNo: z.string().min(3).optional(),
@@ -184,13 +204,13 @@ const createPaymentObligationSchema = z.object({
   receiptRef: z.string().min(3).optional(),
   receiptFileId: z.string().min(3).optional(),
   amount: z.coerce.number().positive().optional(),
-  note: z.string().min(3).optional()
+  note: z.string().min(3).optional(),
 });
 
 const updatePaymentObligationSchema = z.object({
   status: z.enum(["PENDING", "CONFIRMED", "CANCELLED"]),
   legalBasisCode: legalBasisCodeSchema,
-  note: z.string().min(3).optional()
+  note: z.string().min(3).optional(),
 });
 
 const allAuthenticatedRoles = [...AUTH_ROLES.citizen, ...AUTH_ROLES.officers];
@@ -200,7 +220,7 @@ const statusMutationRoles = [
   "LAND_REGISTRY_OFFICER",
   "APPROVAL_AUTHORITY",
   "TAX_OFFICER",
-  "ADMIN"
+  "ADMIN",
 ] as const;
 
 const ROLE_ALLOWED_TARGET_STATUS: Record<UserRole, RegistrationStatus[]> = {
@@ -215,7 +235,7 @@ const ROLE_ALLOWED_TARGET_STATUS: Record<UserRole, RegistrationStatus[]> = {
     "CHO_KY_CAP",
     "DA_CAP_NHAT_HO_SO_DIA_CHINH",
     "CAN_BO_SUNG",
-    "TU_CHOI"
+    "TU_CHOI",
   ],
   APPROVAL_AUTHORITY: ["DA_KY_CAP", "TU_CHOI", "DA_CAP"],
   TAX_OFFICER: ["DA_HOAN_THANH_NGHIA_VU_TAI_CHINH", "CAN_BO_SUNG"],
@@ -238,33 +258,57 @@ const ROLE_ALLOWED_TARGET_STATUS: Record<UserRole, RegistrationStatus[]> = {
     "DA_CAP",
     "DA_TRA_KET_QUA",
     "HUY_HO_SO",
-    "TU_CHOI"
-  ]
+    "TU_CHOI",
+  ],
 };
 
-const STATUS_TRANSITION_GRAPH: Partial<Record<RegistrationStatus, RegistrationStatus[]>> = {
+const STATUS_TRANSITION_GRAPH: Partial<
+  Record<RegistrationStatus, RegistrationStatus[]>
+> = {
   MOI_TAO: ["CHO_TIEP_NHAN"],
   CHO_TIEP_NHAN: ["DA_TIEP_NHAN", "CAN_BO_SUNG", "TU_CHOI"],
   DA_TIEP_NHAN: ["CHO_XAC_NHAN_CAP_XA", "DA_XAC_NHAN_CAP_XA", "CAN_BO_SUNG"],
   CHO_XAC_NHAN_CAP_XA: ["DA_XAC_NHAN_CAP_XA", "CAN_BO_SUNG"],
-  DA_XAC_NHAN_CAP_XA: ["DANG_THAM_DINH_VPDKDD", "CHO_THUE", "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH", "CAN_BO_SUNG"],
-  DANG_THAM_DINH_VPDKDD: ["CHO_THUE", "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH", "CHO_KY_CAP", "CAN_BO_SUNG", "TU_CHOI"],
+  DA_XAC_NHAN_CAP_XA: [
+    "DANG_THAM_DINH_VPDKDD",
+    "CHO_THUE",
+    "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH",
+    "CAN_BO_SUNG",
+  ],
+  DANG_THAM_DINH_VPDKDD: [
+    "CHO_THUE",
+    "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH",
+    "CHO_KY_CAP",
+    "CAN_BO_SUNG",
+    "TU_CHOI",
+  ],
   CHO_THUE: ["CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH"],
-  CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH: ["DA_HOAN_THANH_NGHIA_VU_TAI_CHINH", "CAN_BO_SUNG"],
+  CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH: [
+    "DA_HOAN_THANH_NGHIA_VU_TAI_CHINH",
+    "CAN_BO_SUNG",
+  ],
   DA_HOAN_THANH_NGHIA_VU_TAI_CHINH: ["CHO_KY_CAP"],
   CHO_KY_CAP: ["DA_KY_CAP", "TU_CHOI", "DA_CAP"],
   DA_KY_CAP: ["DA_CAP_NHAT_HO_SO_DIA_CHINH", "DA_CAP"],
-  DA_CAP_NHAT_HO_SO_DIA_CHINH: ["DA_GHI_BLOCKCHAIN", "DA_CAP", "DA_TRA_KET_QUA"],
+  DA_CAP_NHAT_HO_SO_DIA_CHINH: [
+    "DA_GHI_BLOCKCHAIN",
+    "DA_CAP",
+    "DA_TRA_KET_QUA",
+  ],
   DA_CAP: ["DA_GHI_BLOCKCHAIN", "DA_TRA_KET_QUA"],
-  DA_GHI_BLOCKCHAIN: ["DA_TRA_KET_QUA"]
+  DA_GHI_BLOCKCHAIN: ["DA_TRA_KET_QUA"],
 };
 
 function isCitizenRole(role: string) {
-  return AUTH_ROLES.citizen.includes(role as (typeof AUTH_ROLES.citizen)[number]);
+  return AUTH_ROLES.citizen.includes(
+    role as (typeof AUTH_ROLES.citizen)[number],
+  );
 }
 
 function resolveExpectedBlockchainNetwork() {
-  const networkRaw = (process.env.BLOCKCHAIN_NETWORK ?? "SEPOLIA").trim().toUpperCase();
+  const networkRaw = (process.env.BLOCKCHAIN_NETWORK ?? "SEPOLIA")
+    .trim()
+    .toUpperCase();
   return (Object.values(BlockchainNetwork) as string[]).includes(networkRaw)
     ? (networkRaw as BlockchainNetwork)
     : BlockchainNetwork.SEPOLIA;
@@ -283,7 +327,9 @@ function resolveExplorerBaseUrl(network: BlockchainNetwork) {
   return "";
 }
 
-function classifyBlockchainErrorStatus(errorMessage: string): BlockchainTxLifecycleStatus {
+function classifyBlockchainErrorStatus(
+  errorMessage: string,
+): BlockchainTxLifecycleStatus {
   const normalized = errorMessage.toLowerCase();
   if (
     normalized.includes("user denied") ||
@@ -301,16 +347,22 @@ function hashSignature(signature: string) {
 
 function resolveBlockchainSyncMode(
   actorRole: UserRole,
-  requestedMode: z.infer<typeof blockchainSyncModeSchema> | undefined
+  requestedMode: z.infer<typeof blockchainSyncModeSchema> | undefined,
 ) {
-  const roleDefault = isCitizenRole(actorRole) ? "CITIZEN_DIRECT_SIGN" : "OFFICER_SERVICE_WALLET";
+  const roleDefault = isCitizenRole(actorRole)
+    ? "CITIZEN_DIRECT_SIGN"
+    : "OFFICER_SERVICE_WALLET";
   const syncMode = requestedMode ?? roleDefault;
 
   if (syncMode === "CITIZEN_DIRECT_SIGN" && !isCitizenRole(actorRole)) {
-    throw forbiddenError("OWNERSHIP_DENIED: Chỉ công dân/doanh nghiệp được dùng chế độ CITIZEN_DIRECT_SIGN");
+    throw forbiddenError(
+      "OWNERSHIP_DENIED: Chỉ công dân/doanh nghiệp được dùng chế độ CITIZEN_DIRECT_SIGN",
+    );
   }
   if (syncMode === "OFFICER_SERVICE_WALLET" && isCitizenRole(actorRole)) {
-    throw forbiddenError("walletAuthMissing: Công dân/doanh nghiệp không được dùng chế độ OFFICER_SERVICE_WALLET");
+    throw forbiddenError(
+      "walletAuthMissing: Công dân/doanh nghiệp không được dùng chế độ OFFICER_SERVICE_WALLET",
+    );
   }
 
   return syncMode;
@@ -322,7 +374,7 @@ async function ensureServiceWalletAuthorizationForSync(
     walletAuthorizationId: string;
     signerWalletAddress: string;
     signerChainId: number;
-  }
+  },
 ) {
   const expectedNetwork = resolveExpectedBlockchainNetwork();
   const expectedChainId = resolveExpectedBlockchainChainId();
@@ -336,10 +388,10 @@ async function ensureServiceWalletAuthorizationForSync(
           id: true,
           address: true,
           network: true,
-          status: true
-        }
-      }
-    }
+          status: true,
+        },
+      },
+    },
   });
 
   if (!authorization) {
@@ -347,39 +399,59 @@ async function ensureServiceWalletAuthorizationForSync(
   }
 
   if (authorization.status !== "ACTIVE") {
-    throw forbiddenError("walletAuthMissing: Quyền ví công vụ không còn hiệu lực");
+    throw forbiddenError(
+      "walletAuthMissing: Quyền ví công vụ không còn hiệu lực",
+    );
   }
 
   if (authorization.effectiveTo && authorization.effectiveTo <= now) {
     throw forbiddenError("walletAuthMissing: Quyền ví công vụ đã hết hạn");
   }
 
-  if (authorization.network !== expectedNetwork || authorization.chainId !== expectedChainId) {
-    throw forbiddenError("walletAuthMissing: Quyền ví công vụ không khớp network/chainId hệ thống");
+  if (
+    authorization.network !== expectedNetwork ||
+    authorization.chainId !== expectedChainId
+  ) {
+    throw forbiddenError(
+      "walletAuthMissing: Quyền ví công vụ không khớp network/chainId hệ thống",
+    );
   }
 
   if (input.signerChainId !== expectedChainId) {
     throw forbiddenError(
-      `walletAuthMissing: signerChainId không hợp lệ. current=${input.signerChainId} expected=${expectedChainId}`
+      `walletAuthMissing: signerChainId không hợp lệ. current=${input.signerChainId} expected=${expectedChainId}`,
     );
   }
 
-  const normalizedSignerAddress = ethers.getAddress(input.signerWalletAddress.trim());
-  if (normalizedSignerAddress !== ethers.getAddress(authorization.wallet.address)) {
-    throw forbiddenError("walletAuthMissing: Ví ký không trùng với ví công vụ được cấp quyền");
+  const normalizedSignerAddress = ethers.getAddress(
+    input.signerWalletAddress.trim(),
+  );
+  if (
+    normalizedSignerAddress !== ethers.getAddress(authorization.wallet.address)
+  ) {
+    throw forbiddenError(
+      "walletAuthMissing: Ví ký không trùng với ví công vụ được cấp quyền",
+    );
   }
 
-  if (authorization.wallet.network !== expectedNetwork || authorization.wallet.status !== "VERIFIED") {
-    throw forbiddenError("walletAuthMissing: Ví công vụ chưa xác minh hoặc không đúng network");
+  if (
+    authorization.wallet.network !== expectedNetwork ||
+    authorization.wallet.status !== "VERIFIED"
+  ) {
+    throw forbiddenError(
+      "walletAuthMissing: Ví công vụ chưa xác minh hoặc không đúng network",
+    );
   }
 
   if (authorization.userId !== actor.userId) {
-    throw forbiddenError("walletAuthMissing: Bạn không sở hữu quyền ví công vụ này");
+    throw forbiddenError(
+      "walletAuthMissing: Bạn không sở hữu quyền ví công vụ này",
+    );
   }
 
   if (authorization.roleScope !== actor.role) {
     throw forbiddenError(
-      `walletAuthMissing: Vai trò ${actor.role} không khớp roleScope ${authorization.roleScope} của ví công vụ`
+      `walletAuthMissing: Vai trò ${actor.role} không khớp roleScope ${authorization.roleScope} của ví công vụ`,
     );
   }
 
@@ -387,7 +459,7 @@ async function ensureServiceWalletAuthorizationForSync(
     authorization,
     expectedNetwork,
     expectedChainId,
-    normalizedSignerAddress
+    normalizedSignerAddress,
   };
 }
 
@@ -397,53 +469,63 @@ async function ensureCitizenWalletAuthorizationForSync(
   input: {
     signerWalletAddress: string;
     signerChainId: number;
-  }
+  },
 ) {
   const expectedNetwork = resolveExpectedBlockchainNetwork();
   const expectedChainId = resolveExpectedBlockchainChainId();
 
   if (actor.userId !== registrationApplicantId) {
-    throw forbiddenError("OWNERSHIP_DENIED: Bạn không sở hữu hồ sơ đăng ký này");
+    throw forbiddenError(
+      "OWNERSHIP_DENIED: Bạn không sở hữu hồ sơ đăng ký này",
+    );
   }
 
   if (input.signerChainId !== expectedChainId) {
     throw forbiddenError(
-      `WRONG_NETWORK: signerChainId không hợp lệ. current=${input.signerChainId} expected=${expectedChainId}`
+      `WRONG_NETWORK: signerChainId không hợp lệ. current=${input.signerChainId} expected=${expectedChainId}`,
     );
   }
 
-  const normalizedSignerAddress = ethers.getAddress(input.signerWalletAddress.trim());
+  const normalizedSignerAddress = ethers.getAddress(
+    input.signerWalletAddress.trim(),
+  );
   const defaultWallet = await prisma.walletAccount.findFirst({
     where: {
       userId: actor.userId,
       status: "VERIFIED",
       isDefault: true,
-      network: expectedNetwork
+      network: expectedNetwork,
     },
     select: {
       id: true,
       address: true,
-      network: true
-    }
+      network: true,
+    },
   });
 
   if (!defaultWallet) {
-    throw forbiddenError("WALLET_MISMATCH: Chưa có ví mặc định đã xác minh trên mạng blockchain hiện tại");
+    throw forbiddenError(
+      "WALLET_MISMATCH: Chưa có ví mặc định đã xác minh trên mạng blockchain hiện tại",
+    );
   }
 
   if (defaultWallet.network !== expectedNetwork) {
-    throw forbiddenError("WRONG_NETWORK: Ví mặc định không đúng network hệ thống");
+    throw forbiddenError(
+      "WRONG_NETWORK: Ví mặc định không đúng network hệ thống",
+    );
   }
 
   if (ethers.getAddress(defaultWallet.address) !== normalizedSignerAddress) {
-    throw forbiddenError("WALLET_MISMATCH: Ví ký không trùng với ví mặc định đã xác minh");
+    throw forbiddenError(
+      "WALLET_MISMATCH: Ví ký không trùng với ví mặc định đã xác minh",
+    );
   }
 
   return {
     expectedNetwork,
     expectedChainId,
     normalizedSignerAddress,
-    defaultWallet
+    defaultWallet,
   };
 }
 
@@ -456,7 +538,9 @@ function appendNoteHistory(value: Prisma.JsonValue | null, note: string) {
   return [...parseNoteHistory(value), note];
 }
 
-function readJsonObject(value: Prisma.JsonValue | null): Record<string, unknown> {
+function readJsonObject(
+  value: Prisma.JsonValue | null,
+): Record<string, unknown> {
   if (!value || Array.isArray(value) || typeof value !== "object") return {};
   return value as Record<string, unknown>;
 }
@@ -470,42 +554,56 @@ function toNotificationMessage(status: RegistrationStatus, note: string) {
   return `Hồ sơ đã được cập nhật sang trạng thái ${status}: ${note}`;
 }
 
-function assertTransitionAllowed(currentStatus: RegistrationStatus, nextStatus: RegistrationStatus, actorRole: UserRole) {
+function assertTransitionAllowed(
+  currentStatus: RegistrationStatus,
+  nextStatus: RegistrationStatus,
+  actorRole: UserRole,
+) {
   if (nextStatus === "DA_GHI_BLOCKCHAIN") {
-    throw conflictError("Không được chuyển trực tiếp sang DA_GHI_BLOCKCHAIN. Hãy dùng endpoint blockchain-sync.");
+    throw conflictError(
+      "Không được chuyển trực tiếp sang DA_GHI_BLOCKCHAIN. Hãy dùng endpoint blockchain-sync.",
+    );
   }
 
   const allowedNext = STATUS_TRANSITION_GRAPH[currentStatus] ?? [];
   if (!allowedNext.includes(nextStatus)) {
-    throw badRequestError(`Không thể chuyển trạng thái từ ${currentStatus} sang ${nextStatus}`);
+    throw badRequestError(
+      `Không thể chuyển trạng thái từ ${currentStatus} sang ${nextStatus}`,
+    );
   }
   if (actorRole === "ADMIN") return;
 
   const allowedByRole = ROLE_ALLOWED_TARGET_STATUS[actorRole] ?? [];
   if (!allowedByRole.includes(nextStatus)) {
-    throw forbiddenError(`Vai trò ${actorRole} không được phép chuyển sang trạng thái ${nextStatus}`);
+    throw forbiddenError(
+      `Vai trò ${actorRole} không được phép chuyển sang trạng thái ${nextStatus}`,
+    );
   }
 }
 
 async function ensureProcedureAndAuthority(
   registration: { procedureCode: string | null },
-  actorRole: UserRole
+  actorRole: UserRole,
 ) {
   if (!registration.procedureCode) {
     throw badRequestError("Hồ sơ chưa gắn procedureCode hợp lệ");
   }
 
   const procedure = await prisma.legalProcedure.findUnique({
-    where: { procedureCode: registration.procedureCode }
+    where: { procedureCode: registration.procedureCode },
   });
   if (!procedure || !procedure.isActive) {
-    throw badRequestError("Thủ tục pháp lý không tồn tại hoặc không còn hiệu lực");
+    throw badRequestError(
+      "Thủ tục pháp lý không tồn tại hoặc không còn hiệu lực",
+    );
   }
 
   if (actorRole === "ADMIN" || isCitizenRole(actorRole)) return procedure;
   const allowedActors = readAuthorityActors(procedure.authorityActors);
   if (!allowedActors.includes(actorRole)) {
-    throw forbiddenError(`Vai trò ${actorRole} không thuộc authority matrix của thủ tục ${procedure.procedureCode}`);
+    throw forbiddenError(
+      `Vai trò ${actorRole} không thuộc authority matrix của thủ tục ${procedure.procedureCode}`,
+    );
   }
   return procedure;
 }
@@ -514,7 +612,7 @@ async function writeRegistrationNotificationLog(
   registrationId: string,
   actor: AuthenticatedRequest["user"],
   status: RegistrationStatus,
-  note: string
+  note: string,
 ) {
   await writeAuditLog({
     actorId: actor.userId,
@@ -524,8 +622,8 @@ async function writeRegistrationNotificationLog(
     payload: {
       status,
       note,
-      message: toNotificationMessage(status, note)
-    }
+      message: toNotificationMessage(status, note),
+    },
   });
 }
 
@@ -540,26 +638,35 @@ function generateRegistrationCode() {
 async function findRegistrationByParam(input: string) {
   return prisma.registration.findFirst({
     where: {
-      OR: [{ id: input }, { code: input }]
+      OR: [{ id: input }, { code: input }],
     },
-    include: { files: true, procedure: true }
+    include: { files: true, procedure: true },
   });
 }
 
 async function ensureRegistrationReadable(
   record: { applicantId: string },
   user: AuthenticatedRequest["user"],
-  message = "Bạn không có quyền xem hồ sơ này"
+  message = "Bạn không có quyền xem hồ sơ này",
 ) {
   if (isCitizenRole(user.role) && record.applicantId !== user.userId) {
     throw forbiddenError(message);
   }
 }
 
-async function ensureEvidenceFileBelongsRegistration(registrationId: string, fileId: string) {
+async function ensureEvidenceFileBelongsRegistration(
+  registrationId: string,
+  fileId: string,
+) {
   const file = await prisma.fileAsset.findUnique({
     where: { id: fileId },
-    select: { id: true, registrationId: true, documentType: true, cid: true, hash: true }
+    select: {
+      id: true,
+      registrationId: true,
+      documentType: true,
+      cid: true,
+      hash: true,
+    },
   });
   if (!file || file.registrationId !== registrationId) {
     throw badRequestError("evidenceFileId không thuộc hồ sơ đăng ký");
@@ -578,11 +685,11 @@ async function createDocumentVersion(
     fileAssetId?: string | null;
     createdById?: string | null;
     status?: DocumentVersionStatus;
-  }
+  },
 ) {
   const aggregate = await prisma.registrationDocumentVersion.aggregate({
     where: { registrationId },
-    _max: { versionNumber: true }
+    _max: { versionNumber: true },
   });
   const nextVersionNumber = (aggregate._max.versionNumber ?? 0) + 1;
 
@@ -597,21 +704,24 @@ async function createDocumentVersion(
       note: data.note ?? null,
       fileAssetId: data.fileAssetId ?? null,
       createdById: data.createdById ?? null,
-      status: data.status ?? "ACTIVE"
-    }
+      status: data.status ?? "ACTIVE",
+    },
   });
 }
 
-async function ensureActiveDocumentVersions(registrationId: string, actorId: string) {
+async function ensureActiveDocumentVersions(
+  registrationId: string,
+  actorId: string,
+) {
   let activeVersions = await prisma.registrationDocumentVersion.findMany({
     where: { registrationId, status: "ACTIVE" },
-    orderBy: { versionNumber: "asc" }
+    orderBy: { versionNumber: "asc" },
   });
 
   if (activeVersions.length === 0) {
     const files = await prisma.fileAsset.findMany({
       where: { registrationId },
-      orderBy: { createdAt: "asc" }
+      orderBy: { createdAt: "asc" },
     });
     for (const file of files) {
       await createDocumentVersion(registrationId, {
@@ -621,12 +731,12 @@ async function ensureActiveDocumentVersions(registrationId: string, actorId: str
         hash: file.hash,
         fileAssetId: file.id,
         note: "Khởi tạo version tự động từ file đã tải",
-        createdById: actorId
+        createdById: actorId,
       });
     }
     activeVersions = await prisma.registrationDocumentVersion.findMany({
       where: { registrationId, status: "ACTIVE" },
-      orderBy: { versionNumber: "asc" }
+      orderBy: { versionNumber: "asc" },
     });
   }
 
@@ -638,11 +748,11 @@ async function createSubmissionSnapshot(
   actor: AuthenticatedRequest["user"],
   legalBasisCode: string,
   procedureCode: string,
-  activeVersionIds: string[]
+  activeVersionIds: string[],
 ) {
   const aggregate = await prisma.registrationSubmitSnapshot.aggregate({
     where: { registrationId },
-    _max: { snapshotNo: true }
+    _max: { snapshotNo: true },
   });
   const snapshotNo = (aggregate._max.snapshotNo ?? 0) + 1;
 
@@ -654,8 +764,8 @@ async function createSubmissionSnapshot(
       legalBasisCode,
       authorityActor: actor.role,
       documentVersionIds: activeVersionIds,
-      submittedById: actor.userId
-    }
+      submittedById: actor.userId,
+    },
   });
 }
 
@@ -685,7 +795,7 @@ function toDocumentVersionItem(item: {
     fileAssetId: item.fileAssetId,
     createdById: item.createdById,
     createdAt: item.createdAt,
-    updatedAt: item.updatedAt
+    updatedAt: item.updatedAt,
   };
 }
 
@@ -739,7 +849,7 @@ function toPaymentObligationItem(item: {
     evidenceHash: item.evidenceHash,
     evidenceRecordedAt: item.evidenceRecordedAt,
     createdAt: item.createdAt,
-    updatedAt: item.updatedAt
+    updatedAt: item.updatedAt,
   };
 }
 
@@ -802,13 +912,13 @@ function toRegistrationItem(item: {
       mapSheetNumber: item.mapSheetNumber,
       area: Number(item.area),
       landUsePurpose: item.landUsePurpose,
-      address: item.address
+      address: item.address,
     },
     ownerInfo: {
       ownerType: item.ownerType,
       fullName: item.ownerFullName,
       identityNumber: item.ownerIdentityNumber,
-      address: item.ownerAddress
+      address: item.ownerAddress,
     },
     notes,
     files:
@@ -818,10 +928,10 @@ function toRegistrationItem(item: {
         storageStatus: file.storageStatus,
         originalName: file.originalName,
         cid: file.cid,
-        hash: file.hash
+        hash: file.hash,
       })) ?? [],
     createdAt: item.createdAt,
-    updatedAt: item.updatedAt
+    updatedAt: item.updatedAt,
   };
 }
 
@@ -831,11 +941,11 @@ async function updateStatus(
   note: string,
   actor: AuthenticatedRequest["user"],
   legalBasisCode: string,
-  payload: Record<string, unknown> = {}
+  payload: Record<string, unknown> = {},
 ) {
   const registration = await prisma.registration.findUnique({
     where: { id: registrationId },
-    include: { procedure: true }
+    include: { procedure: true },
   });
   if (!registration) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
 
@@ -848,9 +958,11 @@ async function updateStatus(
       status,
       legalBasisCode,
       noteHistory: appendNoteHistory(registration.noteHistory, note),
-      ...(status === "DA_CAP_NHAT_HO_SO_DIA_CHINH" ? { cadastralUpdatedAt: new Date() } : {})
+      ...(status === "DA_CAP_NHAT_HO_SO_DIA_CHINH"
+        ? { cadastralUpdatedAt: new Date() }
+        : {}),
     },
-    include: { files: true }
+    include: { files: true },
   });
 
   await writeAuditLog({
@@ -863,8 +975,8 @@ async function updateStatus(
       status,
       legalBasisCode,
       note,
-      ...payload
-    }
+      ...payload,
+    },
   });
 
   await writeRegistrationNotificationLog(updated.id, actor, status, note);
@@ -880,7 +992,8 @@ registrationRouter.get(
   requireRoles(allAuthenticatedRoles),
   asyncHandler(async (req, res) => {
     const parsed = listSchema.safeParse(req.query);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
     const { page, pageSize, status, keyword, procedureCode } = parsed.data;
@@ -895,10 +1008,10 @@ registrationRouter.get(
               { ownerFullName: { contains: keyword } },
               { parcelNumber: { contains: keyword } },
               { mapSheetNumber: { contains: keyword } },
-              { address: { contains: keyword } }
-            ]
+              { address: { contains: keyword } },
+            ],
           }
-        : {})
+        : {}),
     };
 
     const [items, total] = await Promise.all([
@@ -907,13 +1020,16 @@ registrationRouter.get(
         include: { files: true },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
-        take: pageSize
+        take: pageSize,
       }),
-      prisma.registration.count({ where })
+      prisma.registration.count({ where }),
     ]);
 
-    return ok(res, { items: items.map((item) => toRegistrationItem(item)), total });
-  })
+    return ok(res, {
+      items: items.map((item) => toRegistrationItem(item)),
+      total,
+    });
+  }),
 );
 
 registrationRouter.post(
@@ -921,22 +1037,29 @@ registrationRouter.post(
   requireRoles(AUTH_ROLES.citizen),
   asyncHandler(async (req, res) => {
     const parsed = createRegistrationSchema.safeParse(req.body);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
-    const requestedProcedureCode = parsed.data.procedureCode?.trim().toUpperCase();
-    const procedureCode = requestedProcedureCode || DEFAULT_REGISTRATION_PROCEDURE_CODE;
-    const procedure = await prisma.legalProcedure.findUnique({ where: { procedureCode } });
+    const requestedProcedureCode = parsed.data.procedureCode
+      ?.trim()
+      .toUpperCase();
+    const procedureCode =
+      requestedProcedureCode || DEFAULT_REGISTRATION_PROCEDURE_CODE;
+    const procedure = await prisma.legalProcedure.findUnique({
+      where: { procedureCode },
+    });
     if (!procedure || !procedure.isActive) {
       if (!requestedProcedureCode) {
         throw badRequestError(
-          `Thiếu procedureCode và thủ tục mặc định ${DEFAULT_REGISTRATION_PROCEDURE_CODE} không hợp lệ hoặc đã ngừng áp dụng`
+          `Thiếu procedureCode và thủ tục mặc định ${DEFAULT_REGISTRATION_PROCEDURE_CODE} không hợp lệ hoặc đã ngừng áp dụng`,
         );
       }
       throw badRequestError("procedureCode không hợp lệ hoặc đã ngừng áp dụng");
     }
 
-    const inputFileIds = parsed.data.attachedFileIds ?? parsed.data.fileIds ?? [];
+    const inputFileIds =
+      parsed.data.attachedFileIds ?? parsed.data.fileIds ?? [];
     const code = generateRegistrationCode();
     const initialNote = "Hồ sơ được khởi tạo trên hệ thống";
 
@@ -961,11 +1084,11 @@ registrationRouter.post(
         files:
           inputFileIds.length > 0
             ? {
-                connect: inputFileIds.map((id) => ({ id }))
+                connect: inputFileIds.map((id) => ({ id })),
               }
-            : undefined
+            : undefined,
       },
-      include: { files: true }
+      include: { files: true },
     });
 
     for (const file of record.files) {
@@ -976,7 +1099,7 @@ registrationRouter.post(
         hash: file.hash,
         fileAssetId: file.id,
         createdById: user.userId,
-        note: "Phiên bản tài liệu khởi tạo theo danh sách đính kèm"
+        note: "Phiên bản tài liệu khởi tạo theo danh sách đính kèm",
       });
     }
 
@@ -989,8 +1112,8 @@ registrationRouter.post(
         registrationCode: record.code,
         procedureCode: record.procedureCode,
         provinceCode: record.provinceCode,
-        communeName: record.communeName
-      }
+        communeName: record.communeName,
+      },
     });
 
     return created(
@@ -999,11 +1122,11 @@ registrationRouter.post(
         registrationId: record.id,
         registrationCode: record.code,
         status: record.status,
-        registration: toRegistrationItem(record)
+        registration: toRegistrationItem(record),
       },
-      "Đã tạo hồ sơ đăng ký đất đai lần đầu"
+      "Đã tạo hồ sơ đăng ký đất đai lần đầu",
     );
-  })
+  }),
 );
 
 registrationRouter.get(
@@ -1016,7 +1139,7 @@ registrationRouter.get(
 
     await ensureRegistrationReadable(record, user);
     return ok(res, toRegistrationItem(record));
-  })
+  }),
 );
 
 registrationRouter.get(
@@ -1026,16 +1149,20 @@ registrationRouter.get(
     const user = (req as AuthenticatedRequest).user;
     const record = await findRegistrationByParam(String(req.params.id));
     if (!record) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
-    await ensureRegistrationReadable(record, user, "Bạn không có quyền xem thông báo của hồ sơ này");
+    await ensureRegistrationReadable(
+      record,
+      user,
+      "Bạn không có quyền xem thông báo của hồ sơ này",
+    );
 
     const notificationLogs = await prisma.auditLog.findMany({
       where: {
         entityType: "REGISTRATION",
         entityId: record.id,
-        action: "REGISTRATION_NOTIFICATION_SENT"
+        action: "REGISTRATION_NOTIFICATION_SENT",
       },
       orderBy: { createdAt: "desc" },
-      take: 100
+      take: 100,
     });
 
     const items = notificationLogs.map((entry) => {
@@ -1044,13 +1171,16 @@ registrationRouter.get(
         id: entry.id,
         status: typeof payload.status === "string" ? payload.status : null,
         note: typeof payload.note === "string" ? payload.note : null,
-        message: typeof payload.message === "string" ? payload.message : "Thông báo cập nhật hồ sơ",
-        createdAt: entry.createdAt
+        message:
+          typeof payload.message === "string"
+            ? payload.message
+            : "Thông báo cập nhật hồ sơ",
+        createdAt: entry.createdAt,
       };
     });
 
     return ok(res, { items, total: items.length });
-  })
+  }),
 );
 
 registrationRouter.get(
@@ -1064,23 +1194,37 @@ registrationRouter.get(
 
     const items = await prisma.registrationDocumentVersion.findMany({
       where: { registrationId: record.id },
-      orderBy: [{ versionNumber: "desc" }]
+      orderBy: [{ versionNumber: "desc" }],
     });
-    return ok(res, { items: items.map((item) => toDocumentVersionItem(item)), total: items.length });
-  })
+    return ok(res, {
+      items: items.map((item) => toDocumentVersionItem(item)),
+      total: items.length,
+    });
+  }),
 );
 
 registrationRouter.post(
   "/:id/document-versions",
-  requireRoles([...AUTH_ROLES.citizen, "RECEPTION_OFFICER", "COMMUNE_OFFICER", "LAND_REGISTRY_OFFICER", "ADMIN"]),
+  requireRoles([
+    ...AUTH_ROLES.citizen,
+    "RECEPTION_OFFICER",
+    "COMMUNE_OFFICER",
+    "LAND_REGISTRY_OFFICER",
+    "ADMIN",
+  ]),
   asyncHandler(async (req, res) => {
     const parsed = createDocumentVersionSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
     const record = await findRegistrationByParam(String(req.params.id));
     if (!record) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
-    await ensureRegistrationReadable(record, user, "Bạn không có quyền cập nhật tài liệu hồ sơ này");
+    await ensureRegistrationReadable(
+      record,
+      user,
+      "Bạn không có quyền cập nhật tài liệu hồ sơ này",
+    );
 
     let fileRef: {
       id: string;
@@ -1090,7 +1234,9 @@ registrationRouter.post(
       hash: string | null;
     } | null = null;
     if (parsed.data.fileAssetId) {
-      const file = await prisma.fileAsset.findUnique({ where: { id: parsed.data.fileAssetId } });
+      const file = await prisma.fileAsset.findUnique({
+        where: { id: parsed.data.fileAssetId },
+      });
       if (!file || file.registrationId !== record.id) {
         throw badRequestError("fileAssetId không thuộc hồ sơ đăng ký");
       }
@@ -1101,12 +1247,12 @@ registrationRouter.post(
       where: {
         registrationId: record.id,
         documentType: parsed.data.documentType,
-        status: "ACTIVE"
+        status: "ACTIVE",
       },
       data: {
         status: "REPLACED",
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     const createdVersion = await createDocumentVersion(record.id, {
@@ -1116,7 +1262,7 @@ registrationRouter.post(
       hash: parsed.data.hash ?? fileRef?.hash ?? null,
       note: parsed.data.note,
       fileAssetId: parsed.data.fileAssetId ?? null,
-      createdById: user.userId
+      createdById: user.userId,
     });
 
     await writeAuditLog({
@@ -1127,12 +1273,16 @@ registrationRouter.post(
       payload: {
         versionId: createdVersion.id,
         versionNumber: createdVersion.versionNumber,
-        documentType: createdVersion.documentType
-      }
+        documentType: createdVersion.documentType,
+      },
     });
 
-    return created(res, toDocumentVersionItem(createdVersion), "Đã tạo phiên bản tài liệu mới");
-  })
+    return created(
+      res,
+      toDocumentVersionItem(createdVersion),
+      "Đã tạo phiên bản tài liệu mới",
+    );
+  }),
 );
 
 registrationRouter.get(
@@ -1146,10 +1296,10 @@ registrationRouter.get(
 
     const items = await prisma.registrationSubmitSnapshot.findMany({
       where: { registrationId: record.id },
-      orderBy: { snapshotNo: "desc" }
+      orderBy: { snapshotNo: "desc" },
     });
     return ok(res, { items, total: items.length });
-  })
+  }),
 );
 
 registrationRouter.get(
@@ -1164,20 +1314,26 @@ registrationRouter.get(
     const [versions, snapshots, statusLogs] = await Promise.all([
       prisma.registrationDocumentVersion.findMany({
         where: { registrationId: record.id },
-        orderBy: { createdAt: "desc" }
+        orderBy: { createdAt: "desc" },
       }),
       prisma.registrationSubmitSnapshot.findMany({
         where: { registrationId: record.id },
-        orderBy: { createdAt: "desc" }
+        orderBy: { createdAt: "desc" },
       }),
       prisma.auditLog.findMany({
         where: {
           entityType: "REGISTRATION",
           entityId: record.id,
-          action: { in: ["REGISTRATION_STATUS_UPDATED", "REGISTRATION_APPROVED", "REGISTRATION_BLOCKCHAIN_SYNCED"] }
+          action: {
+            in: [
+              "REGISTRATION_STATUS_UPDATED",
+              "REGISTRATION_APPROVED",
+              "REGISTRATION_BLOCKCHAIN_SYNCED",
+            ],
+          },
         },
-        orderBy: { createdAt: "desc" }
-      })
+        orderBy: { createdAt: "desc" },
+      }),
     ]);
 
     const versionEvents = versions.map((item) => ({
@@ -1189,8 +1345,8 @@ registrationRouter.get(
         status: item.status,
         documentType: item.documentType,
         cid: item.cid,
-        hash: item.hash
-      }
+        hash: item.hash,
+      },
     }));
 
     const snapshotEvents = snapshots.map((item) => ({
@@ -1201,8 +1357,8 @@ registrationRouter.get(
       detail: {
         legalBasisCode: item.legalBasisCode,
         authorityActor: item.authorityActor,
-        documentVersionIds: item.documentVersionIds
-      }
+        documentVersionIds: item.documentVersionIds,
+      },
     }));
 
     const statusEvents = statusLogs.map((item) => ({
@@ -1210,15 +1366,15 @@ registrationRouter.get(
       type: "STATUS_AUDIT",
       at: item.createdAt,
       title: `Cập nhật xử lý: ${item.action}`,
-      detail: item.payload ?? {}
+      detail: item.payload ?? {},
     }));
 
     const items = [...versionEvents, ...snapshotEvents, ...statusEvents].sort(
-      (a, b) => b.at.getTime() - a.at.getTime()
+      (a, b) => b.at.getTime() - a.at.getTime(),
     );
 
     return ok(res, { items, total: items.length });
-  })
+  }),
 );
 
 registrationRouter.post(
@@ -1226,32 +1382,49 @@ registrationRouter.post(
   requireRoles(AUTH_ROLES.citizen),
   asyncHandler(async (req, res) => {
     const parsed = submitSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
     if (!existing) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
-    if (existing.applicantId !== user.userId) throw forbiddenError("Bạn không có quyền nộp hồ sơ này");
+    if (existing.applicantId !== user.userId)
+      throw forbiddenError("Bạn không có quyền nộp hồ sơ này");
     if (!["MOI_TAO", "CAN_BO_SUNG"].includes(existing.status)) {
-      throw conflictError("Chỉ có thể nộp hồ sơ ở trạng thái mới tạo hoặc cần bổ sung");
+      throw conflictError(
+        "Chỉ có thể nộp hồ sơ ở trạng thái mới tạo hoặc cần bổ sung",
+      );
     }
 
     const procedure = await ensureProcedureAndAuthority(existing, user.role);
-    const activeVersions = await ensureActiveDocumentVersions(existing.id, user.userId);
+    const activeVersions = await ensureActiveDocumentVersions(
+      existing.id,
+      user.userId,
+    );
     const activeVersionIds = activeVersions.map((item) => item.id);
 
     if (activeVersionIds.length > 0) {
       await prisma.registrationDocumentVersion.updateMany({
         where: { id: { in: activeVersionIds } },
-        data: { status: "LOCKED", updatedAt: new Date() }
+        data: { status: "LOCKED", updatedAt: new Date() },
       });
     }
 
-    await createSubmissionSnapshot(existing.id, user, parsed.data.legalBasisCode, procedure.procedureCode, activeVersionIds);
+    await createSubmissionSnapshot(
+      existing.id,
+      user,
+      parsed.data.legalBasisCode,
+      procedure.procedureCode,
+      activeVersionIds,
+    );
 
     if (procedure.requiresTaxStep) {
       const intakeFee = await prisma.registrationPaymentObligation.findFirst({
-        where: { registrationId: existing.id, type: "INTAKE_FEE", status: { in: ["PENDING", "CONFIRMED"] } }
+        where: {
+          registrationId: existing.id,
+          type: "INTAKE_FEE",
+          status: { in: ["PENDING", "CONFIRMED"] },
+        },
       });
       if (!intakeFee) {
         await prisma.registrationPaymentObligation.create({
@@ -1261,8 +1434,8 @@ registrationRouter.post(
             status: "PENDING",
             legalBasisCode: parsed.data.legalBasisCode,
             note: "Tạo nghĩa vụ phí/lệ phí tiếp nhận khi nộp hồ sơ",
-            createdById: user.userId
-          }
+            createdById: user.userId,
+          },
         });
       }
     }
@@ -1275,17 +1448,24 @@ registrationRouter.post(
       parsed.data.legalBasisCode,
       {
         snapshotLocked: true,
-        activeVersionCount: activeVersions.length
-      }
+        activeVersionCount: activeVersions.length,
+      },
     );
 
     await prisma.registration.update({
       where: { id: existing.id },
-      data: { submittedSnapshotLocked: true, legalBasisCode: parsed.data.legalBasisCode }
+      data: {
+        submittedSnapshotLocked: true,
+        legalBasisCode: parsed.data.legalBasisCode,
+      },
     });
 
-    return ok(res, toRegistrationItem(updated), "Đã chuyển hồ sơ sang trạng thái chờ tiếp nhận");
-  })
+    return ok(
+      res,
+      toRegistrationItem(updated),
+      "Đã chuyển hồ sơ sang trạng thái chờ tiếp nhận",
+    );
+  }),
 );
 
 registrationRouter.patch(
@@ -1293,16 +1473,25 @@ registrationRouter.patch(
   requireRoles(statusMutationRoles),
   asyncHandler(async (req, res) => {
     const parsed = patchStatusSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
     if (!existing) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
 
-    const note = parsed.data.reason ?? `Cập nhật trạng thái hồ sơ sang ${parsed.data.status} bởi ${user.role}`;
-    const updated = await updateStatus(existing.id, parsed.data.status, note, user, parsed.data.legalBasisCode);
+    const note =
+      parsed.data.reason ??
+      `Cập nhật trạng thái hồ sơ sang ${parsed.data.status} bởi ${user.role}`;
+    const updated = await updateStatus(
+      existing.id,
+      parsed.data.status,
+      note,
+      user,
+      parsed.data.legalBasisCode,
+    );
     return ok(res, toRegistrationItem(updated), "Đã cập nhật trạng thái hồ sơ");
-  })
+  }),
 );
 
 registrationRouter.post(
@@ -1310,21 +1499,34 @@ registrationRouter.post(
   requireRoles(["COMMUNE_OFFICER", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = communeConfirmSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
     if (!existing) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
-    const evidenceFile = await ensureEvidenceFileBelongsRegistration(existing.id, parsed.data.evidenceFileId);
+    const evidenceFile = await ensureEvidenceFileBelongsRegistration(
+      existing.id,
+      parsed.data.evidenceFileId,
+    );
 
-    const nextStatus: RegistrationStatus = parsed.data.confirmed ? "DA_XAC_NHAN_CAP_XA" : "CAN_BO_SUNG";
+    const nextStatus: RegistrationStatus = parsed.data.confirmed
+      ? "DA_XAC_NHAN_CAP_XA"
+      : "CAN_BO_SUNG";
     const note = parsed.data.notes;
 
-    const updated = await updateStatus(existing.id, nextStatus, note, user, parsed.data.legalBasisCode, {
-      confirmed: parsed.data.confirmed,
-      evidenceFileId: evidenceFile.id,
-      evidenceDocumentType: evidenceFile.documentType
-    });
+    const updated = await updateStatus(
+      existing.id,
+      nextStatus,
+      note,
+      user,
+      parsed.data.legalBasisCode,
+      {
+        confirmed: parsed.data.confirmed,
+        evidenceFileId: evidenceFile.id,
+        evidenceDocumentType: evidenceFile.documentType,
+      },
+    );
 
     await writeAuditLog({
       actorId: user.userId,
@@ -1337,11 +1539,15 @@ registrationRouter.post(
         legalBasisCode: parsed.data.legalBasisCode,
         evidenceFileId: evidenceFile.id,
         evidenceCid: evidenceFile.cid,
-        evidenceHash: evidenceFile.hash
-      }
+        evidenceHash: evidenceFile.hash,
+      },
     });
-    return ok(res, toRegistrationItem(updated), "Đã cập nhật kết quả xác nhận cấp xã");
-  })
+    return ok(
+      res,
+      toRegistrationItem(updated),
+      "Đã cập nhật kết quả xác nhận cấp xã",
+    );
+  }),
 );
 
 registrationRouter.post(
@@ -1349,7 +1555,8 @@ registrationRouter.post(
   requireRoles(["LAND_REGISTRY_OFFICER", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = taxTransferSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
@@ -1362,23 +1569,32 @@ registrationRouter.post(
         status: "PENDING",
         legalBasisCode: parsed.data.legalBasisCode,
         referenceNo: parsed.data.taxReferenceNo,
-        amount: parsed.data.amount ? new Prisma.Decimal(parsed.data.amount) : null,
-        note: parsed.data.notes ?? "Đã chuyển thông tin xác định nghĩa vụ tài chính",
-        createdById: user.userId
-      }
+        amount: parsed.data.amount
+          ? new Prisma.Decimal(parsed.data.amount)
+          : null,
+        note:
+          parsed.data.notes ??
+          "Đã chuyển thông tin xác định nghĩa vụ tài chính",
+        createdById: user.userId,
+      },
     });
 
     const updated = await updateStatus(
       existing.id,
       "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH",
-      parsed.data.notes ?? "Đã chuyển thông tin xác định nghĩa vụ tài chính sang cơ quan thuế",
+      parsed.data.notes ??
+        "Đã chuyển thông tin xác định nghĩa vụ tài chính sang cơ quan thuế",
       user,
       parsed.data.legalBasisCode,
-      { taxReferenceNo: parsed.data.taxReferenceNo }
+      { taxReferenceNo: parsed.data.taxReferenceNo },
     );
 
-    return ok(res, toRegistrationItem(updated), "Đã chuyển thông tin nghĩa vụ tài chính");
-  })
+    return ok(
+      res,
+      toRegistrationItem(updated),
+      "Đã chuyển thông tin nghĩa vụ tài chính",
+    );
+  }),
 );
 
 registrationRouter.post(
@@ -1386,7 +1602,8 @@ registrationRouter.post(
   requireRoles(["APPROVAL_AUTHORITY", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = approveSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
@@ -1400,16 +1617,19 @@ registrationRouter.post(
       parsed.data.legalBasisCode,
       {
         approvalNumber: parsed.data.approvalNumber ?? null,
-        approvalDate: parsed.data.approvalDate ?? null
-      }
+        approvalDate: parsed.data.approvalDate ?? null,
+      },
     );
 
     const updated = await prisma.registration.update({
       where: { id: updatedStatus.id },
       data: {
-        landCode: parsed.data.landCode ?? updatedStatus.landCode ?? `LAND-${Date.now()}`
+        landCode:
+          parsed.data.landCode ??
+          updatedStatus.landCode ??
+          `LAND-${Date.now()}`,
       },
-      include: { files: true }
+      include: { files: true },
     });
 
     await writeAuditLog({
@@ -1421,12 +1641,12 @@ registrationRouter.post(
         approvalNumber: parsed.data.approvalNumber ?? null,
         approvalDate: parsed.data.approvalDate ?? null,
         legalBasisCode: parsed.data.legalBasisCode,
-        landCode: updated.landCode
-      }
+        landCode: updated.landCode,
+      },
     });
 
     return ok(res, toRegistrationItem(updated), "Đã phê duyệt hồ sơ đăng ký");
-  })
+  }),
 );
 
 registrationRouter.post(
@@ -1434,7 +1654,8 @@ registrationRouter.post(
   requireRoles(["LAND_REGISTRY_OFFICER", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = cadastralUpdateSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
@@ -1445,10 +1666,14 @@ registrationRouter.post(
       "DA_CAP_NHAT_HO_SO_DIA_CHINH",
       parsed.data.note ?? "Đã cập nhật hồ sơ địa chính off-chain",
       user,
-      parsed.data.legalBasisCode
+      parsed.data.legalBasisCode,
     );
-    return ok(res, toRegistrationItem(updated), "Đã ghi nhận cập nhật hồ sơ địa chính");
-  })
+    return ok(
+      res,
+      toRegistrationItem(updated),
+      "Đã ghi nhận cập nhật hồ sơ địa chính",
+    );
+  }),
 );
 
 registrationRouter.get(
@@ -1470,18 +1695,18 @@ registrationRouter.get(
         status: "ACTIVE",
         network: expectedNetwork,
         chainId: expectedChainId,
-        OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }]
+        OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
       },
       include: {
         wallet: {
           select: {
             address: true,
             status: true,
-            network: true
-          }
-        }
+            network: true,
+          },
+        },
       },
-      orderBy: { updatedAt: "desc" }
+      orderBy: { updatedAt: "desc" },
     });
 
     return ok(
@@ -1495,27 +1720,35 @@ registrationRouter.get(
           chainId: item.chainId,
           roleScope: item.roleScope,
           effectiveTo: item.effectiveTo,
-          status: item.status
+          status: item.status,
         })),
-        total: items.length
+        total: items.length,
       },
-      "Đã tải danh sách ví công vụ sẵn sàng ký blockchain"
+      "Đã tải danh sách ví công vụ sẵn sàng ký blockchain",
     );
-  })
+  }),
 );
 
 registrationRouter.post(
   "/:id/blockchain-sync",
-  requireRoles(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "CITIZEN", "BUSINESS"]),
+  requireRoles([
+    "LAND_REGISTRY_OFFICER",
+    "APPROVAL_AUTHORITY",
+    "CITIZEN",
+    "BUSINESS",
+  ]),
   asyncHandler(async (req, res) => {
     const parsed = blockchainSyncSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
     if (!existing) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
     if (existing.txHash || existing.tokenId) {
-      throw conflictError("Hồ sơ đã có bản ghi blockchain, không thể đồng bộ lặp lại");
+      throw conflictError(
+        "Hồ sơ đã có bản ghi blockchain, không thể đồng bộ lặp lại",
+      );
     }
 
     if (
@@ -1523,7 +1756,7 @@ registrationRouter.post(
       !(existing.status === "DA_CAP" && existing.cadastralUpdatedAt)
     ) {
       throw conflictError(
-        `STATUS_NOT_READY: Chỉ được đồng bộ blockchain sau khi cập nhật hồ sơ địa chính off-chain hợp lệ. currentStatus=${existing.status}`
+        `STATUS_NOT_READY: Chỉ được đồng bộ blockchain sau khi cập nhật hồ sơ địa chính off-chain hợp lệ. currentStatus=${existing.status}`,
       );
     }
 
@@ -1531,45 +1764,60 @@ registrationRouter.post(
 
     let parsedSignerAddress = "";
     try {
-      parsedSignerAddress = ethers.getAddress(parsed.data.signerWalletAddress.trim());
+      parsedSignerAddress = ethers.getAddress(
+        parsed.data.signerWalletAddress.trim(),
+      );
     } catch {
       throw badRequestError("signerWalletAddress không hợp lệ");
     }
 
     let recoveredAddress = "";
     try {
-      recoveredAddress = ethers.getAddress(ethers.verifyMessage(parsed.data.signingMessage, parsed.data.signature));
+      recoveredAddress = ethers.getAddress(
+        ethers.verifyMessage(parsed.data.signingMessage, parsed.data.signature),
+      );
     } catch {
       throw badRequestError("signature không hợp lệ");
     }
 
     if (recoveredAddress !== parsedSignerAddress) {
-      throw forbiddenError("walletAuthMissing: Chữ ký không khớp signerWalletAddress");
+      throw forbiddenError(
+        "walletAuthMissing: Chữ ký không khớp signerWalletAddress",
+      );
     }
 
     const syncMode = resolveBlockchainSyncMode(user.role, parsed.data.syncMode);
     const expectedNetwork = resolveExpectedBlockchainNetwork();
     const expectedChainId = resolveExpectedBlockchainChainId();
     let normalizedSignerAddress = parsedSignerAddress;
-    let authorization: Awaited<ReturnType<typeof ensureServiceWalletAuthorizationForSync>>["authorization"] | null =
-      null;
+    let authorization:
+      | Awaited<
+          ReturnType<typeof ensureServiceWalletAuthorizationForSync>
+        >["authorization"]
+      | null = null;
 
     if (syncMode === "OFFICER_SERVICE_WALLET") {
       if (!parsed.data.walletAuthorizationId) {
-        throw badRequestError("walletAuthMissing: walletAuthorizationId là bắt buộc cho OFFICER_SERVICE_WALLET");
+        throw badRequestError(
+          "walletAuthMissing: walletAuthorizationId là bắt buộc cho OFFICER_SERVICE_WALLET",
+        );
       }
       const verified = await ensureServiceWalletAuthorizationForSync(user, {
         walletAuthorizationId: parsed.data.walletAuthorizationId,
         signerWalletAddress: parsed.data.signerWalletAddress,
-        signerChainId: parsed.data.signerChainId
+        signerChainId: parsed.data.signerChainId,
       });
       authorization = verified.authorization;
       normalizedSignerAddress = verified.normalizedSignerAddress;
     } else {
-      const verified = await ensureCitizenWalletAuthorizationForSync(user, existing.applicantId, {
-        signerWalletAddress: parsed.data.signerWalletAddress,
-        signerChainId: parsed.data.signerChainId
-      });
+      const verified = await ensureCitizenWalletAuthorizationForSync(
+        user,
+        existing.applicantId,
+        {
+          signerWalletAddress: parsed.data.signerWalletAddress,
+          signerChainId: parsed.data.signerChainId,
+        },
+      );
       normalizedSignerAddress = verified.normalizedSignerAddress;
     }
 
@@ -1578,13 +1826,18 @@ registrationRouter.post(
         userId: existing.applicantId,
         status: "VERIFIED",
         isDefault: true,
-        network: expectedNetwork
-      }
+        network: expectedNetwork,
+      },
     });
     const effectiveLandCode = existing.landCode ?? `LAND-${existing.code}`;
-    const onChainLookup = await lookupRegistrationOnChain(existing.code, effectiveLandCode);
+    const onChainLookup = await lookupRegistrationOnChain(
+      existing.code,
+      effectiveLandCode,
+    );
     if (onChainLookup.registrationTokenId || onChainLookup.landTokenId) {
-      throw conflictError("Bản ghi blockchain đã tồn tại cho hồ sơ hoặc mã thửa đất");
+      throw conflictError(
+        "Bản ghi blockchain đã tồn tại cho hồ sơ hoặc mã thửa đất",
+      );
     }
 
     const txLifecycle = await prisma.blockchainTxLifecycle.create({
@@ -1605,9 +1858,9 @@ registrationRouter.post(
           signingMessage: parsed.data.signingMessage,
           signatureHash: hashSignature(parsed.data.signature),
           cid: parsed.data.cid,
-          metadataHash: parsed.data.metadataHash
-        }
-      }
+          metadataHash: parsed.data.metadataHash,
+        },
+      },
     });
 
     let chainResult;
@@ -1623,18 +1876,20 @@ registrationRouter.post(
         applicantId: existing.applicantId,
         documentCid: parsed.data.cid,
         metadataHash: parsed.data.metadataHash,
-        tokenOwnerAddress: ownerWallet?.address
+        tokenOwnerAddress: ownerWallet?.address,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Blockchain sync failed";
+      const message =
+        error instanceof Error ? error.message : "Blockchain sync failed";
       const failureStatus = classifyBlockchainErrorStatus(message);
       await prisma.blockchainTxLifecycle.update({
         where: { id: txLifecycle.id },
         data: {
           status: failureStatus,
-          errorCode: failureStatus === "REJECTED" ? "USER_REJECTED" : "CHAIN_TX_FAILED",
-          errorMessage: message
-        }
+          errorCode:
+            failureStatus === "REJECTED" ? "USER_REJECTED" : "CHAIN_TX_FAILED",
+          errorMessage: message,
+        },
       });
 
       await writeAuditLog({
@@ -1649,12 +1904,14 @@ registrationRouter.post(
           signerWalletAddress: normalizedSignerAddress,
           network: expectedNetwork,
           chainId: expectedChainId,
-          errorMessage: message
-        }
+          errorMessage: message,
+        },
       });
 
       if (message.includes("verified default wallet")) {
-        throw badRequestError("Người nộp hồ sơ chưa có ví mặc định đã xác minh cho mạng blockchain hiện tại");
+        throw badRequestError(
+          "Người nộp hồ sơ chưa có ví mặc định đã xác minh cho mạng blockchain hiện tại",
+        );
       }
       if (
         message.includes("registration already used") ||
@@ -1662,13 +1919,18 @@ registrationRouter.post(
         message.includes("already") ||
         message.includes("duplicate")
       ) {
-        throw conflictError("Bản ghi blockchain đã tồn tại cho hồ sơ hoặc thửa đất này");
+        throw conflictError(
+          "Bản ghi blockchain đã tồn tại cho hồ sơ hoặc thửa đất này",
+        );
       }
       throw conflictError(`Không đồng bộ được blockchain: ${message}`);
     }
 
     const explorerBaseUrl = resolveExplorerBaseUrl(expectedNetwork);
-    const explorerUrl = explorerBaseUrl && chainResult.txHash ? `${explorerBaseUrl}${chainResult.txHash}` : null;
+    const explorerUrl =
+      explorerBaseUrl && chainResult.txHash
+        ? `${explorerBaseUrl}${chainResult.txHash}`
+        : null;
 
     await prisma.blockchainTxLifecycle.update({
       where: { id: txLifecycle.id },
@@ -1677,8 +1939,8 @@ registrationRouter.post(
         txHash: chainResult.txHash,
         explorerUrl,
         errorCode: null,
-        errorMessage: null
-      }
+        errorMessage: null,
+      },
     });
 
     await writeAuditLog({
@@ -1692,8 +1954,8 @@ registrationRouter.post(
         walletAuthorizationId: authorization?.id ?? null,
         signerWalletAddress: normalizedSignerAddress,
         network: expectedNetwork,
-        chainId: expectedChainId
-      }
+        chainId: expectedChainId,
+      },
     });
 
     await writeAuditLog({
@@ -1704,8 +1966,8 @@ registrationRouter.post(
       payload: {
         txLifecycleId: txLifecycle.id,
         txHash: chainResult.txHash,
-        explorerUrl
-      }
+        explorerUrl,
+      },
     });
 
     const updated = await prisma.registration.update({
@@ -1717,9 +1979,12 @@ registrationRouter.post(
         documentHash: parsed.data.metadataHash,
         txHash: chainResult.txHash,
         tokenId: chainResult.tokenId ?? existing.tokenId,
-        noteHistory: appendNoteHistory(existing.noteHistory, "Đã đồng bộ metadata hồ sơ lên blockchain")
+        noteHistory: appendNoteHistory(
+          existing.noteHistory,
+          "Đã đồng bộ metadata hồ sơ lên blockchain",
+        ),
       },
-      include: { files: true }
+      include: { files: true },
     });
 
     await writeAuditLog({
@@ -1745,11 +2010,16 @@ registrationRouter.post(
           mode: onChainLookup.mode,
           contractAddress: onChainLookup.contractAddress,
           registrationTokenId: onChainLookup.registrationTokenId,
-          landTokenId: onChainLookup.landTokenId
-        }
-      }
+          landTokenId: onChainLookup.landTokenId,
+        },
+      },
     });
-    await writeRegistrationNotificationLog(updated.id, user, updated.status, "Đã đồng bộ metadata hồ sơ lên blockchain");
+    await writeRegistrationNotificationLog(
+      updated.id,
+      user,
+      updated.status,
+      "Đã đồng bộ metadata hồ sơ lên blockchain",
+    );
 
     return ok(
       res,
@@ -1763,19 +2033,26 @@ registrationRouter.post(
         contractAddress: onChainLookup.contractAddress,
         explorerUrl,
         cid: updated.ipfsCid,
-        metadataHash: updated.documentHash
+        metadataHash: updated.documentHash,
       },
-      "Đã đồng bộ bản ghi số"
+      "Đã đồng bộ bản ghi số",
     );
-  })
+  }),
 );
 
 registrationRouter.post(
   "/:id/request-supplement",
-  requireRoles(["RECEPTION_OFFICER", "COMMUNE_OFFICER", "LAND_REGISTRY_OFFICER", "TAX_OFFICER", "ADMIN"]),
+  requireRoles([
+    "RECEPTION_OFFICER",
+    "COMMUNE_OFFICER",
+    "LAND_REGISTRY_OFFICER",
+    "TAX_OFFICER",
+    "ADMIN",
+  ]),
   asyncHandler(async (req, res) => {
     const parsed = supplementRequestSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
@@ -1786,10 +2063,17 @@ registrationRouter.post(
       .join("; ");
     const note = `${parsed.data.note} | Danh mục thiếu: ${missingChecklist} | Hạn bổ sung: ${parsed.data.deadlineAt}`;
 
-    const updated = await updateStatus(existing.id, "CAN_BO_SUNG", note, user, parsed.data.legalBasisCode, {
-      missingItems: parsed.data.missingItems,
-      deadlineAt: parsed.data.deadlineAt
-    });
+    const updated = await updateStatus(
+      existing.id,
+      "CAN_BO_SUNG",
+      note,
+      user,
+      parsed.data.legalBasisCode,
+      {
+        missingItems: parsed.data.missingItems,
+        deadlineAt: parsed.data.deadlineAt,
+      },
+    );
 
     await writeAuditLog({
       actorId: user.userId,
@@ -1799,25 +2083,39 @@ registrationRouter.post(
       payload: {
         legalBasisCode: parsed.data.legalBasisCode,
         missingItems: parsed.data.missingItems,
-        deadlineAt: parsed.data.deadlineAt
-      }
+        deadlineAt: parsed.data.deadlineAt,
+      },
     });
-    return ok(res, toRegistrationItem(updated), "Đã cập nhật yêu cầu bổ sung hồ sơ");
-  })
+    return ok(
+      res,
+      toRegistrationItem(updated),
+      "Đã cập nhật yêu cầu bổ sung hồ sơ",
+    );
+  }),
 );
 
 registrationRouter.get(
   "/:id/blockchain-status",
-  requireRoles(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "ADMIN", "AUDITOR"]),
+  requireRoles([
+    "LAND_REGISTRY_OFFICER",
+    "APPROVAL_AUTHORITY",
+    "ADMIN",
+    "AUDITOR",
+  ]),
   asyncHandler(async (req, res) => {
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
     if (!existing) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
 
     const effectiveLandCode = existing.landCode ?? `LAND-${existing.code}`;
-    const onChain = await lookupRegistrationOnChain(existing.code, effectiveLandCode);
+    const onChain = await lookupRegistrationOnChain(
+      existing.code,
+      effectiveLandCode,
+    );
     const offChainLinked = Boolean(existing.txHash || existing.tokenId);
-    const onChainLinked = Boolean(onChain.registrationTokenId || onChain.landTokenId);
+    const onChainLinked = Boolean(
+      onChain.registrationTokenId || onChain.landTokenId,
+    );
     const inSync = offChainLinked === onChainLinked;
 
     await writeAuditLog({
@@ -1830,8 +2128,8 @@ registrationRouter.get(
         landCode: effectiveLandCode,
         offChainLinked,
         onChainLinked,
-        inSync
-      }
+        inSync,
+      },
     });
 
     return ok(
@@ -1843,19 +2141,24 @@ registrationRouter.get(
         offChain: {
           status: existing.status,
           tokenId: existing.tokenId,
-          txHash: existing.txHash
+          txHash: existing.txHash,
         },
         onChain,
-        inSync
+        inSync,
       },
-      "Đã đối soát trạng thái on-chain/off-chain"
+      "Đã đối soát trạng thái on-chain/off-chain",
     );
-  })
+  }),
 );
 
 registrationRouter.get(
   "/:id/tx-lifecycle",
-  requireRoles(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "ADMIN", "AUDITOR"]),
+  requireRoles([
+    "LAND_REGISTRY_OFFICER",
+    "APPROVAL_AUTHORITY",
+    "ADMIN",
+    "AUDITOR",
+  ]),
   asyncHandler(async (req, res) => {
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
@@ -1863,7 +2166,7 @@ registrationRouter.get(
 
     const items = await prisma.blockchainTxLifecycle.findMany({
       where: { registrationId: existing.id },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     await writeAuditLog({
@@ -1871,7 +2174,7 @@ registrationRouter.get(
       action: "REGISTRATION_BLOCKCHAIN_TX_LIFECYCLE_VIEWED",
       entityType: "REGISTRATION",
       entityId: existing.id,
-      payload: { total: items.length }
+      payload: { total: items.length },
     });
 
     return ok(
@@ -1889,13 +2192,13 @@ registrationRouter.get(
           errorCode: item.errorCode,
           errorMessage: item.errorMessage,
           createdAt: item.createdAt,
-          updatedAt: item.updatedAt
+          updatedAt: item.updatedAt,
         })),
-        total: items.length
+        total: items.length,
       },
-      "Đã tải vòng đời giao dịch blockchain"
+      "Đã tải vòng đời giao dịch blockchain",
     );
-  })
+  }),
 );
 
 registrationRouter.post(
@@ -1903,7 +2206,8 @@ registrationRouter.post(
   requireRoles(["RECEPTION_OFFICER", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = submitSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
@@ -1914,10 +2218,10 @@ registrationRouter.post(
       "DA_TIEP_NHAN",
       parsed.data.note ?? "Bộ phận một cửa đã tiếp nhận hồ sơ",
       user,
-      parsed.data.legalBasisCode
+      parsed.data.legalBasisCode,
     );
     return ok(res, toRegistrationItem(updated), "Đã tiếp nhận hồ sơ hợp lệ");
-  })
+  }),
 );
 
 registrationRouter.post(
@@ -1925,15 +2229,22 @@ registrationRouter.post(
   requireRoles(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = requiredNoteSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
     if (!existing) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
 
-    const updated = await updateStatus(existing.id, "TU_CHOI", parsed.data.note, user, parsed.data.legalBasisCode);
+    const updated = await updateStatus(
+      existing.id,
+      "TU_CHOI",
+      parsed.data.note,
+      user,
+      parsed.data.legalBasisCode,
+    );
     return ok(res, toRegistrationItem(updated), "Đã từ chối hồ sơ");
-  })
+  }),
 );
 
 registrationRouter.get(
@@ -1947,35 +2258,51 @@ registrationRouter.get(
 
     const items = await prisma.registrationPaymentObligation.findMany({
       where: { registrationId: existing.id },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
-    return ok(res, { items: items.map((item) => toPaymentObligationItem(item)), total: items.length });
-  })
+    return ok(res, {
+      items: items.map((item) => toPaymentObligationItem(item)),
+      total: items.length,
+    });
+  }),
 );
 
 registrationRouter.post(
   "/:id/payment-obligations",
-  requireRoles(["RECEPTION_OFFICER", "LAND_REGISTRY_OFFICER", "TAX_OFFICER", "ADMIN"]),
+  requireRoles([
+    "RECEPTION_OFFICER",
+    "LAND_REGISTRY_OFFICER",
+    "TAX_OFFICER",
+    "ADMIN",
+  ]),
   asyncHandler(async (req, res) => {
     const parsed = createPaymentObligationSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
     if (!existing) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
     await ensureProcedureAndAuthority(existing, user.role);
 
-    if (parsed.data.type === "LAND_FINANCIAL_OBLIGATION" && !["LAND_REGISTRY_OFFICER", "TAX_OFFICER", "ADMIN"].includes(user.role)) {
-      throw forbiddenError("Vai trò hiện tại không được tạo nghĩa vụ tài chính đất đai");
+    if (
+      parsed.data.type === "LAND_FINANCIAL_OBLIGATION" &&
+      !["LAND_REGISTRY_OFFICER", "TAX_OFFICER", "ADMIN"].includes(user.role)
+    ) {
+      throw forbiddenError(
+        "Vai trò hiện tại không được tạo nghĩa vụ tài chính đất đai",
+      );
     }
 
     if (parsed.data.receiptFileId) {
       const receiptFile = await prisma.fileAsset.findUnique({
         where: { id: parsed.data.receiptFileId },
-        select: { id: true, registrationId: true }
+        select: { id: true, registrationId: true },
       });
       if (!receiptFile || receiptFile.registrationId !== existing.id) {
-        throw badRequestError("receiptFileId không thuộc hồ sơ đăng ký liên quan");
+        throw badRequestError(
+          "receiptFileId không thuộc hồ sơ đăng ký liên quan",
+        );
       }
     }
 
@@ -1989,11 +2316,15 @@ registrationRouter.post(
         receiptRef: parsed.data.receiptRef ?? null,
         receiptFileId: parsed.data.receiptFileId ?? null,
         ...(parsed.data.noticeRef ? { noticeIssuedAt: new Date() } : {}),
-        ...(parsed.data.receiptRef || parsed.data.receiptFileId ? { receiptSubmittedAt: new Date() } : {}),
-        amount: parsed.data.amount ? new Prisma.Decimal(parsed.data.amount) : null,
+        ...(parsed.data.receiptRef || parsed.data.receiptFileId
+          ? { receiptSubmittedAt: new Date() }
+          : {}),
+        amount: parsed.data.amount
+          ? new Prisma.Decimal(parsed.data.amount)
+          : null,
         note: parsed.data.note ?? null,
-        createdById: user.userId
-      }
+        createdById: user.userId,
+      },
     });
 
     await writeAuditLog({
@@ -2004,12 +2335,16 @@ registrationRouter.post(
       payload: {
         registrationId: existing.id,
         type: obligation.type,
-        legalBasisCode: obligation.legalBasisCode
-      }
+        legalBasisCode: obligation.legalBasisCode,
+      },
     });
 
-    return created(res, toPaymentObligationItem(obligation), "Đã tạo nghĩa vụ tài chính");
-  })
+    return created(
+      res,
+      toPaymentObligationItem(obligation),
+      "Đã tạo nghĩa vụ tài chính",
+    );
+  }),
 );
 
 registrationRouter.patch(
@@ -2017,7 +2352,8 @@ registrationRouter.patch(
   requireRoles(["TAX_OFFICER", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = updatePaymentObligationSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const user = (req as AuthenticatedRequest).user;
     const existing = await findRegistrationByParam(String(req.params.id));
@@ -2025,29 +2361,37 @@ registrationRouter.patch(
     await ensureProcedureAndAuthority(existing, user.role);
 
     const obligation = await prisma.registrationPaymentObligation.findFirst({
-      where: { id: String(req.params.obligationId), registrationId: existing.id }
+      where: {
+        id: String(req.params.obligationId),
+        registrationId: existing.id,
+      },
     });
     if (!obligation) throw notFoundError("Không tìm thấy nghĩa vụ tài chính");
 
-    const updatedObligation = await prisma.registrationPaymentObligation.update({
-      where: { id: obligation.id },
-      data: {
-        status: parsed.data.status,
-        legalBasisCode: parsed.data.legalBasisCode,
-        note: parsed.data.note ?? obligation.note,
-        ...(parsed.data.status === "CONFIRMED"
-          ? { confirmedById: user.userId, confirmedAt: new Date() }
-          : {})
-      }
-    });
+    const updatedObligation = await prisma.registrationPaymentObligation.update(
+      {
+        where: { id: obligation.id },
+        data: {
+          status: parsed.data.status,
+          legalBasisCode: parsed.data.legalBasisCode,
+          note: parsed.data.note ?? obligation.note,
+          ...(parsed.data.status === "CONFIRMED"
+            ? { confirmedById: user.userId, confirmedAt: new Date() }
+            : {}),
+        },
+      },
+    );
 
-    if (parsed.data.status === "CONFIRMED" && existing.status === "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH") {
+    if (
+      parsed.data.status === "CONFIRMED" &&
+      existing.status === "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH"
+    ) {
       await updateStatus(
         existing.id,
         "DA_HOAN_THANH_NGHIA_VU_TAI_CHINH",
         parsed.data.note ?? "Đã hoàn thành nghĩa vụ tài chính",
         user,
-        parsed.data.legalBasisCode
+        parsed.data.legalBasisCode,
       );
     }
 
@@ -2060,10 +2404,14 @@ registrationRouter.patch(
         registrationId: existing.id,
         previousStatus: obligation.status,
         status: updatedObligation.status,
-        legalBasisCode: parsed.data.legalBasisCode
-      }
+        legalBasisCode: parsed.data.legalBasisCode,
+      },
     });
 
-    return ok(res, toPaymentObligationItem(updatedObligation), "Đã cập nhật nghĩa vụ tài chính");
-  })
+    return ok(
+      res,
+      toPaymentObligationItem(updatedObligation),
+      "Đã cập nhật nghĩa vụ tài chính",
+    );
+  }),
 );

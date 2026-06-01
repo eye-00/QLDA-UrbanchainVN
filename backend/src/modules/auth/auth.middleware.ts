@@ -30,7 +30,7 @@ export const AUTH_ROLES = {
     "TAX_OFFICER",
     "APPROVAL_AUTHORITY",
     "AUDITOR",
-    "ADMIN"
+    "ADMIN",
   ],
   dashboard: [
     "CITIZEN",
@@ -41,17 +41,20 @@ export const AUTH_ROLES = {
     "TAX_OFFICER",
     "APPROVAL_AUTHORITY",
     "AUDITOR",
-    "ADMIN"
+    "ADMIN",
   ],
-  admin: ["ADMIN"]
+  admin: ["ADMIN"],
 } as const satisfies Record<string, readonly UserRole[]>;
 
 function getJwtSecret() {
   const configuredSecret = process.env.JWT_SECRET?.trim();
   if (process.env.NODE_ENV === "production") {
-    if (!configuredSecret) throw new Error("JWT_SECRET must be configured in production");
+    if (!configuredSecret)
+      throw new Error("JWT_SECRET must be configured in production");
     if (configuredSecret === "dev-secret") {
-      throw new Error("JWT_SECRET must not use development default in production");
+      throw new Error(
+        "JWT_SECRET must not use development default in production",
+      );
     }
   }
   return configuredSecret || "dev-secret";
@@ -60,13 +63,15 @@ function getJwtSecret() {
 export function signAccessToken(user: AuthUser) {
   return jwt.sign({ email: user.email, role: user.role }, getJwtSecret(), {
     subject: user.userId,
-    expiresIn: "1h"
+    expiresIn: "1h",
   });
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const header = req.header("authorization");
-  const token = header?.startsWith("Bearer ") ? header.slice("Bearer ".length) : null;
+  const token = header?.startsWith("Bearer ")
+    ? header.slice("Bearer ".length)
+    : null;
   if (!token) return next(unauthorizedError());
 
   try {
@@ -82,7 +87,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
           userId: user.id,
           fullName: user.fullName,
           email: user.email,
-          role: user.role
+          role: user.role,
         };
         return next();
       })
@@ -96,7 +101,8 @@ export function requireRoles(roles: readonly UserRole[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     const user = (req as AuthenticatedRequest).user;
     if (!user) return next(unauthorizedError());
-    if (!roles.includes(user.role)) return next(forbiddenError("Role is not allowed for this action"));
+    if (!roles.includes(user.role))
+      return next(forbiddenError("Role is not allowed for this action"));
     return next();
   };
 }

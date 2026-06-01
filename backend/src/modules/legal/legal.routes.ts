@@ -2,10 +2,20 @@ import { Prisma, ProcedureLevel } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
-import { asyncHandler, badRequestError, conflictError, notFoundError } from "../../lib/errors.js";
+import {
+  asyncHandler,
+  badRequestError,
+  conflictError,
+  notFoundError,
+} from "../../lib/errors.js";
 import { created, ok } from "../../lib/response.js";
 import { prisma } from "../../lib/prisma.js";
-import { AUTH_ROLES, requireAuth, requireRoles, type AuthenticatedRequest } from "../auth/auth.middleware.js";
+import {
+  AUTH_ROLES,
+  requireAuth,
+  requireRoles,
+  type AuthenticatedRequest,
+} from "../auth/auth.middleware.js";
 
 const authorityActorSchema = z.enum([
   "RECEPTION_OFFICER",
@@ -14,7 +24,7 @@ const authorityActorSchema = z.enum([
   "APPROVAL_AUTHORITY",
   "TAX_OFFICER",
   "AUDITOR",
-  "ADMIN"
+  "ADMIN",
 ]);
 
 const levelSchema = z.enum(["XA", "TINH", "LIEN_THONG"]);
@@ -31,7 +41,7 @@ const listSchema = z.object({
       return value === "true";
     }),
   page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(100).default(20)
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
 
 const createSchema = z.object({
@@ -40,7 +50,7 @@ const createSchema = z.object({
   legalBasis: z.string().min(3),
   level: levelSchema,
   authorityActors: z.array(authorityActorSchema).min(1),
-  requiresTaxStep: z.boolean().default(false)
+  requiresTaxStep: z.boolean().default(false),
 });
 
 const updateSchema = z.object({
@@ -49,7 +59,7 @@ const updateSchema = z.object({
   level: levelSchema.optional(),
   authorityActors: z.array(authorityActorSchema).min(1).optional(),
   requiresTaxStep: z.boolean().optional(),
-  isActive: z.boolean().optional()
+  isActive: z.boolean().optional(),
 });
 
 function toItem(item: {
@@ -70,11 +80,13 @@ function toItem(item: {
     sourceDecision: item.sourceDecision,
     legalBasis: item.legalBasis,
     level: item.level,
-    authorityActors: Array.isArray(item.authorityActors) ? item.authorityActors : [],
+    authorityActors: Array.isArray(item.authorityActors)
+      ? item.authorityActors
+      : [],
     requiresTaxStep: item.requiresTaxStep,
     isActive: item.isActive,
     createdAt: item.createdAt,
-    updatedAt: item.updatedAt
+    updatedAt: item.updatedAt,
   };
 }
 
@@ -87,7 +99,8 @@ legalRouter.get(
   requireRoles([...AUTH_ROLES.officers, ...AUTH_ROLES.citizen]),
   asyncHandler(async (req, res) => {
     const parsed = listSchema.safeParse(req.query);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const { keyword, level, isActive, page, pageSize } = parsed.data;
     const skip = (page - 1) * pageSize;
@@ -99,10 +112,10 @@ legalRouter.get(
             OR: [
               { procedureCode: { contains: keyword } },
               { sourceDecision: { contains: keyword } },
-              { legalBasis: { contains: keyword } }
-            ]
+              { legalBasis: { contains: keyword } },
+            ],
           }
-        : {})
+        : {}),
     };
 
     const [items, total] = await Promise.all([
@@ -110,13 +123,18 @@ legalRouter.get(
         where,
         orderBy: [{ isActive: "desc" }, { procedureCode: "asc" }],
         skip,
-        take: pageSize
+        take: pageSize,
       }),
-      prisma.legalProcedure.count({ where })
+      prisma.legalProcedure.count({ where }),
     ]);
 
-    return ok(res, { items: items.map((item) => toItem(item)), total, page, pageSize });
-  })
+    return ok(res, {
+      items: items.map((item) => toItem(item)),
+      total,
+      page,
+      pageSize,
+    });
+  }),
 );
 
 legalRouter.get(
@@ -124,10 +142,12 @@ legalRouter.get(
   requireRoles([...AUTH_ROLES.officers, ...AUTH_ROLES.citizen]),
   asyncHandler(async (req, res) => {
     const procedureCode = String(req.params.procedureCode);
-    const item = await prisma.legalProcedure.findUnique({ where: { procedureCode } });
+    const item = await prisma.legalProcedure.findUnique({
+      where: { procedureCode },
+    });
     if (!item) throw notFoundError("Không tìm thấy thủ tục pháp lý");
     return ok(res, toItem(item));
-  })
+  }),
 );
 
 legalRouter.post(
@@ -135,7 +155,8 @@ legalRouter.post(
   requireRoles(AUTH_ROLES.admin),
   asyncHandler(async (req, res) => {
     const parsed = createSchema.safeParse(req.body);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     try {
       const actor = (req as AuthenticatedRequest).user;
@@ -146,8 +167,8 @@ legalRouter.post(
           legalBasis: parsed.data.legalBasis.trim(),
           level: parsed.data.level,
           authorityActors: parsed.data.authorityActors,
-          requiresTaxStep: parsed.data.requiresTaxStep
-        }
+          requiresTaxStep: parsed.data.requiresTaxStep,
+        },
       });
 
       await writeAuditLog({
@@ -157,18 +178,21 @@ legalRouter.post(
         entityId: createdProcedure.id,
         payload: {
           procedureCode: createdProcedure.procedureCode,
-          level: createdProcedure.level
-        }
+          level: createdProcedure.level,
+        },
       });
 
       return created(res, toItem(createdProcedure), "Đã tạo thủ tục pháp lý");
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
         throw conflictError("Mã thủ tục pháp lý đã tồn tại");
       }
       throw error;
     }
-  })
+  }),
 );
 
 legalRouter.patch(
@@ -176,7 +200,8 @@ legalRouter.patch(
   requireRoles(AUTH_ROLES.admin),
   asyncHandler(async (req, res) => {
     const parsed = updateSchema.safeParse(req.body);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const id = String(req.params.id);
     const actor = (req as AuthenticatedRequest).user;
@@ -186,13 +211,25 @@ legalRouter.patch(
     const item = await prisma.legalProcedure.update({
       where: { id },
       data: {
-        ...(parsed.data.sourceDecision !== undefined ? { sourceDecision: parsed.data.sourceDecision.trim() } : {}),
-        ...(parsed.data.legalBasis !== undefined ? { legalBasis: parsed.data.legalBasis.trim() } : {}),
-        ...(parsed.data.level !== undefined ? { level: parsed.data.level } : {}),
-        ...(parsed.data.authorityActors !== undefined ? { authorityActors: parsed.data.authorityActors } : {}),
-        ...(parsed.data.requiresTaxStep !== undefined ? { requiresTaxStep: parsed.data.requiresTaxStep } : {}),
-        ...(parsed.data.isActive !== undefined ? { isActive: parsed.data.isActive } : {})
-      }
+        ...(parsed.data.sourceDecision !== undefined
+          ? { sourceDecision: parsed.data.sourceDecision.trim() }
+          : {}),
+        ...(parsed.data.legalBasis !== undefined
+          ? { legalBasis: parsed.data.legalBasis.trim() }
+          : {}),
+        ...(parsed.data.level !== undefined
+          ? { level: parsed.data.level }
+          : {}),
+        ...(parsed.data.authorityActors !== undefined
+          ? { authorityActors: parsed.data.authorityActors }
+          : {}),
+        ...(parsed.data.requiresTaxStep !== undefined
+          ? { requiresTaxStep: parsed.data.requiresTaxStep }
+          : {}),
+        ...(parsed.data.isActive !== undefined
+          ? { isActive: parsed.data.isActive }
+          : {}),
+      },
     });
 
     await writeAuditLog({
@@ -203,10 +240,10 @@ legalRouter.patch(
       payload: {
         procedureCode: item.procedureCode,
         previousIsActive: existing.isActive,
-        isActive: item.isActive
-      }
+        isActive: item.isActive,
+      },
     });
 
     return ok(res, toItem(item), "Đã cập nhật thủ tục pháp lý");
-  })
+  }),
 );

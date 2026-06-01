@@ -2,11 +2,21 @@ import { Prisma, UserRole, UserStatus } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
-import { asyncHandler, badRequestError, conflictError, notFoundError } from "../../lib/errors.js";
+import {
+  asyncHandler,
+  badRequestError,
+  conflictError,
+  notFoundError,
+} from "../../lib/errors.js";
 import { hashPassword } from "../../lib/password.js";
 import { created, ok } from "../../lib/response.js";
 import { prisma } from "../../lib/prisma.js";
-import { AUTH_ROLES, requireAuth, requireRoles, type AuthenticatedRequest } from "../auth/auth.middleware.js";
+import {
+  AUTH_ROLES,
+  requireAuth,
+  requireRoles,
+  type AuthenticatedRequest,
+} from "../auth/auth.middleware.js";
 
 const roleSchema = z.enum([
   "CITIZEN",
@@ -17,7 +27,7 @@ const roleSchema = z.enum([
   "TAX_OFFICER",
   "APPROVAL_AUTHORITY",
   "AUDITOR",
-  "ADMIN"
+  "ADMIN",
 ]);
 
 const statusSchema = z.enum(["ACTIVE", "LOCKED"]);
@@ -28,7 +38,7 @@ const listUsersSchema = z.object({
   organizationId: z.string().optional(),
   status: statusSchema.optional(),
   page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(100).default(20)
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
 
 const createUserSchema = z.object({
@@ -37,7 +47,7 @@ const createUserSchema = z.object({
   password: z.string().min(8),
   role: roleSchema,
   identityNumber: z.string().optional(),
-  organizationId: z.string().nullable().optional()
+  organizationId: z.string().nullable().optional(),
 });
 
 const updateUserSchema = z.object({
@@ -45,11 +55,11 @@ const updateUserSchema = z.object({
   email: z.string().email().optional(),
   role: roleSchema.optional(),
   identityNumber: z.string().nullable().optional(),
-  organizationId: z.string().nullable().optional()
+  organizationId: z.string().nullable().optional(),
 });
 
 const updateStatusSchema = z.object({
-  status: statusSchema
+  status: statusSchema,
 });
 
 function toUserItem(user: {
@@ -73,10 +83,14 @@ function toUserItem(user: {
     identityNumber: user.identityNumber,
     organizationId: user.organizationId,
     organization: user.organization
-      ? { id: user.organization.id, code: user.organization.code, name: user.organization.name }
+      ? {
+          id: user.organization.id,
+          code: user.organization.code,
+          name: user.organization.name,
+        }
       : null,
     createdAt: user.createdAt,
-    updatedAt: user.updatedAt
+    updatedAt: user.updatedAt,
   };
 }
 
@@ -88,9 +102,11 @@ userRouter.get(
   "/",
   asyncHandler(async (req, res) => {
     const parsed = listUsersSchema.safeParse(req.query);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
-    const { keyword, role, organizationId, status, page, pageSize } = parsed.data;
+    const { keyword, role, organizationId, status, page, pageSize } =
+      parsed.data;
     const skip = (page - 1) * pageSize;
 
     const where: Prisma.UserWhereInput = {
@@ -102,10 +118,10 @@ userRouter.get(
             OR: [
               { fullName: { contains: keyword } },
               { email: { contains: keyword } },
-              { identityNumber: { contains: keyword } }
-            ]
+              { identityNumber: { contains: keyword } },
+            ],
           }
-        : {})
+        : {}),
     };
 
     const [items, total] = await Promise.all([
@@ -114,23 +130,24 @@ userRouter.get(
         include: { organization: true },
         orderBy: { createdAt: "desc" },
         skip,
-        take: pageSize
+        take: pageSize,
       }),
-      prisma.user.count({ where })
+      prisma.user.count({ where }),
     ]);
 
     return ok(res, {
       items: items.map((item) => toUserItem(item)),
-      total
+      total,
     });
-  })
+  }),
 );
 
 userRouter.post(
   "/",
   asyncHandler(async (req, res) => {
     const parsed = createUserSchema.safeParse(req.body);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     try {
       const authUser = (req as AuthenticatedRequest).user;
@@ -142,9 +159,9 @@ userRouter.post(
           role: parsed.data.role,
           status: "ACTIVE",
           identityNumber: parsed.data.identityNumber,
-          organizationId: parsed.data.organizationId ?? null
+          organizationId: parsed.data.organizationId ?? null,
         },
-        include: { organization: true }
+        include: { organization: true },
       });
 
       await writeAuditLog({
@@ -155,47 +172,62 @@ userRouter.post(
         payload: {
           role: user.role,
           organizationId: user.organizationId,
-          status: user.status
-        }
+          status: user.status,
+        },
       });
 
       return created(res, toUserItem(user), "Created successfully");
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
         throw conflictError("Email already exists");
       }
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2003"
+      ) {
         throw badRequestError("Organization is invalid");
       }
       throw error;
     }
-  })
+  }),
 );
 
 userRouter.patch(
   "/:id",
   asyncHandler(async (req, res) => {
     const parsed = updateUserSchema.safeParse(req.body);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     try {
       const authUser = (req as AuthenticatedRequest).user;
       const previous = await prisma.user.findUnique({
         where: { id: String(req.params.id) },
-        select: { id: true, role: true, organizationId: true }
+        select: { id: true, role: true, organizationId: true },
       });
       if (!previous) throw notFoundError("User not found");
 
       const user = await prisma.user.update({
         where: { id: String(req.params.id) },
         data: {
-          ...(parsed.data.fullName !== undefined ? { fullName: parsed.data.fullName } : {}),
-          ...(parsed.data.email !== undefined ? { email: parsed.data.email.toLowerCase() } : {}),
+          ...(parsed.data.fullName !== undefined
+            ? { fullName: parsed.data.fullName }
+            : {}),
+          ...(parsed.data.email !== undefined
+            ? { email: parsed.data.email.toLowerCase() }
+            : {}),
           ...(parsed.data.role !== undefined ? { role: parsed.data.role } : {}),
-          ...(parsed.data.identityNumber !== undefined ? { identityNumber: parsed.data.identityNumber } : {}),
-          ...(parsed.data.organizationId !== undefined ? { organizationId: parsed.data.organizationId } : {})
+          ...(parsed.data.identityNumber !== undefined
+            ? { identityNumber: parsed.data.identityNumber }
+            : {}),
+          ...(parsed.data.organizationId !== undefined
+            ? { organizationId: parsed.data.organizationId }
+            : {}),
         },
-        include: { organization: true }
+        include: { organization: true },
       });
 
       await writeAuditLog({
@@ -207,8 +239,8 @@ userRouter.patch(
           previousRole: previous.role,
           role: user.role,
           previousOrganizationId: previous.organizationId,
-          organizationId: user.organizationId
-        }
+          organizationId: user.organizationId,
+        },
       });
 
       if (previous.role !== user.role) {
@@ -219,32 +251,42 @@ userRouter.patch(
           entityId: user.id,
           payload: {
             previousRole: previous.role,
-            currentRole: user.role
-          }
+            currentRole: user.role,
+          },
         });
       }
 
       return ok(res, toUserItem(user));
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
         throw notFoundError("User not found");
       }
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
         throw conflictError("Email already exists");
       }
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2003"
+      ) {
         throw badRequestError("Organization is invalid");
       }
       throw error;
     }
-  })
+  }),
 );
 
 userRouter.patch(
   "/:id/status",
   asyncHandler(async (req, res) => {
     const parsed = updateStatusSchema.safeParse(req.body);
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     try {
       const authUser = (req as AuthenticatedRequest).user;
@@ -255,11 +297,11 @@ userRouter.patch(
           ...(parsed.data.status === "ACTIVE"
             ? {
                 failedLoginAttempts: 0,
-                lockedUntil: null
+                lockedUntil: null,
               }
-            : {})
+            : {}),
         },
-        include: { organization: true }
+        include: { organization: true },
       });
 
       await writeAuditLog({
@@ -268,26 +310,32 @@ userRouter.patch(
         entityType: "USER",
         entityId: user.id,
         payload: {
-          status: user.status
-        }
+          status: user.status,
+        },
       });
 
       await writeAuditLog({
         actorId: authUser.userId,
-        action: parsed.data.status === "LOCKED" ? "RBAC_USER_LOCKED" : "RBAC_USER_UNLOCKED",
+        action:
+          parsed.data.status === "LOCKED"
+            ? "RBAC_USER_LOCKED"
+            : "RBAC_USER_UNLOCKED",
         entityType: "USER",
         entityId: user.id,
         payload: {
-          status: user.status
-        }
+          status: user.status,
+        },
       });
 
       return ok(res, toUserItem(user));
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
         throw notFoundError("User not found");
       }
       throw error;
     }
-  })
+  }),
 );

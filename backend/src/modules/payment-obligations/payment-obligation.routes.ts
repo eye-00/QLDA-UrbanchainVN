@@ -1,11 +1,27 @@
-import { PaymentObligationStatus, PaymentObligationType, Prisma, RegistrationStatus } from "@prisma/client";
+import {
+  PaymentObligationStatus,
+  PaymentObligationType,
+  Prisma,
+  RegistrationStatus,
+} from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import { writeAuditLog } from "../../lib/audit.js";
-import { asyncHandler, badRequestError, conflictError, forbiddenError, notFoundError } from "../../lib/errors.js";
+import {
+  asyncHandler,
+  badRequestError,
+  conflictError,
+  forbiddenError,
+  notFoundError,
+} from "../../lib/errors.js";
 import { created, ok } from "../../lib/response.js";
 import { prisma } from "../../lib/prisma.js";
-import { AUTH_ROLES, requireAuth, requireRoles, type AuthenticatedRequest } from "../auth/auth.middleware.js";
+import {
+  AUTH_ROLES,
+  requireAuth,
+  requireRoles,
+  type AuthenticatedRequest,
+} from "../auth/auth.middleware.js";
 
 const legalBasisCodeSchema = z.string().min(3).max(191);
 
@@ -16,20 +32,20 @@ const createPaymentObligationSchema = z.object({
     "LAND_FINANCIAL_OBLIGATION",
     "REGISTRATION_FEE",
     "LATE_FEE",
-    "OTHER_LEGAL_FEE"
+    "OTHER_LEGAL_FEE",
   ]),
   legalBasisCode: legalBasisCodeSchema,
   referenceNo: z.string().min(3).optional(),
   noticeRef: z.string().min(3).optional(),
   amount: z.coerce.number().positive().optional(),
-  note: z.string().min(3).optional()
+  note: z.string().min(3).optional(),
 });
 
 const generateQrSchema = z.object({
   legalBasisCode: legalBasisCodeSchema,
   noticeRef: z.string().min(3).optional(),
   amount: z.coerce.number().positive().optional(),
-  note: z.string().min(3).optional()
+  note: z.string().min(3).optional(),
 });
 
 const mockConfirmSchema = z
@@ -37,14 +53,14 @@ const mockConfirmSchema = z
     legalBasisCode: legalBasisCodeSchema,
     receiptRef: z.string().min(3).optional(),
     receiptFileId: z.string().min(3).optional(),
-    note: z.string().min(3).optional()
+    note: z.string().min(3).optional(),
   })
   .superRefine((value, ctx) => {
     if (!value.receiptRef && !value.receiptFileId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["receiptRef"],
-        message: "receiptRef hoặc receiptFileId là bắt buộc"
+        message: "receiptRef hoặc receiptFileId là bắt buộc",
       });
     }
   });
@@ -52,7 +68,7 @@ const mockConfirmSchema = z
 const verifyReceiptSchema = z.object({
   legalBasisCode: legalBasisCodeSchema,
   verified: z.boolean(),
-  verifyNote: z.string().min(3).optional()
+  verifyNote: z.string().min(3).optional(),
 });
 
 const recordOnChainSchema = z.object({
@@ -60,11 +76,13 @@ const recordOnChainSchema = z.object({
   evidenceTxHash: z.string().min(6),
   evidenceCid: z.string().min(3).optional(),
   evidenceHash: z.string().min(3).optional(),
-  note: z.string().min(3).optional()
+  note: z.string().min(3).optional(),
 });
 
 function isCitizenRole(role: string) {
-  return AUTH_ROLES.citizen.includes(role as (typeof AUTH_ROLES.citizen)[number]);
+  return AUTH_ROLES.citizen.includes(
+    role as (typeof AUTH_ROLES.citizen)[number],
+  );
 }
 
 function readAuthorityActors(value: Prisma.JsonValue): string[] {
@@ -133,18 +151,29 @@ function toPaymentObligationItem(item: {
     evidenceHash: item.evidenceHash,
     evidenceRecordedAt: item.evidenceRecordedAt,
     createdAt: item.createdAt,
-    updatedAt: item.updatedAt
+    updatedAt: item.updatedAt,
   };
 }
 
-async function ensureProcedureAuthority(procedureCode: string | null, actorRole: string) {
+async function ensureProcedureAuthority(
+  procedureCode: string | null,
+  actorRole: string,
+) {
   if (actorRole === "ADMIN" || isCitizenRole(actorRole)) return;
-  if (!procedureCode) throw badRequestError("Hồ sơ chưa gắn procedureCode hợp lệ");
-  const procedure = await prisma.legalProcedure.findUnique({ where: { procedureCode } });
-  if (!procedure || !procedure.isActive) throw badRequestError("Thủ tục pháp lý không tồn tại hoặc không còn hiệu lực");
+  if (!procedureCode)
+    throw badRequestError("Hồ sơ chưa gắn procedureCode hợp lệ");
+  const procedure = await prisma.legalProcedure.findUnique({
+    where: { procedureCode },
+  });
+  if (!procedure || !procedure.isActive)
+    throw badRequestError(
+      "Thủ tục pháp lý không tồn tại hoặc không còn hiệu lực",
+    );
   const allowedActors = readAuthorityActors(procedure.authorityActors);
   if (!allowedActors.includes(actorRole)) {
-    throw forbiddenError(`Vai trò ${actorRole} không thuộc authority matrix của thủ tục ${procedure.procedureCode}`);
+    throw forbiddenError(
+      `Vai trò ${actorRole} không thuộc authority matrix của thủ tục ${procedure.procedureCode}`,
+    );
   }
 }
 
@@ -157,10 +186,10 @@ async function findObligationOrThrow(id: string) {
           id: true,
           code: true,
           applicantId: true,
-          procedureCode: true
-        }
-      }
-    }
+          procedureCode: true,
+        },
+      },
+    },
   });
   if (!item) throw notFoundError("Không tìm thấy nghĩa vụ tài chính");
   return item;
@@ -170,11 +199,11 @@ async function advanceRegistrationAfterPaymentConfirm(
   registrationId: string,
   actor: AuthenticatedRequest["user"],
   legalBasisCode: string,
-  note: string
+  note: string,
 ) {
   const registration = await prisma.registration.findUnique({
     where: { id: registrationId },
-    select: { id: true, status: true, noteHistory: true }
+    select: { id: true, status: true, noteHistory: true },
   });
   if (!registration) return;
   if (registration.status !== "CHO_HOAN_THANH_NGHIA_VU_TAI_CHINH") return;
@@ -187,9 +216,9 @@ async function advanceRegistrationAfterPaymentConfirm(
       legalBasisCode,
       noteHistory: appendNoteHistory(
         registration.noteHistory,
-        note || "Đã hoàn thành nghĩa vụ tài chính qua top-level payment flow"
-      )
-    }
+        note || "Đã hoàn thành nghĩa vụ tài chính qua top-level payment flow",
+      ),
+    },
   });
 
   await writeAuditLog({
@@ -201,8 +230,8 @@ async function advanceRegistrationAfterPaymentConfirm(
       previousStatus: registration.status,
       status: nextStatus,
       legalBasisCode,
-      note
-    }
+      note,
+    },
   });
 }
 
@@ -214,12 +243,13 @@ paymentObligationRouter.post(
   requireRoles(["TAX_OFFICER", "LAND_REGISTRY_OFFICER", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = createPaymentObligationSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const actor = (req as AuthenticatedRequest).user;
     const registration = await prisma.registration.findUnique({
       where: { id: parsed.data.registrationId },
-      select: { id: true, procedureCode: true }
+      select: { id: true, procedureCode: true },
     });
     if (!registration) throw notFoundError("Không tìm thấy hồ sơ đăng ký");
     await ensureProcedureAuthority(registration.procedureCode, actor.role);
@@ -232,10 +262,12 @@ paymentObligationRouter.post(
         referenceNo: parsed.data.referenceNo ?? null,
         noticeRef: parsed.data.noticeRef ?? null,
         ...(parsed.data.noticeRef ? { noticeIssuedAt: new Date() } : {}),
-        amount: parsed.data.amount ? new Prisma.Decimal(parsed.data.amount) : null,
+        amount: parsed.data.amount
+          ? new Prisma.Decimal(parsed.data.amount)
+          : null,
         note: parsed.data.note ?? null,
-        createdById: actor.userId
-      }
+        createdById: actor.userId,
+      },
     });
 
     await writeAuditLog({
@@ -246,12 +278,16 @@ paymentObligationRouter.post(
       payload: {
         registrationId: registration.id,
         type: createdItem.type,
-        legalBasisCode: createdItem.legalBasisCode
-      }
+        legalBasisCode: createdItem.legalBasisCode,
+      },
     });
 
-    return created(res, toPaymentObligationItem(createdItem), "Đã tạo nghĩa vụ tài chính");
-  })
+    return created(
+      res,
+      toPaymentObligationItem(createdItem),
+      "Đã tạo nghĩa vụ tài chính",
+    );
+  }),
 );
 
 paymentObligationRouter.get(
@@ -260,11 +296,16 @@ paymentObligationRouter.get(
   asyncHandler(async (req, res) => {
     const actor = (req as AuthenticatedRequest).user;
     const obligation = await findObligationOrThrow(String(req.params.id));
-    if (isCitizenRole(actor.role) && obligation.registration.applicantId !== actor.userId) {
-      throw forbiddenError("OWNERSHIP_DENIED: Bạn không có quyền xem nghĩa vụ tài chính này");
+    if (
+      isCitizenRole(actor.role) &&
+      obligation.registration.applicantId !== actor.userId
+    ) {
+      throw forbiddenError(
+        "OWNERSHIP_DENIED: Bạn không có quyền xem nghĩa vụ tài chính này",
+      );
     }
     return ok(res, toPaymentObligationItem(obligation));
-  })
+  }),
 );
 
 paymentObligationRouter.post(
@@ -272,10 +313,14 @@ paymentObligationRouter.post(
   requireRoles(["TAX_OFFICER", "LAND_REGISTRY_OFFICER", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = generateQrSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
     const actor = (req as AuthenticatedRequest).user;
     const obligation = await findObligationOrThrow(String(req.params.id));
-    await ensureProcedureAuthority(obligation.registration.procedureCode, actor.role);
+    await ensureProcedureAuthority(
+      obligation.registration.procedureCode,
+      actor.role,
+    );
 
     const noticeRef = parsed.data.noticeRef ?? `NOTICE-${Date.now()}`;
     const updated = await prisma.registrationPaymentObligation.update({
@@ -284,9 +329,11 @@ paymentObligationRouter.post(
         legalBasisCode: parsed.data.legalBasisCode,
         noticeRef,
         noticeIssuedAt: new Date(),
-        amount: parsed.data.amount ? new Prisma.Decimal(parsed.data.amount) : obligation.amount,
-        note: parsed.data.note ?? obligation.note
-      }
+        amount: parsed.data.amount
+          ? new Prisma.Decimal(parsed.data.amount)
+          : obligation.amount,
+        note: parsed.data.note ?? obligation.note,
+      },
     });
 
     await writeAuditLog({
@@ -297,38 +344,62 @@ paymentObligationRouter.post(
       payload: {
         registrationId: updated.registrationId,
         noticeRef: updated.noticeRef,
-        legalBasisCode: updated.legalBasisCode
-      }
+        legalBasisCode: updated.legalBasisCode,
+      },
     });
 
-    return ok(res, toPaymentObligationItem(updated), "Đã tạo thông báo/QR test");
-  })
+    return ok(
+      res,
+      toPaymentObligationItem(updated),
+      "Đã tạo thông báo/QR test",
+    );
+  }),
 );
 
 paymentObligationRouter.post(
   "/:id/mock-confirm",
-  requireRoles(["CITIZEN", "BUSINESS", "TAX_OFFICER", "LAND_REGISTRY_OFFICER", "ADMIN"]),
+  requireRoles([
+    "CITIZEN",
+    "BUSINESS",
+    "TAX_OFFICER",
+    "LAND_REGISTRY_OFFICER",
+    "ADMIN",
+  ]),
   asyncHandler(async (req, res) => {
     const parsed = mockConfirmSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
 
     const actor = (req as AuthenticatedRequest).user;
     const obligation = await findObligationOrThrow(String(req.params.id));
-    if (isCitizenRole(actor.role) && obligation.registration.applicantId !== actor.userId) {
-      throw forbiddenError("OWNERSHIP_DENIED: Bạn không có quyền nộp biên nhận cho nghĩa vụ này");
+    if (
+      isCitizenRole(actor.role) &&
+      obligation.registration.applicantId !== actor.userId
+    ) {
+      throw forbiddenError(
+        "OWNERSHIP_DENIED: Bạn không có quyền nộp biên nhận cho nghĩa vụ này",
+      );
     }
 
     if (!isCitizenRole(actor.role)) {
-      await ensureProcedureAuthority(obligation.registration.procedureCode, actor.role);
+      await ensureProcedureAuthority(
+        obligation.registration.procedureCode,
+        actor.role,
+      );
     }
 
     if (parsed.data.receiptFileId) {
       const receiptFile = await prisma.fileAsset.findUnique({
         where: { id: parsed.data.receiptFileId },
-        select: { id: true, registrationId: true }
+        select: { id: true, registrationId: true },
       });
-      if (!receiptFile || receiptFile.registrationId !== obligation.registrationId) {
-        throw badRequestError("receiptFileId không thuộc hồ sơ đăng ký liên quan");
+      if (
+        !receiptFile ||
+        receiptFile.registrationId !== obligation.registrationId
+      ) {
+        throw badRequestError(
+          "receiptFileId không thuộc hồ sơ đăng ký liên quan",
+        );
       }
     }
 
@@ -339,8 +410,8 @@ paymentObligationRouter.post(
         receiptRef: parsed.data.receiptRef ?? obligation.receiptRef,
         receiptFileId: parsed.data.receiptFileId ?? obligation.receiptFileId,
         receiptSubmittedAt: new Date(),
-        note: parsed.data.note ?? obligation.note
-      }
+        note: parsed.data.note ?? obligation.note,
+      },
     });
 
     await writeAuditLog({
@@ -352,12 +423,16 @@ paymentObligationRouter.post(
         registrationId: updated.registrationId,
         receiptRef: updated.receiptRef,
         receiptFileId: updated.receiptFileId,
-        legalBasisCode: updated.legalBasisCode
-      }
+        legalBasisCode: updated.legalBasisCode,
+      },
     });
 
-    return ok(res, toPaymentObligationItem(updated), "Đã ghi nhận biên nhận nghĩa vụ tài chính");
-  })
+    return ok(
+      res,
+      toPaymentObligationItem(updated),
+      "Đã ghi nhận biên nhận nghĩa vụ tài chính",
+    );
+  }),
 );
 
 paymentObligationRouter.post(
@@ -365,16 +440,24 @@ paymentObligationRouter.post(
   requireRoles(["TAX_OFFICER", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = verifyReceiptSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
     const actor = (req as AuthenticatedRequest).user;
     const obligation = await findObligationOrThrow(String(req.params.id));
-    await ensureProcedureAuthority(obligation.registration.procedureCode, actor.role);
+    await ensureProcedureAuthority(
+      obligation.registration.procedureCode,
+      actor.role,
+    );
 
     if (!obligation.receiptRef && !obligation.receiptFileId) {
-      throw conflictError("Không thể xác minh khi chưa có biên nhận nghĩa vụ tài chính");
+      throw conflictError(
+        "Không thể xác minh khi chưa có biên nhận nghĩa vụ tài chính",
+      );
     }
 
-    const nextStatus: PaymentObligationStatus = parsed.data.verified ? "CONFIRMED" : "CANCELLED";
+    const nextStatus: PaymentObligationStatus = parsed.data.verified
+      ? "CONFIRMED"
+      : "CANCELLED";
     const updated = await prisma.registrationPaymentObligation.update({
       where: { id: obligation.id },
       data: {
@@ -383,8 +466,10 @@ paymentObligationRouter.post(
         verifiedById: actor.userId,
         verifiedAt: new Date(),
         verifyNote: parsed.data.verifyNote ?? null,
-        ...(nextStatus === "CONFIRMED" ? { confirmedById: actor.userId, confirmedAt: new Date() } : {})
-      }
+        ...(nextStatus === "CONFIRMED"
+          ? { confirmedById: actor.userId, confirmedAt: new Date() }
+          : {}),
+      },
     });
 
     await writeAuditLog({
@@ -395,8 +480,8 @@ paymentObligationRouter.post(
       payload: {
         registrationId: updated.registrationId,
         status: updated.status,
-        legalBasisCode: updated.legalBasisCode
-      }
+        legalBasisCode: updated.legalBasisCode,
+      },
     });
 
     if (nextStatus === "CONFIRMED") {
@@ -404,12 +489,16 @@ paymentObligationRouter.post(
         updated.registrationId,
         actor,
         parsed.data.legalBasisCode,
-        parsed.data.verifyNote ?? "Đã hoàn thành nghĩa vụ tài chính"
+        parsed.data.verifyNote ?? "Đã hoàn thành nghĩa vụ tài chính",
       );
     }
 
-    return ok(res, toPaymentObligationItem(updated), "Đã xác minh biên nhận nghĩa vụ tài chính");
-  })
+    return ok(
+      res,
+      toPaymentObligationItem(updated),
+      "Đã xác minh biên nhận nghĩa vụ tài chính",
+    );
+  }),
 );
 
 paymentObligationRouter.post(
@@ -417,13 +506,19 @@ paymentObligationRouter.post(
   requireRoles(["LAND_REGISTRY_OFFICER", "APPROVAL_AUTHORITY", "ADMIN"]),
   asyncHandler(async (req, res) => {
     const parsed = recordOnChainSchema.safeParse(req.body ?? {});
-    if (!parsed.success) throw badRequestError("Validation error", parsed.error.issues);
+    if (!parsed.success)
+      throw badRequestError("Validation error", parsed.error.issues);
     const actor = (req as AuthenticatedRequest).user;
     const obligation = await findObligationOrThrow(String(req.params.id));
-    await ensureProcedureAuthority(obligation.registration.procedureCode, actor.role);
+    await ensureProcedureAuthority(
+      obligation.registration.procedureCode,
+      actor.role,
+    );
 
     if (obligation.status !== "CONFIRMED") {
-      throw conflictError("Chỉ được ghi nhận on-chain khi nghĩa vụ tài chính đã xác nhận");
+      throw conflictError(
+        "Chỉ được ghi nhận on-chain khi nghĩa vụ tài chính đã xác nhận",
+      );
     }
 
     const updated = await prisma.registrationPaymentObligation.update({
@@ -434,8 +529,8 @@ paymentObligationRouter.post(
         evidenceCid: parsed.data.evidenceCid ?? null,
         evidenceHash: parsed.data.evidenceHash ?? null,
         evidenceRecordedAt: new Date(),
-        note: parsed.data.note ?? obligation.note
-      }
+        note: parsed.data.note ?? obligation.note,
+      },
     });
 
     await writeAuditLog({
@@ -448,10 +543,14 @@ paymentObligationRouter.post(
         evidenceTxHash: updated.evidenceTxHash,
         evidenceCid: updated.evidenceCid,
         evidenceHash: updated.evidenceHash,
-        legalBasisCode: updated.legalBasisCode
-      }
+        legalBasisCode: updated.legalBasisCode,
+      },
     });
 
-    return ok(res, toPaymentObligationItem(updated), "Đã ghi nhận bằng chứng on-chain cho nghĩa vụ tài chính");
-  })
+    return ok(
+      res,
+      toPaymentObligationItem(updated),
+      "Đã ghi nhận bằng chứng on-chain cho nghĩa vụ tài chính",
+    );
+  }),
 );
