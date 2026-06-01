@@ -18,6 +18,7 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --shadow-soft: 0 2px 12px rgba(39, 34, 29, 0.06);
+  --shadow-card: 0 8px 22px rgba(39, 34, 29, 0.08);
   font-family: "Public Sans", Inter, "Segoe UI", system-ui, sans-serif;
 }
 
@@ -49,13 +50,14 @@ p {
 }
 
 .app-sidebar {
-  background: #1f1a14;
+  background: linear-gradient(180deg, #1f1a14 0%, #241d16 100%);
   color: #f7f2eb;
   padding: 20px 16px;
   display: grid;
   align-content: start;
   gap: 20px;
   border-right: 1px solid #2e261f;
+  box-shadow: inset -1px 0 0 #2e261f;
 }
 
 .brand-block h1 {
@@ -82,12 +84,13 @@ p {
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
 
 .sidebar-nav a:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.08);
+  transform: translateX(2px);
 }
 
 .sidebar-nav a.active {
@@ -110,6 +113,7 @@ p {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
+  box-shadow: 0 1px 0 rgba(39, 34, 29, 0.03);
 }
 
 .topbar-title {
@@ -125,6 +129,19 @@ p {
 .topbar-title span {
   font-size: 13px;
   color: var(--color-text-muted);
+}
+
+.topbar-role-badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  border: 1px solid #dbc8ae;
+  background: #f8efe2;
+  color: #744700;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 600;
+  line-height: 1.1;
 }
 
 .topbar-actions {
@@ -143,6 +160,8 @@ p {
   display: grid;
   gap: 16px;
   align-content: start;
+  width: min(1320px, 100%);
+  margin: 0 auto;
 }
 
 .guest-shell {
@@ -159,6 +178,12 @@ p {
   border: 1px solid var(--color-border);
   padding: 16px;
   box-shadow: var(--shadow-soft);
+  transition: box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-card);
+  border-color: #d2c7b7;
 }
 
 .section-header {
@@ -250,6 +275,7 @@ textarea {
   padding: 9px 10px;
   color: var(--color-text);
   background: #fff;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 input:focus,
@@ -269,15 +295,20 @@ button {
   background: var(--color-brand);
   color: #fff;
   font-weight: 600;
+  transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
 }
 
 button:hover {
   background: var(--color-brand-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(127, 0, 9, 0.2);
 }
 
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .btn-link {
@@ -480,6 +511,10 @@ button:disabled {
   border-bottom: 1px solid var(--color-border);
   font-size: 14px;
   vertical-align: top;
+}
+
+.data-table tbody tr:hover {
+  background: #fdfaf5;
 }
 
 .data-table th {
